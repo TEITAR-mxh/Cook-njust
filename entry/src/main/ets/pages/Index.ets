@@ -233,8 +233,12 @@ struct Index {
       .width('100%')
       .height(52)
       .backgroundColor('#F5F5F5')
+      // 延伸到底部系统安全区（手势条区域），避免底栏与屏幕底边之间露出一截背景缝
+      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
     }
     .width('100%')
     .height('100%')
+    // 根容器一并延伸到底部，避免子组件裁剪导致底栏仍被整体上推
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
   }
 }

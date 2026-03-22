@@ -33,6 +33,7 @@ export class CookPreferences {
   private static store: preferences.Preferences | null = null;
   private static opening: Promise<preferences.Preferences> | null = null;
   private static readonly HISTORY_MAX: number = 50;
+  private static readonly FAVORITE_MAX: number = 500;
 
   private static async getStore(context: common.Context): Promise<preferences.Preferences> {
     if (CookPreferences.store !== null) {
@@ -102,11 +103,12 @@ export class CookPreferences {
     await p.put(CookPreferenceKeys.TOOL, '');
     await p.put(CookPreferenceKeys.MODE, 'loose');
     await p.put(CookPreferenceKeys.HISTORY, '[]');
+    await p.put(CookPreferenceKeys.FAVORITES, '[]');
     await p.flush();
   }
 
-  /** 浏览历史：菜谱 id 数组，下标 0 为最近访问（与 Web Dexie id 一致） */
-  private static parseHistoryIds(raw: string): number[] {
+  /** 历史 / 收藏：JSON number[]，非负整数 id */
+  private static parseRecipeIdArray(raw: string): number[] {
     if (raw.length === 0) {
       return [];
     }
@@ -131,7 +133,58 @@ export class CookPreferences {
   static async getHistoryIds(context: common.Context): Promise<number[]> {
     const p = await CookPreferences.getStore(context);
     const raw = CookPreferences.getSettingsString(await p.get(CookPreferenceKeys.HISTORY, ''));
-    return CookPreferences.parseHistoryIds(raw);
+    return CookPreferences.parseRecipeIdArray(raw);
+  }
+
+  static async getFavoriteIds(context: common.Context): Promise<number[]> {
+    const p = await CookPreferences.getStore(context);
+    const raw = CookPreferences.getSettingsString(await p.get(CookPreferenceKeys.FAVORITES, ''));
+    return CookPreferences.parseRecipeIdArray(raw);
+  }
+
+  static async setFavoriteIds(context: common.Context, ids: number[]): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.FAVORITES, JSON.stringify(ids));
+    await p.flush();
+  }
+
+  /** 已收藏则取消，否则插到队首；最多 FAVORITE_MAX 条 */
+  static async toggleFavoriteId(context: common.Context, recipeId: number): Promise<void> {
+    if (recipeId < 0 || Math.floor(recipeId) !== recipeId) {
+      return;
+    }
+    const prev = await CookPreferences.getFavoriteIds(context);
+    const rest: number[] = [];
+    let had = false;
+    for (let i = 0; i < prev.length; i++) {
+      if (prev[i] === recipeId) {
+        had = true;
+      } else {
+        rest.push(prev[i]);
+      }
+    }
+    let next: number[];
+    if (had) {
+      next = rest;
+    } else {
+      const withNew: number[] = [recipeId];
+      for (let j = 0; j < rest.length; j++) {
+        withNew.push(rest[j]);
+      }
+      next = withNew;
+    }
+    const capped: number[] = [];
+    const max = CookPreferences.FAVORITE_MAX;
+    for (let k = 0; k < next.length && k < max; k++) {
+      capped.push(next[k]);
+    }
+    await CookPreferences.setFavoriteIds(context, capped);
+  }
+
+  static async clearFavorites(context: common.Context): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.FAVORITES, '[]');
+    await p.flush();
   }
 
   static async clearHistory(context: common.Context): Promise<void> {
@@ -147,7 +200,7 @@ export class CookPreferences {
     }
     const p = await CookPreferences.getStore(context);
     const raw = CookPreferences.getSettingsString(await p.get(CookPreferenceKeys.HISTORY, ''));
-    const prev = CookPreferences.parseHistoryIds(raw);
+    const prev = CookPreferences.parseRecipeIdArray(raw);
     const next: number[] = [];
     next.push(recipeId);
     for (let i = 0; i < prev.length; i++) {

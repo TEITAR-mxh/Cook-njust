@@ -32,6 +32,8 @@ struct Index {
   @State discoverNoVideoHint: string = ''
   /** 浏览历史：id 从新到旧，与 Preferences 一致 */
   @State historyIds: number[] = []
+  /** 收藏：id 顺序为最近收藏在前 */
+  @State favoriteIds: number[] = []
 
   aboutToAppear(): void {
     void this.bootstrapData();
@@ -71,6 +73,68 @@ struct Index {
     this.runSearch();
     this.runLibrarySearch();
     await this.refreshHistory();
+    await this.refreshFavorites();
+  }
+
+  private isRecipeFavorite(recipeId: number): boolean {
+    for (let i = 0; i < this.favoriteIds.length; i++) {
+      if (this.favoriteIds[i] === recipeId) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** 从 Preferences 同步收藏 id，并剔除当前菜谱库里不存在的 id */
+  private async refreshFavorites(): Promise<void> {
+    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    if (host === undefined) {
+      return;
+    }
+    if (!this.keepLocalData) {
+      this.favoriteIds = [];
+      return;
+    }
+    try {
+      const raw = await CookPreferences.getFavoriteIds(host);
+      const n = RecipeRepository.getInstance().getCount();
+      const next: number[] = [];
+      for (let i = 0; i < raw.length; i++) {
+        const id = raw[i];
+        if (id >= 0 && id < n) {
+          next.push(id);
+        }
+      }
+      this.favoriteIds = next;
+    } catch {
+      console.error('refreshFavorites failed');
+    }
+  }
+
+  private onTapFavorite(recipeId: number): void {
+    if (!this.keepLocalData) {
+      return;
+    }
+    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    if (host === undefined) {
+      return;
+    }
+    void CookPreferences.toggleFavoriteId(host, recipeId).then(() => {
+      void this.refreshFavorites();
+    });
+  }
+
+  private async clearFavoritesList(): Promise<void> {
+    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    if (host === undefined) {
+      return;
+    }
+    try {
+      await CookPreferences.clearFavorites(host);
+      this.favoriteIds = [];
+    } catch {
+      console.error('clearFavoritesList failed');
+    }
   }
 
   /** 从 Preferences 同步历史 id，并剔除当前菜谱库里不存在的 id */
@@ -321,6 +385,14 @@ struct Index {
     return this.recipeVideoUri(item) !== null;
   }
 
+  private recipeRowClickableFromId(recipeId: number): boolean {
+    const r = RecipeRepository.getInstance().getById(recipeId);
+    if (r === null) {
+      return false;
+    }
+    return this.recipeVideoUri(r) !== null;
+  }
+
   private async persistCookIfNeeded(): Promise<void> {
     if (!this.keepLocalData) {
       return;
@@ -389,11 +461,13 @@ struct Index {
       if (!isOn) {
         await CookPreferences.clearCookPersisted(host);
         this.historyIds = [];
+        this.favoriteIds = [];
       } else {
         this.selectedStuff = await CookPreferences.getSelectedStuff(host);
         this.curTool = await CookPreferences.getCurTool(host);
         this.searchMode = await CookPreferences.getSearchMode(host);
         await this.refreshHistory();
+        await this.refreshFavorites();
       }
       this.runSearch();
     } catch {
@@ -425,21 +499,37 @@ struct Index {
   @Builder
   recipeHitRow(item: RecipeWithId) {
     Row() {
-      Text(item.name)
-        .fontSize(15)
-        .layoutWeight(1)
-        .maxLines(2)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .fontColor(this.recipeRowClickable(item) ? '#18A058' : Color.Black)
-      Text((item.difficulty !== undefined && item.difficulty.length > 0) ? item.difficulty : ' ')
-        .fontSize(12)
-        .fontColor('#888888')
-        .width(40)
-      if (this.recipeRowClickable(item)) {
-        Text('›')
-          .fontSize(18)
-          .fontColor('#CCCCCC')
-          .padding({ left: 4 })
+      Row() {
+        Text(item.name)
+          .fontSize(15)
+          .layoutWeight(1)
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .fontColor(this.recipeRowClickable(item) ? '#18A058' : Color.Black)
+        Text((item.difficulty !== undefined && item.difficulty.length > 0) ? item.difficulty : ' ')
+          .fontSize(12)
+          .fontColor('#888888')
+          .width(40)
+        if (this.recipeRowClickable(item)) {
+          Text('›')
+            .fontSize(18)
+            .fontColor('#CCCCCC')
+            .padding({ left: 4 })
+        }
+      }
+      .layoutWeight(1)
+      .onClick(() => {
+        this.openRecipeVideo(item);
+      })
+
+      if (this.keepLocalData) {
+        Text(this.isRecipeFavorite(item.id) ? '★' : '☆')
+          .fontSize(22)
+          .fontColor(this.isRecipeFavorite(item.id) ? '#FFB020' : '#CCCCCC')
+          .padding({ left: 8, right: 4 })
+          .onClick(() => {
+            this.onTapFavorite(item.id);
+          })
       }
     }
     .width('100%')
@@ -447,9 +537,6 @@ struct Index {
     .backgroundColor('#F9F9F9')
     .borderRadius(8)
     .margin({ bottom: 8 })
-    .onClick(() => {
-      this.openRecipeVideo(item);
-    })
   }
 
   /**
@@ -459,22 +546,38 @@ struct Index {
   @Builder
   discoverPickHitRow() {
     Row() {
-      Text(this.discoverPick.name)
-        .fontSize(15)
-        .layoutWeight(1)
-        .maxLines(2)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .fontColor(this.recipeRowClickable(this.discoverPick) ? '#18A058' : Color.Black)
-      Text((this.discoverPick.difficulty !== undefined && this.discoverPick.difficulty.length > 0) ?
-        this.discoverPick.difficulty : ' ')
-        .fontSize(12)
-        .fontColor('#888888')
-        .width(40)
-      if (this.recipeRowClickable(this.discoverPick)) {
-        Text('›')
-          .fontSize(18)
-          .fontColor('#CCCCCC')
-          .padding({ left: 4 })
+      Row() {
+        Text(this.discoverPick.name)
+          .fontSize(15)
+          .layoutWeight(1)
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .fontColor(this.recipeRowClickable(this.discoverPick) ? '#18A058' : Color.Black)
+        Text((this.discoverPick.difficulty !== undefined && this.discoverPick.difficulty.length > 0) ?
+          this.discoverPick.difficulty : ' ')
+          .fontSize(12)
+          .fontColor('#888888')
+          .width(40)
+        if (this.recipeRowClickable(this.discoverPick)) {
+          Text('›')
+            .fontSize(18)
+            .fontColor('#CCCCCC')
+            .padding({ left: 4 })
+        }
+      }
+      .layoutWeight(1)
+      .onClick(() => {
+        this.openRecipeVideo(this.discoverPick);
+      })
+
+      if (this.keepLocalData && this.discoverPick.id >= 0) {
+        Text(this.isRecipeFavorite(this.discoverPick.id) ? '★' : '☆')
+          .fontSize(22)
+          .fontColor(this.isRecipeFavorite(this.discoverPick.id) ? '#FFB020' : '#CCCCCC')
+          .padding({ left: 8, right: 4 })
+          .onClick(() => {
+            this.onTapFavorite(this.discoverPick.id);
+          })
       }
     }
     .width('100%')
@@ -482,9 +585,6 @@ struct Index {
     .backgroundColor('#F9F9F9')
     .borderRadius(8)
     .margin({ bottom: 8 })
-    .onClick(() => {
-      this.openRecipeVideo(this.discoverPick);
-    })
   }
 
   private historyRowTitle(recipeId: number): string {
@@ -498,28 +598,83 @@ struct Index {
   @Builder
   historyListRow(recipeId: number) {
     Row() {
-      Text(this.historyRowTitle(recipeId))
-        .fontSize(15)
-        .layoutWeight(1)
-        .maxLines(2)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .fontColor(Color.Black)
-      Text('›')
-        .fontSize(18)
-        .fontColor('#CCCCCC')
-        .padding({ left: 4 })
+      Row() {
+        Text(this.historyRowTitle(recipeId))
+          .fontSize(15)
+          .layoutWeight(1)
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .fontColor(Color.Black)
+        Text('›')
+          .fontSize(18)
+          .fontColor('#CCCCCC')
+          .padding({ left: 4 })
+      }
+      .layoutWeight(1)
+      .onClick(() => {
+        const r = RecipeRepository.getInstance().getById(recipeId);
+        if (r !== null) {
+          this.openRecipeVideo(r);
+        }
+      })
+
+      if (this.keepLocalData) {
+        Text(this.isRecipeFavorite(recipeId) ? '★' : '☆')
+          .fontSize(22)
+          .fontColor(this.isRecipeFavorite(recipeId) ? '#FFB020' : '#CCCCCC')
+          .padding({ left: 8, right: 4 })
+          .onClick(() => {
+            this.onTapFavorite(recipeId);
+          })
+      }
     }
     .width('100%')
     .padding(12)
     .backgroundColor('#F9F9F9')
     .borderRadius(8)
     .margin({ bottom: 8 })
-    .onClick(() => {
-      const r = RecipeRepository.getInstance().getById(recipeId);
-      if (r !== null) {
-        this.openRecipeVideo(r);
+  }
+
+  @Builder
+  favoriteListRow(recipeId: number) {
+    Row() {
+      Row() {
+        Text(this.historyRowTitle(recipeId))
+          .fontSize(15)
+          .layoutWeight(1)
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .fontColor(this.recipeRowClickableFromId(recipeId) ? '#18A058' : Color.Black)
+        if (this.recipeRowClickableFromId(recipeId)) {
+          Text('›')
+            .fontSize(18)
+            .fontColor('#CCCCCC')
+            .padding({ left: 4 })
+        }
       }
-    })
+      .layoutWeight(1)
+      .onClick(() => {
+        const r = RecipeRepository.getInstance().getById(recipeId);
+        if (r !== null) {
+          this.openRecipeVideo(r);
+        }
+      })
+
+      if (this.keepLocalData) {
+        Text('★')
+          .fontSize(22)
+          .fontColor('#FFB020')
+          .padding({ left: 8, right: 4 })
+          .onClick(() => {
+            this.onTapFavorite(recipeId);
+          })
+      }
+    }
+    .width('100%')
+    .padding(12)
+    .backgroundColor('#F9F9F9')
+    .borderRadius(8)
+    .margin({ bottom: 8 })
   }
 
   @Builder
@@ -867,7 +1022,40 @@ struct Index {
             }, (recipeId: number) => `h-${recipeId}`)
           }
 
-          Text('收藏、关于（开发中）')
+          Row() {
+            Text('我的收藏')
+              .fontSize(16)
+              .fontWeight(FontWeight.Medium)
+              .layoutWeight(1)
+            if (this.keepLocalData && this.favoriteIds.length > 0) {
+              Text('清空')
+                .fontSize(14)
+                .fontColor('#18A058')
+                .onClick(() => {
+                  void this.clearFavoritesList();
+                })
+            }
+          }
+          .width('100%')
+          .margin({ top: 8 })
+
+          if (!this.keepLocalData) {
+            Text('开启「保留本地数据」后可使用收藏')
+              .fontSize(13)
+              .fontColor('#888888')
+              .alignSelf(ItemAlign.Start)
+          } else if (this.favoriteIds.length === 0) {
+            Text('暂无收藏，在列表右侧点 ☆ 添加')
+              .fontSize(14)
+              .fontColor('#888888')
+              .alignSelf(ItemAlign.Start)
+          } else {
+            ForEach(this.favoriteIds, (recipeId: number) => {
+              this.favoriteListRow(recipeId);
+            }, (recipeId: number) => `f-${recipeId}`)
+          }
+
+          Text('关于（开发中）')
             .fontSize(14)
             .fontColor('#888888')
             .alignSelf(ItemAlign.Start)
@@ -954,6 +1142,7 @@ struct Index {
         .onClick(() => {
           this.mainTabIndex = 3;
           void this.refreshHistory();
+          void this.refreshFavorites();
         })
       }
       .width('100%')

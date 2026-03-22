@@ -27,6 +27,9 @@ struct Index {
   @State searchHits: RecipeWithId[] = []
   @State libraryKeyword: string = ''
   @State libraryHits: RecipeWithId[] = []
+  /** 发现 Tab：随机选中的菜谱；id 为 -1 表示未选 */
+  @State discoverPick: RecipeWithId = { id: -1, name: '', stuff: [], tools: [] }
+  @State discoverNoVideoHint: string = ''
 
   aboutToAppear(): void {
     void this.bootstrapData();
@@ -75,6 +78,35 @@ struct Index {
   private runLibrarySearch(): void {
     const all = RecipeRepository.getInstance().getAll();
     this.libraryHits = RecipeSearchService.filterLibraryByName(all, this.libraryKeyword);
+  }
+
+  private emptyDiscoverPick(): RecipeWithId {
+    const r: RecipeWithId = { id: -1, name: '', stuff: [], tools: [] };
+    return r;
+  }
+
+  /** 从全库中随机选一道「可打开视频」的菜谱 */
+  private pickRandomDiscover(): void {
+    const all = RecipeRepository.getInstance().getAll();
+    const candidates: RecipeWithId[] = [];
+    for (let i = 0; i < all.length; i++) {
+      const it = all[i];
+      if (this.recipeVideoUri(it) !== null) {
+        candidates.push(it);
+      }
+    }
+    if (candidates.length === 0) {
+      this.discoverPick = this.emptyDiscoverPick();
+      if (all.length > 0) {
+        this.discoverNoVideoHint = '暂无可打开视频的菜谱';
+      } else {
+        this.discoverNoVideoHint = '';
+      }
+      return;
+    }
+    this.discoverNoVideoHint = '';
+    const idx = Math.floor(Math.random() * candidates.length);
+    this.discoverPick = candidates[idx];
   }
 
   /** 与 Web 一致：优先 link，否则 bilibili.com/video/{bv} */
@@ -504,18 +536,99 @@ struct Index {
   @Builder
   buildDiscoverTab() {
     Column() {
-      Text('发现')
-        .fontSize(20)
-        .fontWeight(FontWeight.Medium)
-        .margin({ bottom: 12 })
-      Text('今天吃什么等入口（开发中）')
-        .fontSize(14)
-        .fontColor('#888888')
+      Scroll() {
+        Column({ space: 12 }) {
+          Text('发现')
+            .fontSize(20)
+            .fontWeight(FontWeight.Medium)
+            .alignSelf(ItemAlign.Start)
+
+          Text('不知道吃什么？随机从全库挑一道能看视频的。')
+            .fontSize(14)
+            .fontColor('#888888')
+            .alignSelf(ItemAlign.Start)
+
+          if (this.errHint.length > 0) {
+            Text(this.errHint)
+              .fontSize(12)
+              .fontColor(Color.Red)
+              .alignSelf(ItemAlign.Start)
+          }
+
+          Row({ space: 12 }) {
+            Text('随机一道')
+              .fontSize(15)
+              .fontColor(Color.White)
+              .padding({ left: 20, right: 20, top: 10, bottom: 10 })
+              .backgroundColor('#18A058')
+              .borderRadius(8)
+              .onClick(() => {
+                this.pickRandomDiscover();
+              })
+
+            if (this.discoverPick.id >= 0) {
+              Text('换一道')
+                .fontSize(15)
+                .fontColor('#18A058')
+                .padding({ left: 20, right: 20, top: 10, bottom: 10 })
+                .backgroundColor('#E8F5E9')
+                .borderRadius(8)
+                .onClick(() => {
+                  this.pickRandomDiscover();
+                })
+            }
+          }
+          .margin({ top: 8 })
+          .alignSelf(ItemAlign.Start)
+
+          if (this.discoverNoVideoHint.length > 0) {
+            Text(this.discoverNoVideoHint)
+              .fontSize(14)
+              .fontColor('#888888')
+              .alignSelf(ItemAlign.Start)
+              .margin({ top: 12 })
+          }
+
+          if (this.recipeCount === 0) {
+            Text('暂无菜谱数据')
+              .fontSize(14)
+              .fontColor('#888888')
+              .alignSelf(ItemAlign.Start)
+              .margin({ top: 16 })
+          } else if (this.discoverPick.id < 0) {
+            if (this.discoverNoVideoHint.length === 0) {
+              Text('点击「随机一道」开始')
+                .fontSize(14)
+                .fontColor('#888888')
+                .alignSelf(ItemAlign.Start)
+                .margin({ top: 16 })
+            }
+          } else {
+            Column({ space: 8 }) {
+              Text('今日推荐')
+                .fontSize(15)
+                .fontWeight(FontWeight.Medium)
+                .alignSelf(ItemAlign.Start)
+                .margin({ top: 8 })
+
+              this.recipeHitRow(this.discoverPick);
+            }
+            .width('100%')
+            .alignItems(HorizontalAlign.Start)
+          }
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+        .padding({ left: 16, right: 16, bottom: 24 })
+      }
+      .width('100%')
+      .layoutWeight(1)
+      .scrollBar(BarState.Auto)
+      .align(Alignment.TopStart)
     }
     .width('100%')
     .height('100%')
-    .justifyContent(FlexAlign.Center)
-    .alignItems(HorizontalAlign.Center)
+    .padding({ top: 8 })
   }
 
   @Builder

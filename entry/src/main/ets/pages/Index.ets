@@ -1,9 +1,16 @@
-import { common } from '@kit.AbilityKit';
+import { common, Want } from '@kit.AbilityKit';
+import { pasteboard } from '@kit.BasicServicesKit';
+import { promptAction } from '@kit.ArkUI';
 import { meatItems, stapleItems, toolItems, vegetableItems } from '../data/foodCatalog';
 import { RecipeRepository } from '../data/RecipeRepository';
 import type { RecipeWithId, SearchMode, StuffItem } from '../model/recipe';
 import { RecipeSearchService } from '../service/RecipeSearchService';
 import { CookPreferences } from '../store/CookPreferences';
+
+/** UIAbilityContext 上的 openLink 在类型声明里可能未体现，单独声明以符合 ArkTS（禁止交叉类型） */
+interface HostWithOpenLink {
+  openLink?: (url: string) => Promise<void>
+}
 
 @Entry
 @Component
@@ -60,6 +67,105 @@ struct Index {
   private runSearch(): void {
     const all = RecipeRepository.getInstance().getAll();
     this.searchHits = RecipeSearchService.search(all, this.selectedStuff, this.curTool, this.searchMode, this.keyword.trim());
+  }
+
+  /** 与 Web 一致：优先 link，否则 bilibili.com/video/{bv} */
+  private recipeVideoUri(item: RecipeWithId): string | null {
+    if (item.link !== undefined && item.link.trim().length > 0) {
+      return item.link.trim();
+    }
+    if (item.bv !== undefined && item.bv.trim().length > 0) {
+      const bv = item.bv.trim();
+      if (bv.startsWith('http://') || bv.startsWith('https://')) {
+        return bv;
+      }
+      return `https://www.bilibili.com/video/${bv}`;
+    }
+    return null;
+  }
+
+  /** 使用系统浏览器打开链接；模拟器上 startAbility 常无响应，会复制链接并 Toast */
+  private openRecipeVideo(item: RecipeWithId): void {
+    const uri = this.recipeVideoUri(item);
+    if (uri === null) {
+      return;
+    }
+    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    if (host === undefined) {
+      return;
+    }
+    void this.openExternalUri(host, uri);
+  }
+
+  private async openExternalUri(host: common.UIAbilityContext, uri: string): Promise<void> {
+    const withOpen = host as HostWithOpenLink;
+    if (withOpen.openLink !== undefined) {
+      try {
+        await withOpen.openLink(uri);
+        return;
+      } catch {
+        console.error('openExternalUri: openLink failed');
+      }
+    }
+
+    const wants: Want[] = [
+      {
+        action: 'ohos.want.action.viewData',
+        entities: ['entity.system.browsable'],
+        uri: uri,
+      },
+      {
+        action: 'ohos.want.action.view',
+        entities: ['entity.system.browsable'],
+        uri: uri,
+      },
+    ];
+
+    let opened = false;
+    for (const want of wants) {
+      try {
+        const ret = host.startAbility(want);
+        if (ret instanceof Promise) {
+          try {
+            await ret;
+            opened = true;
+            break;
+          } catch {
+            console.error('openExternalUri: startAbility rejected');
+          }
+        }
+      } catch {
+        console.error('openExternalUri: startAbility threw');
+      }
+    }
+
+    if (!opened) {
+      await this.copyUriAndToast(uri);
+    }
+  }
+
+  private async copyUriAndToast(uri: string): Promise<void> {
+    try {
+      const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, uri);
+      await pasteboard.getSystemPasteboard().setData(data);
+      await promptAction.showToast({
+        message: '链接已复制，可在浏览器粘贴打开',
+        duration: 2500,
+      });
+    } catch {
+      try {
+        await promptAction.showToast({
+          message: '无法打开外链，请使用真机或在浏览器手动打开',
+          duration: 2500,
+        });
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  private recipeRowClickable(item: RecipeWithId): boolean {
+    return this.recipeVideoUri(item) !== null;
   }
 
   private async persistCookIfNeeded(): Promise<void> {
@@ -281,16 +387,26 @@ struct Index {
                 .layoutWeight(1)
                 .maxLines(2)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .fontColor(this.recipeRowClickable(item) ? '#18A058' : Color.Black)
               Text((item.difficulty !== undefined && item.difficulty.length > 0) ? item.difficulty : ' ')
                 .fontSize(12)
                 .fontColor('#888888')
                 .width(40)
+              if (this.recipeRowClickable(item)) {
+                Text('›')
+                  .fontSize(18)
+                  .fontColor('#CCCCCC')
+                  .padding({ left: 4 })
+              }
             }
             .width('100%')
             .padding(12)
             .backgroundColor('#F9F9F9')
             .borderRadius(8)
             .margin({ bottom: 8 })
+            .onClick(() => {
+              this.openRecipeVideo(item);
+            })
           }, (item: RecipeWithId) => item.id.toString())
         }
         .width('100%')

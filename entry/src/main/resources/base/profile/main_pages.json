@@ -1,5 +1,6 @@
 {
   "src": [
+    "pages/IndexV2",
     "pages/Index",
     "pages/HistoryPage",
     "pages/FavoritesPage"

@@ -1,16 +1,12 @@
-import { common, Want } from '@kit.AbilityKit';
-import { pasteboard } from '@kit.BasicServicesKit';
-import { promptAction } from '@kit.ArkUI';
+import { common } from '@kit.AbilityKit';
+import { router } from '@kit.ArkUI';
 import { meatItems, stapleItems, toolItems, vegetableItems } from '../data/foodCatalog';
 import { RecipeRepository } from '../data/RecipeRepository';
 import type { RecipeWithId, SearchMode, StuffItem } from '../model/recipe';
 import { RecipeSearchService } from '../service/RecipeSearchService';
+import { RecipeVideoLauncher } from '../service/RecipeVideoLauncher';
 import { CookPreferences } from '../store/CookPreferences';
-
-/** UIAbilityContext 上的 openLink 在类型声明里可能未体现，单独声明以符合 ArkTS（禁止交叉类型） */
-interface HostWithOpenLink {
-  openLink?: (url: string) => Promise<void>
-}
+import { getSystemSafeTopVp } from '../util/StatusBarInset';
 
 @Entry
 @Component
@@ -34,9 +30,28 @@ struct Index {
   @State historyIds: number[] = []
   /** 收藏：id 顺序为最近收藏在前 */
   @State favoriteIds: number[] = []
+  /** 主界面顶栏：状态栏/挖孔下内边距（vp） */
+  @State mainNavTopInsetVp: number = 48
 
   aboutToAppear(): void {
     void this.bootstrapData();
+    const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    if (ctx !== undefined) {
+      void getSystemSafeTopVp(ctx).then((vp: number) => {
+        this.mainNavTopInsetVp = vp;
+      });
+    }
+  }
+
+  onPageShow(): void {
+    void this.refreshHistory();
+    void this.refreshFavorites();
+    const ctx2 = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    if (ctx2 !== undefined) {
+      void getSystemSafeTopVp(ctx2).then((vp: number) => {
+        this.mainNavTopInsetVp = vp;
+      });
+    }
   }
 
   private async bootstrapData(): Promise<void> {
@@ -45,6 +60,11 @@ struct Index {
       this.status = '加载失败';
       this.errHint = '无法获取 UIAbility 上下文';
       return;
+    }
+    try {
+      this.mainNavTopInsetVp = await getSystemSafeTopVp(host);
+    } catch {
+      // 保持默认 mainNavTopInsetVp
     }
     try {
       await RecipeRepository.getInstance().load(host);
@@ -124,19 +144,6 @@ struct Index {
     });
   }
 
-  private async clearFavoritesList(): Promise<void> {
-    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
-    if (host === undefined) {
-      return;
-    }
-    try {
-      await CookPreferences.clearFavorites(host);
-      this.favoriteIds = [];
-    } catch {
-      console.error('clearFavoritesList failed');
-    }
-  }
-
   /** 从 Preferences 同步历史 id，并剔除当前菜谱库里不存在的 id */
   private async refreshHistory(): Promise<void> {
     const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
@@ -160,19 +167,6 @@ struct Index {
       this.historyIds = next;
     } catch {
       console.error('refreshHistory failed');
-    }
-  }
-
-  private async clearHistoryList(): Promise<void> {
-    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
-    if (host === undefined) {
-      return;
-    }
-    try {
-      await CookPreferences.clearHistory(host);
-      this.historyIds = [];
-    } catch {
-      console.error('clearHistoryList failed');
     }
   }
 
@@ -248,7 +242,7 @@ struct Index {
     const candidates: RecipeWithId[] = [];
     for (let i = 0; i < all.length; i++) {
       const it = all[i];
-      if (this.recipeVideoUri(it) !== null) {
+      if (RecipeVideoLauncher.recipeVideoUri(it) !== null) {
         candidates.push(it);
       }
     }
@@ -281,108 +275,18 @@ struct Index {
     this.discoverPick = this.cloneRecipeForDiscoverState(pool[idx]);
   }
 
-  /** 与 Web 一致：优先 link，否则 bilibili.com/video/{bv} */
-  private recipeVideoUri(item: RecipeWithId): string | null {
-    if (item.link !== undefined && item.link.trim().length > 0) {
-      return item.link.trim();
-    }
-    if (item.bv !== undefined && item.bv.trim().length > 0) {
-      const bv = item.bv.trim();
-      if (bv.startsWith('http://') || bv.startsWith('https://')) {
-        return bv;
-      }
-      return `https://www.bilibili.com/video/${bv}`;
-    }
-    return null;
-  }
-
-  /** 使用系统浏览器打开链接；模拟器上 startAbility 常无响应，会复制链接并 Toast */
   private openRecipeVideo(item: RecipeWithId): void {
-    const uri = this.recipeVideoUri(item);
-    if (uri === null) {
-      return;
-    }
     const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
     if (host === undefined) {
       return;
     }
-    if (this.keepLocalData) {
-      void CookPreferences.recordHistoryVisit(host, item.id).then(() => {
-        void this.refreshHistory();
-      });
-    }
-    void this.openExternalUri(host, uri);
-  }
-
-  private async openExternalUri(host: common.UIAbilityContext, uri: string): Promise<void> {
-    const withOpen = host as HostWithOpenLink;
-    if (withOpen.openLink !== undefined) {
-      try {
-        await withOpen.openLink(uri);
-        return;
-      } catch {
-        console.error('openExternalUri: openLink failed');
-      }
-    }
-
-    const wants: Want[] = [
-      {
-        action: 'ohos.want.action.viewData',
-        entities: ['entity.system.browsable'],
-        uri: uri,
-      },
-      {
-        action: 'ohos.want.action.view',
-        entities: ['entity.system.browsable'],
-        uri: uri,
-      },
-    ];
-
-    let opened = false;
-    for (const want of wants) {
-      try {
-        const ret = host.startAbility(want);
-        if (ret instanceof Promise) {
-          try {
-            await ret;
-            opened = true;
-            break;
-          } catch {
-            console.error('openExternalUri: startAbility rejected');
-          }
-        }
-      } catch {
-        console.error('openExternalUri: startAbility threw');
-      }
-    }
-
-    if (!opened) {
-      await this.copyUriAndToast(uri);
-    }
-  }
-
-  private async copyUriAndToast(uri: string): Promise<void> {
-    try {
-      const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, uri);
-      await pasteboard.getSystemPasteboard().setData(data);
-      await promptAction.showToast({
-        message: '链接已复制，可在浏览器粘贴打开',
-        duration: 2500,
-      });
-    } catch {
-      try {
-        await promptAction.showToast({
-          message: '无法打开外链，请使用真机或在浏览器手动打开',
-          duration: 2500,
-        });
-      } catch {
-        // ignore
-      }
-    }
+    RecipeVideoLauncher.open(host, item, this.keepLocalData, () => {
+      void this.refreshHistory();
+    });
   }
 
   private recipeRowClickable(item: RecipeWithId): boolean {
-    return this.recipeVideoUri(item) !== null;
+    return RecipeVideoLauncher.recipeVideoUri(item) !== null;
   }
 
   private recipeRowClickableFromId(recipeId: number): boolean {
@@ -390,7 +294,7 @@ struct Index {
     if (r === null) {
       return false;
     }
-    return this.recipeVideoUri(r) !== null;
+    return RecipeVideoLauncher.recipeVideoUri(r) !== null;
   }
 
   private async persistCookIfNeeded(): Promise<void> {
@@ -577,96 +481,6 @@ struct Index {
           .padding({ left: 8, right: 4 })
           .onClick(() => {
             this.onTapFavorite(this.discoverPick.id);
-          })
-      }
-    }
-    .width('100%')
-    .padding(12)
-    .backgroundColor('#F9F9F9')
-    .borderRadius(8)
-    .margin({ bottom: 8 })
-  }
-
-  private historyRowTitle(recipeId: number): string {
-    const r = RecipeRepository.getInstance().getById(recipeId);
-    if (r !== null) {
-      return r.name;
-    }
-    return '';
-  }
-
-  @Builder
-  historyListRow(recipeId: number) {
-    Row() {
-      Row() {
-        Text(this.historyRowTitle(recipeId))
-          .fontSize(15)
-          .layoutWeight(1)
-          .maxLines(2)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .fontColor(Color.Black)
-        Text('›')
-          .fontSize(18)
-          .fontColor('#CCCCCC')
-          .padding({ left: 4 })
-      }
-      .layoutWeight(1)
-      .onClick(() => {
-        const r = RecipeRepository.getInstance().getById(recipeId);
-        if (r !== null) {
-          this.openRecipeVideo(r);
-        }
-      })
-
-      if (this.keepLocalData) {
-        Text(this.isRecipeFavorite(recipeId) ? '★' : '☆')
-          .fontSize(22)
-          .fontColor(this.isRecipeFavorite(recipeId) ? '#FFB020' : '#CCCCCC')
-          .padding({ left: 8, right: 4 })
-          .onClick(() => {
-            this.onTapFavorite(recipeId);
-          })
-      }
-    }
-    .width('100%')
-    .padding(12)
-    .backgroundColor('#F9F9F9')
-    .borderRadius(8)
-    .margin({ bottom: 8 })
-  }
-
-  @Builder
-  favoriteListRow(recipeId: number) {
-    Row() {
-      Row() {
-        Text(this.historyRowTitle(recipeId))
-          .fontSize(15)
-          .layoutWeight(1)
-          .maxLines(2)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .fontColor(this.recipeRowClickableFromId(recipeId) ? '#18A058' : Color.Black)
-        if (this.recipeRowClickableFromId(recipeId)) {
-          Text('›')
-            .fontSize(18)
-            .fontColor('#CCCCCC')
-            .padding({ left: 4 })
-        }
-      }
-      .layoutWeight(1)
-      .onClick(() => {
-        const r = RecipeRepository.getInstance().getById(recipeId);
-        if (r !== null) {
-          this.openRecipeVideo(r);
-        }
-      })
-
-      if (this.keepLocalData) {
-        Text('★')
-          .fontSize(22)
-          .fontColor('#FFB020')
-          .padding({ left: 8, right: 4 })
-          .onClick(() => {
-            this.onTapFavorite(recipeId);
           })
       }
     }
@@ -990,70 +804,64 @@ struct Index {
           }
           .width('100%')
 
-          Row() {
-            Text('浏览历史')
-              .fontSize(16)
-              .fontWeight(FontWeight.Medium)
-              .layoutWeight(1)
-            if (this.keepLocalData && this.historyIds.length > 0) {
-              Text('清空')
-                .fontSize(14)
-                .fontColor('#18A058')
-                .onClick(() => {
-                  void this.clearHistoryList();
-                })
-            }
-          }
-          .width('100%')
-
-          if (!this.keepLocalData) {
-            Text('关闭「保留本地数据」时不记录历史')
-              .fontSize(13)
-              .fontColor('#888888')
-              .alignSelf(ItemAlign.Start)
-          } else if (this.historyIds.length === 0) {
-            Text('暂无浏览历史')
-              .fontSize(14)
-              .fontColor('#888888')
-              .alignSelf(ItemAlign.Start)
-          } else {
-            ForEach(this.historyIds, (recipeId: number) => {
-              this.historyListRow(recipeId);
-            }, (recipeId: number) => `h-${recipeId}`)
-          }
+          Text('数据')
+            .fontSize(15)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#666666')
+            .alignSelf(ItemAlign.Start)
+            .margin({ top: 4 })
 
           Row() {
-            Text('我的收藏')
-              .fontSize(16)
-              .fontWeight(FontWeight.Medium)
-              .layoutWeight(1)
-            if (this.keepLocalData && this.favoriteIds.length > 0) {
-              Text('清空')
-                .fontSize(14)
-                .fontColor('#18A058')
-                .onClick(() => {
-                  void this.clearFavoritesList();
-                })
+            Column({ space: 6 }) {
+              Text('浏览历史')
+                .fontSize(16)
+                .fontWeight(FontWeight.Medium)
+              Text(this.keepLocalData ? `共 ${this.historyIds.length} 条` : '关闭本地数据时不记录')
+                .fontSize(12)
+                .fontColor('#888888')
             }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+
+            Text('›')
+              .fontSize(22)
+              .fontColor('#CCCCCC')
           }
           .width('100%')
-          .margin({ top: 8 })
+          .padding(16)
+          .backgroundColor('#F9F9F9')
+          .borderRadius(10)
+          .onClick(() => {
+            router.pushUrl({ url: 'pages/HistoryPage' }).catch(() => {
+              console.error('router HistoryPage failed');
+            });
+          })
 
-          if (!this.keepLocalData) {
-            Text('开启「保留本地数据」后可使用收藏')
-              .fontSize(13)
-              .fontColor('#888888')
-              .alignSelf(ItemAlign.Start)
-          } else if (this.favoriteIds.length === 0) {
-            Text('暂无收藏，在列表右侧点 ☆ 添加')
-              .fontSize(14)
-              .fontColor('#888888')
-              .alignSelf(ItemAlign.Start)
-          } else {
-            ForEach(this.favoriteIds, (recipeId: number) => {
-              this.favoriteListRow(recipeId);
-            }, (recipeId: number) => `f-${recipeId}`)
+          Row() {
+            Column({ space: 6 }) {
+              Text('我的收藏')
+                .fontSize(16)
+                .fontWeight(FontWeight.Medium)
+              Text(this.keepLocalData ? `共 ${this.favoriteIds.length} 条` : '需开启本地数据')
+                .fontSize(12)
+                .fontColor('#888888')
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+
+            Text('›')
+              .fontSize(22)
+              .fontColor('#CCCCCC')
           }
+          .width('100%')
+          .padding(16)
+          .backgroundColor('#F9F9F9')
+          .borderRadius(10)
+          .onClick(() => {
+            router.pushUrl({ url: 'pages/FavoritesPage' }).catch(() => {
+              console.error('router FavoritesPage failed');
+            });
+          })
         }
         .width('100%')
         .alignItems(HorizontalAlign.Start)
@@ -1070,6 +878,28 @@ struct Index {
 
   build() {
     Column() {
+      Column() {
+        Row() {
+          Text('今天来做菜')
+            .fontSize(18)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(Color.Black)
+            .layoutWeight(1)
+            .maxLines(1)
+            .textAlign(TextAlign.Center)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+        .width('100%')
+        .height(48)
+        .justifyContent(FlexAlign.Center)
+        .alignItems(VerticalAlign.Center)
+      }
+      .width('100%')
+      .padding({ top: this.mainNavTopInsetVp })
+      .backgroundColor('#F5F5F5')
+      .borderWidth({ bottom: 1 })
+      .borderColor('#E8E8E8')
+
       Column() {
         if (this.mainTabIndex === 0) {
           this.buildCookTab();

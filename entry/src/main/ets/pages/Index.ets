@@ -85,6 +85,57 @@ struct Index {
     return r;
   }
 
+  /**
+   * 发现 Tab 写入 @State 必须用新对象引用，否则与仓库同一引用时「换一道」不触发刷新。
+   */
+  private cloneRecipeForDiscoverState(source: RecipeWithId): RecipeWithId {
+    const stuffCopy: string[] = [];
+    for (let i = 0; i < source.stuff.length; i++) {
+      stuffCopy.push(source.stuff[i]);
+    }
+    const toolsCopy: string[] = [];
+    for (let i = 0; i < source.tools.length; i++) {
+      toolsCopy.push(source.tools[i]);
+    }
+    const r: RecipeWithId = {
+      id: source.id,
+      name: source.name,
+      stuff: stuffCopy,
+      tools: toolsCopy,
+    };
+    if (source.link !== undefined) {
+      r.link = source.link;
+    }
+    if (source.bv !== undefined) {
+      r.bv = source.bv;
+    }
+    if (source.emojis !== undefined) {
+      const em: string[] = [];
+      for (let j = 0; j < source.emojis.length; j++) {
+        em.push(source.emojis[j]);
+      }
+      r.emojis = em;
+    }
+    if (source.difficulty !== undefined) {
+      r.difficulty = source.difficulty;
+    }
+    if (source.tags !== undefined) {
+      const tg: string[] = [];
+      for (let j = 0; j < source.tags.length; j++) {
+        tg.push(source.tags[j]);
+      }
+      r.tags = tg;
+    }
+    if (source.methods !== undefined) {
+      const mh: ('炒' | '煎' | '烘' | '炸')[] = [];
+      for (let j = 0; j < source.methods.length; j++) {
+        mh.push(source.methods[j]);
+      }
+      r.methods = mh;
+    }
+    return r;
+  }
+
   /** 从全库中随机选一道「可打开视频」的菜谱 */
   private pickRandomDiscover(): void {
     const all = RecipeRepository.getInstance().getAll();
@@ -105,8 +156,23 @@ struct Index {
       return;
     }
     this.discoverNoVideoHint = '';
-    const idx = Math.floor(Math.random() * candidates.length);
-    this.discoverPick = candidates[idx];
+
+    let pool: RecipeWithId[] = candidates;
+    const curId = this.discoverPick.id;
+    if (curId >= 0 && candidates.length > 1) {
+      const filtered: RecipeWithId[] = [];
+      for (let k = 0; k < candidates.length; k++) {
+        if (candidates[k].id !== curId) {
+          filtered.push(candidates[k]);
+        }
+      }
+      if (filtered.length > 0) {
+        pool = filtered;
+      }
+    }
+
+    const idx = Math.floor(Math.random() * pool.length);
+    this.discoverPick = this.cloneRecipeForDiscoverState(pool[idx]);
   }
 
   /** 与 Web 一致：优先 link，否则 bilibili.com/video/{bv} */
@@ -337,6 +403,41 @@ struct Index {
     .margin({ bottom: 8 })
     .onClick(() => {
       this.openRecipeVideo(item);
+    })
+  }
+
+  /**
+   * 发现 Tab 专用：禁止写 recipeHitRow(this.discoverPick)。
+   * 对象作 @Builder 入参时 ArkUI 常无法对 @State 整对象替换建立依赖，界面不刷新。
+   */
+  @Builder
+  discoverPickHitRow() {
+    Row() {
+      Text(this.discoverPick.name)
+        .fontSize(15)
+        .layoutWeight(1)
+        .maxLines(2)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .fontColor(this.recipeRowClickable(this.discoverPick) ? '#18A058' : Color.Black)
+      Text((this.discoverPick.difficulty !== undefined && this.discoverPick.difficulty.length > 0) ?
+        this.discoverPick.difficulty : ' ')
+        .fontSize(12)
+        .fontColor('#888888')
+        .width(40)
+      if (this.recipeRowClickable(this.discoverPick)) {
+        Text('›')
+          .fontSize(18)
+          .fontColor('#CCCCCC')
+          .padding({ left: 4 })
+      }
+    }
+    .width('100%')
+    .padding(12)
+    .backgroundColor('#F9F9F9')
+    .borderRadius(8)
+    .margin({ bottom: 8 })
+    .onClick(() => {
+      this.openRecipeVideo(this.discoverPick);
     })
   }
 
@@ -611,7 +712,7 @@ struct Index {
                 .alignSelf(ItemAlign.Start)
                 .margin({ top: 8 })
 
-              this.recipeHitRow(this.discoverPick);
+              this.discoverPickHitRow();
             }
             .width('100%')
             .alignItems(HorizontalAlign.Start)

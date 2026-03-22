@@ -1,5 +1,8 @@
 import { common } from '@kit.AbilityKit';
+import { meatItems, stapleItems, toolItems, vegetableItems } from '../data/foodCatalog';
 import { RecipeRepository } from '../data/RecipeRepository';
+import type { RecipeWithId, SearchMode, StuffItem } from '../model/recipe';
+import { RecipeSearchService } from '../service/RecipeSearchService';
 import { CookPreferences } from '../store/CookPreferences';
 
 @Entry
@@ -10,6 +13,11 @@ struct Index {
   @State recipeCount: number = 0
   @State errHint: string = ''
   @State keepLocalData: boolean = true
+  @State selectedStuff: string[] = []
+  @State curTool: string = ''
+  @State searchMode: SearchMode = 'loose'
+  @State keyword: string = ''
+  @State searchHits: RecipeWithId[] = []
 
   aboutToAppear(): void {
     void this.bootstrapData();
@@ -37,10 +45,78 @@ struct Index {
     try {
       const settings = await CookPreferences.getSettings(host);
       this.keepLocalData = settings.keepLocalData;
+      if (this.keepLocalData) {
+        this.selectedStuff = await CookPreferences.getSelectedStuff(host);
+        this.curTool = await CookPreferences.getCurTool(host);
+        this.searchMode = await CookPreferences.getSearchMode(host);
+      }
     } catch {
       this.keepLocalData = true;
       console.error('CookPreferences.getSettings failed');
     }
+    this.runSearch();
+  }
+
+  private runSearch(): void {
+    const all = RecipeRepository.getInstance().getAll();
+    this.searchHits = RecipeSearchService.search(all, this.selectedStuff, this.curTool, this.searchMode, this.keyword.trim());
+  }
+
+  private async persistCookIfNeeded(): Promise<void> {
+    if (!this.keepLocalData) {
+      return;
+    }
+    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    if (!host) {
+      return;
+    }
+    await CookPreferences.setSelectedStuff(host, this.selectedStuff);
+    await CookPreferences.setCurTool(host, this.curTool);
+    await CookPreferences.setSearchMode(host, this.searchMode);
+  }
+
+  private chipLabel(item: StuffItem): string {
+    const em = item.emoji;
+    if (em.length > 0) {
+      return `${em} ${item.name}`;
+    }
+    return item.name;
+  }
+
+  private toggleStuff(name: string): void {
+    const idx = this.selectedStuff.indexOf(name);
+    if (idx >= 0) {
+      const next: string[] = [];
+      for (let i = 0; i < this.selectedStuff.length; i++) {
+        if (i !== idx) {
+          next.push(this.selectedStuff[i]);
+        }
+      }
+      this.selectedStuff = next;
+    } else {
+      this.selectedStuff = this.selectedStuff.concat([name]);
+    }
+    this.runSearch();
+    void this.persistCookIfNeeded();
+  }
+
+  private toggleTool(name: string): void {
+    this.curTool = this.curTool === name ? '' : name;
+    this.runSearch();
+    void this.persistCookIfNeeded();
+  }
+
+  private applySearchMode(mode: SearchMode): void {
+    this.searchMode = mode;
+    this.runSearch();
+    void this.persistCookIfNeeded();
+  }
+
+  private resetSelection(): void {
+    this.selectedStuff = [];
+    this.curTool = '';
+    this.runSearch();
+    void this.persistCookIfNeeded();
   }
 
   private async onKeepLocalChange(isOn: boolean): Promise<void> {
@@ -51,9 +127,21 @@ struct Index {
     try {
       await CookPreferences.setKeepLocalData(host, isOn);
       this.keepLocalData = isOn;
+      if (!isOn) {
+        await CookPreferences.clearCookPersisted(host);
+      } else {
+        this.selectedStuff = await CookPreferences.getSelectedStuff(host);
+        this.curTool = await CookPreferences.getCurTool(host);
+        this.searchMode = await CookPreferences.getSearchMode(host);
+      }
+      this.runSearch();
     } catch {
       console.error('CookPreferences.setKeepLocalData failed');
     }
+  }
+
+  private modeButtonBg(mode: SearchMode): string {
+    return this.searchMode === mode ? '#C8E6C9' : '#EEEEEE';
   }
 
   private tabLabelColor(idx: number): string {
@@ -65,35 +153,158 @@ struct Index {
   }
 
   @Builder
+  sectionTitle(title: string) {
+    Text(title)
+      .fontSize(15)
+      .fontWeight(FontWeight.Medium)
+      .margin({ top: 8, bottom: 6 })
+      .alignSelf(ItemAlign.Start)
+  }
+
+  @Builder
+  chipWrap(items: StuffItem[], isTool: boolean) {
+    Flex({ direction: FlexDirection.Row, wrap: FlexWrap.Wrap, alignItems: ItemAlign.Center }) {
+      ForEach(items, (item: StuffItem) => {
+        Text(this.chipLabel(item))
+          .fontSize(13)
+          .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+          .margin({ right: 8, bottom: 8 })
+          .backgroundColor(isTool ?
+            (this.curTool === item.name ? '#C8E6C9' : '#EFEFEF') :
+            (this.selectedStuff.includes(item.name) ? '#C8E6C9' : '#EFEFEF'))
+          .borderRadius(16)
+          .onClick(() => {
+            if (isTool) {
+              this.toggleTool(item.name);
+            } else {
+              this.toggleStuff(item.name);
+            }
+          })
+      }, (item: StuffItem) => item.name)
+    }
+    .width('100%')
+  }
+
+  @Builder
   buildCookTab() {
-    Column({ space: 16 }) {
-      Text('好的，今天我们来做菜！')
-        .fontSize(18)
-        .fontWeight(FontWeight.Medium)
+    Column() {
+      Scroll() {
+        Column({ space: 8 }) {
+          Row() {
+            Text('好的，今天我们来做菜！')
+              .fontSize(18)
+              .fontWeight(FontWeight.Medium)
+              .layoutWeight(1)
+            Text('清空')
+              .fontSize(14)
+              .fontColor('#18A058')
+              .onClick(() => {
+                this.resetSelection();
+              })
+          }
+          .width('100%')
 
-      Text(this.status)
-        .fontSize($r('app.float.page_text_font_size'))
+          Text(`${this.status} · 全库 ${this.recipeCount} 条`)
+            .fontSize(12)
+            .fontColor('#888888')
 
-      Text(`菜谱条数：${this.recipeCount}`)
-        .fontSize(16)
+          if (this.errHint.length > 0) {
+            Text(this.errHint)
+              .fontSize(12)
+              .fontColor(Color.Red)
+          }
 
-      if (this.errHint.length > 0) {
-        Text(this.errHint)
-          .fontSize(12)
-          .fontColor(Color.Red)
-          .maxLines(4)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text('匹配模式')
+            .fontSize(14)
+            .fontWeight(FontWeight.Medium)
+            .alignSelf(ItemAlign.Start)
+            .margin({ top: 4 })
+
+          Row({ space: 8 }) {
+            Text('模糊')
+              .fontSize(13)
+              .padding({ left: 14, right: 14, top: 8, bottom: 8 })
+              .backgroundColor(this.modeButtonBg('loose'))
+              .borderRadius(8)
+              .onClick(() => {
+                this.applySearchMode('loose');
+              })
+            Text('严格')
+              .fontSize(13)
+              .padding({ left: 14, right: 14, top: 8, bottom: 8 })
+              .backgroundColor(this.modeButtonBg('strict'))
+              .borderRadius(8)
+              .onClick(() => {
+                this.applySearchMode('strict');
+              })
+            Text('生存')
+              .fontSize(13)
+              .padding({ left: 14, right: 14, top: 8, bottom: 8 })
+              .backgroundColor(this.modeButtonBg('survival'))
+              .borderRadius(8)
+              .onClick(() => {
+                this.applySearchMode('survival');
+              })
+          }
+
+          TextInput({ placeholder: '搜索菜名', text: this.keyword })
+            .width('100%')
+            .height(40)
+            .onChange((v: string) => {
+              this.keyword = v;
+              this.runSearch();
+            })
+            .margin({ top: 4 })
+
+          this.sectionTitle('素菜');
+          this.chipWrap(vegetableItems, false);
+
+          this.sectionTitle('荤菜');
+          this.chipWrap(meatItems, false);
+
+          this.sectionTitle('主食');
+          this.chipWrap(stapleItems, false);
+
+          this.sectionTitle('厨具');
+          this.chipWrap(toolItems, true);
+
+          Text(`匹配结果 ${this.searchHits.length} 条`)
+            .fontSize(15)
+            .fontWeight(FontWeight.Medium)
+            .margin({ top: 12, bottom: 8 })
+            .alignSelf(ItemAlign.Start)
+
+          ForEach(this.searchHits, (item: RecipeWithId) => {
+            Row() {
+              Text(item.name)
+                .fontSize(15)
+                .layoutWeight(1)
+                .maxLines(2)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+              Text((item.difficulty !== undefined && item.difficulty.length > 0) ? item.difficulty : ' ')
+                .fontSize(12)
+                .fontColor('#888888')
+                .width(40)
+            }
+            .width('100%')
+            .padding(12)
+            .backgroundColor('#F9F9F9')
+            .borderRadius(8)
+            .margin({ bottom: 8 })
+          }, (item: RecipeWithId) => item.id.toString())
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+        .padding({ left: 16, right: 16, bottom: 24 })
       }
-
-      Text('选食材与匹配结果（开发中）')
-        .fontSize(14)
-        .fontColor('#888888')
-        .margin({ top: 24 })
+      .width('100%')
+      .layoutWeight(1)
+      .scrollBar(BarState.Auto)
+      .align(Alignment.TopStart)
     }
     .width('100%')
     .height('100%')
-    .padding({ left: 20, right: 20, top: 16 })
-    .alignItems(HorizontalAlign.Start)
+    .padding({ top: 8 })
   }
 
   @Builder
@@ -233,12 +444,10 @@ struct Index {
       .width('100%')
       .height(52)
       .backgroundColor('#F5F5F5')
-      // 延伸到底部系统安全区（手势条区域），避免底栏与屏幕底边之间露出一截背景缝
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
     }
     .width('100%')
     .height('100%')
-    // 根容器一并延伸到底部，避免子组件裁剪导致底栏仍被整体上推
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
   }
 }

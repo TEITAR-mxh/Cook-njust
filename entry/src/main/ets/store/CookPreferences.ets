@@ -1,5 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
+import type { SearchMode } from '../model/recipe';
 
 const PREF_STORE_NAME = 'cook_storage';
 
@@ -91,5 +92,74 @@ export class CookPreferences {
 
   static async setKeepLocalData(context: common.Context, keep: boolean): Promise<void> {
     await CookPreferences.setSettings(context, { keepLocalData: keep });
+  }
+
+  /** 关闭「保留本地数据」时可清空已持久化的选料（与 Web 行为接近） */
+  static async clearCookPersisted(context: common.Context): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.STUFF, '[]');
+    await p.put(CookPreferenceKeys.TOOL, '');
+    await p.put(CookPreferenceKeys.MODE, 'loose');
+    await p.flush();
+  }
+
+  private static parseStringArray(raw: string): string[] {
+    if (raw.length === 0) {
+      return [];
+    }
+    try {
+      const v = JSON.parse(raw) as string[];
+      if (!Array.isArray(v)) {
+        return [];
+      }
+      const out: string[] = [];
+      for (let i = 0; i < v.length; i++) {
+        const s = v[i];
+        if (typeof s === 'string') {
+          out.push(s);
+        }
+      }
+      return out;
+    } catch {
+      return [];
+    }
+  }
+
+  static async getSelectedStuff(context: common.Context): Promise<string[]> {
+    const p = await CookPreferences.getStore(context);
+    const raw = CookPreferences.getSettingsString(await p.get(CookPreferenceKeys.STUFF, ''));
+    return CookPreferences.parseStringArray(raw);
+  }
+
+  static async setSelectedStuff(context: common.Context, stuff: string[]): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.STUFF, JSON.stringify(stuff));
+    await p.flush();
+  }
+
+  static async getCurTool(context: common.Context): Promise<string> {
+    const p = await CookPreferences.getStore(context);
+    return CookPreferences.getSettingsString(await p.get(CookPreferenceKeys.TOOL, ''));
+  }
+
+  static async setCurTool(context: common.Context, tool: string): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.TOOL, tool);
+    await p.flush();
+  }
+
+  static async getSearchMode(context: common.Context): Promise<SearchMode> {
+    const p = await CookPreferences.getStore(context);
+    const raw = CookPreferences.getSettingsString(await p.get(CookPreferenceKeys.MODE, 'loose'));
+    if (raw === 'strict' || raw === 'survival' || raw === 'loose') {
+      return raw as SearchMode;
+    }
+    return 'loose';
+  }
+
+  static async setSearchMode(context: common.Context, mode: SearchMode): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.MODE, mode);
+    await p.flush();
   }
 }

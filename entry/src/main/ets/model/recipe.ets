@@ -1,3 +1,6 @@
+/** 与 Web `useRecipeStore` 一致：生存 / 模糊 / 严格 */
+export type SearchMode = 'survival' | 'loose' | 'strict'
+
 export type Difficulty = '简单' | '普通' | '困难'
 
 export interface RecipeItem {

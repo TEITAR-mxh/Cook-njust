@@ -119,4 +119,11 @@ export class RecipeRepository {
   getCount(): number {
     return this.recipes.length;
   }
+
+  getById(id: number): RecipeWithId | null {
+    if (id < 0 || id >= this.recipes.length) {
+      return null;
+    }
+    return this.recipes[id];
+  }
 }

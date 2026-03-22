@@ -134,6 +134,12 @@ export class CookPreferences {
     return CookPreferences.parseHistoryIds(raw);
   }
 
+  static async clearHistory(context: common.Context): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.HISTORY, '[]');
+    await p.flush();
+  }
+
   /** 记录一次打开视频：去重后插到队首，最多保留 HISTORY_MAX 条 */
   static async recordHistoryVisit(context: common.Context, recipeId: number): Promise<void> {
     if (recipeId < 0 || Math.floor(recipeId) !== recipeId) {

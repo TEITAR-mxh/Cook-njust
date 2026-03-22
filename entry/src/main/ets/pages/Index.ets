@@ -30,6 +30,8 @@ struct Index {
   /** 发现 Tab：随机选中的菜谱；id 为 -1 表示未选 */
   @State discoverPick: RecipeWithId = { id: -1, name: '', stuff: [], tools: [] }
   @State discoverNoVideoHint: string = ''
+  /** 浏览历史：id 从新到旧，与 Preferences 一致 */
+  @State historyIds: number[] = []
 
   aboutToAppear(): void {
     void this.bootstrapData();
@@ -68,6 +70,46 @@ struct Index {
     }
     this.runSearch();
     this.runLibrarySearch();
+    await this.refreshHistory();
+  }
+
+  /** 从 Preferences 同步历史 id，并剔除当前菜谱库里不存在的 id */
+  private async refreshHistory(): Promise<void> {
+    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    if (host === undefined) {
+      return;
+    }
+    if (!this.keepLocalData) {
+      this.historyIds = [];
+      return;
+    }
+    try {
+      const raw = await CookPreferences.getHistoryIds(host);
+      const n = RecipeRepository.getInstance().getCount();
+      const next: number[] = [];
+      for (let i = 0; i < raw.length; i++) {
+        const id = raw[i];
+        if (id >= 0 && id < n) {
+          next.push(id);
+        }
+      }
+      this.historyIds = next;
+    } catch {
+      console.error('refreshHistory failed');
+    }
+  }
+
+  private async clearHistoryList(): Promise<void> {
+    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    if (host === undefined) {
+      return;
+    }
+    try {
+      await CookPreferences.clearHistory(host);
+      this.historyIds = [];
+    } catch {
+      console.error('clearHistoryList failed');
+    }
   }
 
   private runSearch(): void {
@@ -201,7 +243,9 @@ struct Index {
       return;
     }
     if (this.keepLocalData) {
-      void CookPreferences.recordHistoryVisit(host, item.id);
+      void CookPreferences.recordHistoryVisit(host, item.id).then(() => {
+        void this.refreshHistory();
+      });
     }
     void this.openExternalUri(host, uri);
   }
@@ -344,10 +388,12 @@ struct Index {
       this.keepLocalData = isOn;
       if (!isOn) {
         await CookPreferences.clearCookPersisted(host);
+        this.historyIds = [];
       } else {
         this.selectedStuff = await CookPreferences.getSelectedStuff(host);
         this.curTool = await CookPreferences.getCurTool(host);
         this.searchMode = await CookPreferences.getSearchMode(host);
+        await this.refreshHistory();
       }
       this.runSearch();
     } catch {
@@ -438,6 +484,41 @@ struct Index {
     .margin({ bottom: 8 })
     .onClick(() => {
       this.openRecipeVideo(this.discoverPick);
+    })
+  }
+
+  private historyRowTitle(recipeId: number): string {
+    const r = RecipeRepository.getInstance().getById(recipeId);
+    if (r !== null) {
+      return r.name;
+    }
+    return '';
+  }
+
+  @Builder
+  historyListRow(recipeId: number) {
+    Row() {
+      Text(this.historyRowTitle(recipeId))
+        .fontSize(15)
+        .layoutWeight(1)
+        .maxLines(2)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .fontColor(Color.Black)
+      Text('›')
+        .fontSize(18)
+        .fontColor('#CCCCCC')
+        .padding({ left: 4 })
+    }
+    .width('100%')
+    .padding(12)
+    .backgroundColor('#F9F9F9')
+    .borderRadius(8)
+    .margin({ bottom: 8 })
+    .onClick(() => {
+      const r = RecipeRepository.getInstance().getById(recipeId);
+      if (r !== null) {
+        this.openRecipeVideo(r);
+      }
     })
   }
 
@@ -734,33 +815,75 @@ struct Index {
 
   @Builder
   buildMyTab() {
-    Column({ space: 20 }) {
-      Text('我的')
-        .fontSize(20)
-        .fontWeight(FontWeight.Medium)
-        .alignSelf(ItemAlign.Start)
+    Column() {
+      Scroll() {
+        Column({ space: 16 }) {
+          Text('我的')
+            .fontSize(20)
+            .fontWeight(FontWeight.Medium)
+            .alignSelf(ItemAlign.Start)
 
-      Row({ space: 12 }) {
-        Text('保留本地选料等数据')
-          .fontSize(16)
-          .layoutWeight(1)
+          Row({ space: 12 }) {
+            Text('保留本地选料等数据')
+              .fontSize(16)
+              .layoutWeight(1)
 
-        Toggle({ type: ToggleType.Switch, isOn: this.keepLocalData })
-          .onChange((isOn: boolean) => {
-            void this.onKeepLocalChange(isOn);
-          })
+            Toggle({ type: ToggleType.Switch, isOn: this.keepLocalData })
+              .onChange((isOn: boolean) => {
+                void this.onKeepLocalChange(isOn);
+              })
+          }
+          .width('100%')
+
+          Row() {
+            Text('浏览历史')
+              .fontSize(16)
+              .fontWeight(FontWeight.Medium)
+              .layoutWeight(1)
+            if (this.keepLocalData && this.historyIds.length > 0) {
+              Text('清空')
+                .fontSize(14)
+                .fontColor('#18A058')
+                .onClick(() => {
+                  void this.clearHistoryList();
+                })
+            }
+          }
+          .width('100%')
+
+          if (!this.keepLocalData) {
+            Text('关闭「保留本地数据」时不记录历史')
+              .fontSize(13)
+              .fontColor('#888888')
+              .alignSelf(ItemAlign.Start)
+          } else if (this.historyIds.length === 0) {
+            Text('暂无浏览历史')
+              .fontSize(14)
+              .fontColor('#888888')
+              .alignSelf(ItemAlign.Start)
+          } else {
+            ForEach(this.historyIds, (recipeId: number) => {
+              this.historyListRow(recipeId);
+            }, (recipeId: number) => `h-${recipeId}`)
+          }
+
+          Text('收藏、关于（开发中）')
+            .fontSize(14)
+            .fontColor('#888888')
+            .alignSelf(ItemAlign.Start)
+            .margin({ top: 8 })
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+        .padding({ left: 20, right: 20, top: 16, bottom: 24 })
       }
       .width('100%')
-
-      Text('历史、收藏、关于等（开发中）')
-        .fontSize(14)
-        .fontColor('#888888')
-        .alignSelf(ItemAlign.Start)
+      .layoutWeight(1)
+      .scrollBar(BarState.Auto)
+      .align(Alignment.TopStart)
     }
     .width('100%')
     .height('100%')
-    .padding({ left: 20, right: 20, top: 16 })
-    .alignItems(HorizontalAlign.Start)
   }
 
   build() {
@@ -830,6 +953,7 @@ struct Index {
         .justifyContent(FlexAlign.Center)
         .onClick(() => {
           this.mainTabIndex = 3;
+          void this.refreshHistory();
         })
       }
       .width('100%')

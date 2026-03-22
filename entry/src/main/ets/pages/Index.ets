@@ -1054,12 +1054,6 @@ struct Index {
               this.favoriteListRow(recipeId);
             }, (recipeId: number) => `f-${recipeId}`)
           }
-
-          Text('关于（开发中）')
-            .fontSize(14)
-            .fontColor('#888888')
-            .alignSelf(ItemAlign.Start)
-            .margin({ top: 8 })
         }
         .width('100%')
         .alignItems(HorizontalAlign.Start)

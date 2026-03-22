@@ -59,4 +59,23 @@ export class RecipeSearchService {
     }
     return result;
   }
+
+  /**
+   * 全库按菜名关键字筛选（不依赖选料/模式）；keyword 为空则返回全量。
+   * 与做菜页在「有选料」时的 search 不同，此处专门用于菜谱 Tab。
+   */
+  static filterLibraryByName(all: RecipeWithId[], keyword: string): RecipeWithId[] {
+    const k = keyword.trim();
+    if (k.length === 0) {
+      return all;
+    }
+    const out: RecipeWithId[] = [];
+    for (let i = 0; i < all.length; i++) {
+      const item = all[i];
+      if (item.name.includes(k)) {
+        out.push(item);
+      }
+    }
+    return out;
+  }
 }

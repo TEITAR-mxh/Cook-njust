@@ -25,6 +25,8 @@ struct Index {
   @State searchMode: SearchMode = 'loose'
   @State keyword: string = ''
   @State searchHits: RecipeWithId[] = []
+  @State libraryKeyword: string = ''
+  @State libraryHits: RecipeWithId[] = []
 
   aboutToAppear(): void {
     void this.bootstrapData();
@@ -62,11 +64,17 @@ struct Index {
       console.error('CookPreferences.getSettings failed');
     }
     this.runSearch();
+    this.runLibrarySearch();
   }
 
   private runSearch(): void {
     const all = RecipeRepository.getInstance().getAll();
     this.searchHits = RecipeSearchService.search(all, this.selectedStuff, this.curTool, this.searchMode, this.keyword.trim());
+  }
+
+  private runLibrarySearch(): void {
+    const all = RecipeRepository.getInstance().getAll();
+    this.libraryHits = RecipeSearchService.filterLibraryByName(all, this.libraryKeyword);
   }
 
   /** 与 Web 一致：优先 link，否则 bilibili.com/video/{bv} */
@@ -93,6 +101,9 @@ struct Index {
     const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
     if (host === undefined) {
       return;
+    }
+    if (this.keepLocalData) {
+      void CookPreferences.recordHistoryVisit(host, item.id);
     }
     void this.openExternalUri(host, uri);
   }
@@ -268,6 +279,36 @@ struct Index {
   }
 
   @Builder
+  recipeHitRow(item: RecipeWithId) {
+    Row() {
+      Text(item.name)
+        .fontSize(15)
+        .layoutWeight(1)
+        .maxLines(2)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .fontColor(this.recipeRowClickable(item) ? '#18A058' : Color.Black)
+      Text((item.difficulty !== undefined && item.difficulty.length > 0) ? item.difficulty : ' ')
+        .fontSize(12)
+        .fontColor('#888888')
+        .width(40)
+      if (this.recipeRowClickable(item)) {
+        Text('›')
+          .fontSize(18)
+          .fontColor('#CCCCCC')
+          .padding({ left: 4 })
+      }
+    }
+    .width('100%')
+    .padding(12)
+    .backgroundColor('#F9F9F9')
+    .borderRadius(8)
+    .margin({ bottom: 8 })
+    .onClick(() => {
+      this.openRecipeVideo(item);
+    })
+  }
+
+  @Builder
   chipWrap(items: StuffItem[], isTool: boolean) {
     Flex({ direction: FlexDirection.Row, wrap: FlexWrap.Wrap, alignItems: ItemAlign.Center }) {
       ForEach(items, (item: StuffItem) => {
@@ -381,32 +422,7 @@ struct Index {
             .alignSelf(ItemAlign.Start)
 
           ForEach(this.searchHits, (item: RecipeWithId) => {
-            Row() {
-              Text(item.name)
-                .fontSize(15)
-                .layoutWeight(1)
-                .maxLines(2)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-                .fontColor(this.recipeRowClickable(item) ? '#18A058' : Color.Black)
-              Text((item.difficulty !== undefined && item.difficulty.length > 0) ? item.difficulty : ' ')
-                .fontSize(12)
-                .fontColor('#888888')
-                .width(40)
-              if (this.recipeRowClickable(item)) {
-                Text('›')
-                  .fontSize(18)
-                  .fontColor('#CCCCCC')
-                  .padding({ left: 4 })
-              }
-            }
-            .width('100%')
-            .padding(12)
-            .backgroundColor('#F9F9F9')
-            .borderRadius(8)
-            .margin({ bottom: 8 })
-            .onClick(() => {
-              this.openRecipeVideo(item);
-            })
+            this.recipeHitRow(item);
           }, (item: RecipeWithId) => item.id.toString())
         }
         .width('100%')
@@ -426,18 +442,63 @@ struct Index {
   @Builder
   buildLibraryTab() {
     Column() {
-      Text('菜谱')
-        .fontSize(20)
-        .fontWeight(FontWeight.Medium)
-        .margin({ bottom: 12 })
-      Text('全库浏览与搜索（开发中）')
-        .fontSize(14)
-        .fontColor('#888888')
+      Scroll() {
+        Column({ space: 8 }) {
+          Text('菜谱')
+            .fontSize(20)
+            .fontWeight(FontWeight.Medium)
+            .alignSelf(ItemAlign.Start)
+
+          Text(`${this.status} · 全库 ${this.recipeCount} 条`)
+            .fontSize(12)
+            .fontColor('#888888')
+            .alignSelf(ItemAlign.Start)
+
+          if (this.errHint.length > 0) {
+            Text(this.errHint)
+              .fontSize(12)
+              .fontColor(Color.Red)
+              .alignSelf(ItemAlign.Start)
+          }
+
+          TextInput({ placeholder: '搜索菜名', text: this.libraryKeyword })
+            .width('100%')
+            .height(40)
+            .onChange((v: string) => {
+              this.libraryKeyword = v;
+              this.runLibrarySearch();
+            })
+            .margin({ top: 4 })
+
+          Text(`列表 ${this.libraryHits.length} 条`)
+            .fontSize(15)
+            .fontWeight(FontWeight.Medium)
+            .margin({ top: 12, bottom: 8 })
+            .alignSelf(ItemAlign.Start)
+
+          if (this.libraryHits.length === 0) {
+            Text(this.recipeCount === 0 ? '暂无菜谱数据' : '暂无匹配的菜名')
+              .fontSize(14)
+              .fontColor('#888888')
+              .alignSelf(ItemAlign.Start)
+          } else {
+            ForEach(this.libraryHits, (item: RecipeWithId) => {
+              this.recipeHitRow(item);
+            }, (item: RecipeWithId) => item.id.toString())
+          }
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+        .padding({ left: 16, right: 16, bottom: 24 })
+      }
+      .width('100%')
+      .layoutWeight(1)
+      .scrollBar(BarState.Auto)
+      .align(Alignment.TopStart)
     }
     .width('100%')
     .height('100%')
-    .justifyContent(FlexAlign.Center)
-    .alignItems(HorizontalAlign.Center)
+    .padding({ top: 8 })
   }
 
   @Builder

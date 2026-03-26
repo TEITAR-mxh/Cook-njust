@@ -15,9 +15,9 @@ export struct PlateCard {
   @State translateY: number = 0
 
   build() {
-    Column({ space: 16 }) {
-      // 外层盘子(plate-ui)
-      Column() {
+    Column({ space: 12 }) {
+      // 外层盘子(plate-ui) - 添加默认占位图片
+      Stack({ alignContent: Alignment.Center }) {
         // 内层盘沿(plate-inner)
         Column()
           .width('85%')
@@ -33,21 +33,16 @@ export struct PlateCard {
             offsetY: 6
           })
 
-        // 菜品 Emoji
-        Text(this.emoji)
-          .fontSize(48)
-          .zIndex(10)
-          .scale({ x: 1.0, y: 1.0 })
-          .animation({
-            duration: 300,
-            curve: Curve.EaseOut
-          })
+        // 默认占位图片区域
+        Text('🍽️')
+          .fontSize(36)
+          .fontColor(AppColors.GRAY_400)
+          .opacity(0.3)
       }
       .width(140)
       .height(140)
       .borderRadius(1000)
       .backgroundColor(Color.White)
-      .justifyContent(FlexAlign.Center)
       .shadow({
         radius: 35,
         color: 'rgba(139, 126, 110, 0.2)',
@@ -61,12 +56,16 @@ export struct PlateCard {
         curve: Curve.Sharp
       })
 
-      // 菜品标签(plate-label)
+      // 菜品标签(plate-label) - 文字居中
       Text(this.dishName)
         .fontSize(13)
         .fontColor('#5C5042')
         .fontWeight(FontWeight.Bold)
-        .padding({ left: 16, right: 16, top: 6, bottom: 6 })
+        .textAlign(TextAlign.Center)
+        .maxLines(2)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .width('100%')
+        .padding({ left: 12, right: 12, top: 6, bottom: 6 })
         .backgroundColor('rgba(255,255,255,0.85)')
         .borderRadius(100)
         .borderWidth(0.5)
@@ -79,6 +78,7 @@ export struct PlateCard {
         })
         .backgroundBlurStyle(BlurStyle.Thin)
     }
+    .width(140)
     .alignItems(HorizontalAlign.Center)
     .onTouch((event) => {
       if (event.type === TouchType.Down) {

@@ -18,6 +18,8 @@ export const vegetableItems: StuffItem[] = [
   { name: '豆腐', emoji: '🍲' },
   { name: '包菜', emoji: '🥗' },
   { name: '白菜', emoji: '🥬' },
+  { name: '青椒', emoji: '🫑' },
+  { name: '木耳', emoji: '🍄‍🟫' },
 ];
 
 export const meatItems: StuffItem[] = [

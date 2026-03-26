@@ -39,11 +39,16 @@ export struct RecipeCard {
   buildLargeCard() {
     Column() {
       // 顶部大图区域
-      Column() {
-        Text(this.getEmoji())
-          .fontSize(60)
+      Stack() {
+        Column() {
+          Text(this.getEmoji())
+            .fontSize(60)
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.Center)
 
-        // 播放量标签
+        // 播放量标签 (右下角)
         if (this.hasVideo) {
           Row({ space: 4 }) {
             Text('▶')
@@ -62,12 +67,39 @@ export struct RecipeCard {
           .markAnchor({ x: '100%', y: '100%' })
           .translate({ x: -8, y: -8 })
         }
+
+        // 收藏按钮 (右上角)
+        Column() {
+          Text(this.isFavorite ? '★' : '☆')
+            .fontSize(24)
+            .fontColor(this.isFavorite ? '#FFB020' : AppColors.GRAY_400)
+        }
+        .width(36)
+        .height(36)
+        .borderRadius(18)
+        .backgroundColor('rgba(255, 255, 255, 0.95)')
+        .backdropBlur(8)
+        .justifyContent(FlexAlign.Center)
+        .shadow({
+          radius: 4,
+          color: 'rgba(0,0,0,0.08)',
+          offsetX: 0,
+          offsetY: 2
+        })
+        .position({ x: '100%', y: 0 })
+        .markAnchor({ x: '100%', y: 0 })
+        .translate({ x: -8, y: 8 })
+        .hitTestBehavior(HitTestMode.Block)
+        .onClick(() => {
+          if (this.onFavoriteClick) {
+            this.onFavoriteClick()
+          }
+        })
       }
       .width('100%')
       .height(160)
       .backgroundColor('#FFF5EB') // bg-orange-50
       .borderRadius({ topLeft: 24, topRight: 24 })
-      .justifyContent(FlexAlign.Center)
 
       // 底部信息区域
       Column({ space: 8 }) {
@@ -125,56 +157,87 @@ export struct RecipeCard {
    */
   @Builder
   buildSmallCard() {
-    Row({ space: 16 }) {
-      // 左侧图标
-      Column() {
-        Text(this.getEmoji())
-          .fontSize(40)
-      }
-      .width(96)
-      .height(96)
-      .borderRadius(14)
-      .backgroundColor('#F0FDF4') // bg-green-50
-      .justifyContent(FlexAlign.Center)
-
-      // 右侧信息
-      Column({ space: 6 }) {
-        Text(this.recipe.name)
-          .fontSize(16)
-          .fontColor(AppColors.GRAY_900)
-          .fontWeight(FontWeight.Bold)
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-
-        Text(this.recipe.difficulty || '减脂期也能大口吃肉')
-          .fontSize(12)
-          .fontColor(AppColors.GRAY_500)
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-
-        Row({ space: 6 }) {
-          Text('15分钟')
-            .fontSize(11)
-            .fontColor(AppColors.GRAY_500)
-
-          Text('·')
-            .fontSize(11)
-            .fontColor(AppColors.GRAY_300)
-
-          Text('简单')
-            .fontSize(11)
-            .fontColor(AppColors.GRAY_500)
+    Stack() {
+      Row({ space: 16 }) {
+        // 左侧图标
+        Column() {
+          Text(this.getEmoji())
+            .fontSize(40)
         }
-        .padding({ left: 8, right: 8, top: 2, bottom: 2 })
-        .backgroundColor(AppColors.GRAY_100)
-        .borderRadius(4)
+        .width(96)
+        .height(96)
+        .borderRadius(14)
+        .backgroundColor('#F0FDF4') // bg-green-50
+        .justifyContent(FlexAlign.Center)
+
+        // 右侧信息
+        Column({ space: 6 }) {
+          Text(this.recipe.name)
+            .fontSize(16)
+            .fontColor(AppColors.GRAY_900)
+            .fontWeight(FontWeight.Bold)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+          Text(this.recipe.difficulty || '减脂期也能大口吃肉')
+            .fontSize(12)
+            .fontColor(AppColors.GRAY_500)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+          Row({ space: 6 }) {
+            Text('15分钟')
+              .fontSize(11)
+              .fontColor(AppColors.GRAY_500)
+
+            Text('·')
+              .fontSize(11)
+              .fontColor(AppColors.GRAY_300)
+
+            Text('简单')
+              .fontSize(11)
+              .fontColor(AppColors.GRAY_500)
+          }
+          .padding({ left: 8, right: 8, top: 2, bottom: 2 })
+          .backgroundColor(AppColors.GRAY_100)
+          .borderRadius(4)
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+        .justifyContent(FlexAlign.Center)
       }
-      .layoutWeight(1)
-      .alignItems(HorizontalAlign.Start)
+      .width('100%')
+      .padding(12)
+
+      // 收藏按钮 (右上角)
+      Column() {
+        Text(this.isFavorite ? '★' : '☆')
+          .fontSize(20)
+          .fontColor(this.isFavorite ? '#FFB020' : AppColors.GRAY_400)
+      }
+      .width(32)
+      .height(32)
+      .borderRadius(16)
+      .backgroundColor('rgba(255, 255, 255, 0.95)')
+      .backdropBlur(8)
       .justifyContent(FlexAlign.Center)
+      .shadow({
+        radius: 4,
+        color: 'rgba(0,0,0,0.08)',
+        offsetX: 0,
+        offsetY: 2
+      })
+      .position({ x: '100%', y: 0 })
+      .markAnchor({ x: '100%', y: 0 })
+      .translate({ x: -8, y: 8 })
+      .hitTestBehavior(HitTestMode.Block)
+      .onClick(() => {
+        if (this.onFavoriteClick) {
+          this.onFavoriteClick()
+        }
+      })
     }
     .width('100%')
-    .padding(12)
     .backgroundColor(Color.White)
     .borderRadius(20)
     .shadow({

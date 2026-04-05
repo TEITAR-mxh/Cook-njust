@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>您吃了么</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* --- 核心基建与重置 --- */
+        :root {
+            --brand-color: #FF4757;
+            --brand-gradient: linear-gradient(135deg, #FF6B6B 0%, #FF4757 100%);
+            --bg-color: #F4F5F7;
+            --card-bg: #FFFFFF;
+            --table-bg: #FDFBF7; /* 餐桌专属色调 */
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif; background-color: var(--bg-color); margin: 0; color: #111827; -webkit-tap-highlight-color: transparent; }
+        .mobile-wrapper { max-width: 430px; margin: 0 auto; background: var(--bg-color); height: 100vh; position: relative; overflow: hidden; box-shadow: 0 0 40px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+        
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* --- 页面路由系统 --- */
+        .tab-content { flex: 1; overflow-y: auto; display: none; padding-bottom: 120px; animation: fadeUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .tab-content.active { display: block; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- 原生感 Toast 提示 --- */
+        #toast { position: absolute; top: 50px; left: 50%; transform: translateX(-50%) translateY(-100px); background: rgba(17, 24, 39, 0.9); backdrop-filter: blur(8px); color: white; padding: 12px 24px; border-radius: 100px; font-size: 14px; font-weight: 500; z-index: 9999; transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); opacity: 0; pointer-events: none; white-space: nowrap; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+        /* --- 食材标签库 --- */
+        .tag-base { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); user-select: none; border: 1px solid transparent; }
+        .tag-base:active { transform: scale(0.92); }
+        .tag-off { background: var(--card-bg); border-color: #E5E7EB; color: #4B5563; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .tag-meat.active { background: #FEF2F2; border-color: #FCA5A5; color: #DC2626; font-weight: 600; }
+        .tag-veg.active { background: #F0FDF4; border-color: #86EFAC; color: #16A34A; font-weight: 600; }
+        .tag-carb.active { background: #FFFBEB; border-color: #FDE047; color: #D97706; font-weight: 600; }
+        .tag-highlight { background: #D1D5DB !important; color: white !important; transform: scale(1.05); }
+
+        /* --- 餐桌风格专属 UI (Neo-skeuomorphism) --- */
+        .table-surface { background-color: var(--table-bg); background-image: radial-gradient(#E5E0D8 1px, transparent 1px); background-size: 24px 24px; }
+        .plate-ui { background: #FFFFFF; box-shadow: 0 15px 35px -5px rgba(139, 126, 110, 0.2), 0 5px 15px rgba(139, 126, 110, 0.1), inset 0 -4px 10px rgba(0,0,0,0.02); transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .plate-inner { box-shadow: inset 0 6px 15px rgba(0,0,0,0.04), inset 0 -2px 5px rgba(255,255,255,1); border: 1px solid rgba(240, 235, 230, 0.5); }
+        .plate-wrapper:active .plate-ui { transform: scale(0.92) translateY(4px); box-shadow: 0 5px 15px -5px rgba(139, 126, 110, 0.2); }
+        .plate-label { background: rgba(255,255,255,0.85); backdrop-filter: blur(8px); box-shadow: 0 4px 12px rgba(139, 126, 110, 0.1); border: 0.5px solid rgba(255,255,255,0.5); }
+
+        /* --- 底部导航与悬浮 --- */
+        .glass-nav { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 0.5px solid rgba(0,0,0,0.05); padding-bottom: 24px; }
+        .btn-main { background: var(--brand-gradient); box-shadow: 0 8px 24px -6px rgba(255, 71, 87, 0.5); color: white; transition: all 0.2s; }
+        .btn-main:active { transform: scale(0.96); box-shadow: 0 4px 12px -4px rgba(255, 71, 87, 0.4); }
+        .btn-off { background: #E5E7EB; color: #9CA3AF; pointer-events: none; }
+        .btn-bili { background: #FB7299; box-shadow: 0 8px 20px -6px rgba(251, 114, 153, 0.5); color: white; transition: all 0.2s; }
+        .btn-bili:active { transform: scale(0.96); }
+
+        /* --- 详情页 Modal --- */
+        .modal-layer { position: absolute; bottom: 0; left: 0; w-full; height: 95%; background: #fff; z-index: 100; transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1); box-shadow: 0 -10px 40px rgba(0,0,0,0.1); border-radius: 32px 32px 0 0; overflow-y: auto; padding-bottom: 100px; }
+        .modal-layer.show { transform: translateY(0); }
+        .modal-drag-indicator { width: 40px; height: 5px; background: rgba(0,0,0,0.2); border-radius: 10px; margin: 12px auto; }
+        .icon-heart.active { fill: var(--brand-color); stroke: var(--brand-color); animation: heartPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes heartPop { 0% { transform: scale(1); } 50% { transform: scale(1.4); } 100% { transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+<div class="mobile-wrapper" id="app-wrapper">
+    <div id="toast">提示信息</div>
+
+    <div id="tab-home" class="tab-content active px-5 pt-16 hide-scrollbar">
+        <header class="flex justify-between items-end mb-6">
+            <div>
+                <h1 class="text-[28px] font-extrabold text-gray-900 tracking-tight">准备做点什么？</h1>
+                <p class="text-gray-500 text-[14px] mt-1">点选食材，匹配最佳做法</p>
+            </div>
+            <button class="text-[13px] font-medium text-gray-500 bg-white px-3.5 py-1.5 rounded-full shadow-sm active:bg-gray-50" onclick="clearAll()">清空</button>
+        </header>
+
+        <div class="bg-gradient-to-r from-orange-400 to-red-400 rounded-[20px] p-4 mb-8 shadow-sm cursor-pointer active:scale-[0.98] transition-transform flex justify-between items-center" onclick="startRandomizer()">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-xl backdrop-blur-sm">🎲</div>
+                <div>
+                    <h2 class="text-white text-[15px] font-bold">没有灵感？</h2>
+                    <p class="text-white/80 text-[12px]">帮我随机搭配一餐</p>
+                </div>
+            </div>
+            <span class="text-white font-bold opacity-70">›</span>
+        </div>
+
+        <div class="space-y-8">
+            <section>
+                <h3 class="text-[15px] font-bold text-gray-800 mb-3 flex items-center gap-2">🥩 肉蛋水产</h3>
+                <div class="flex flex-wrap gap-2.5">
+                    <div class="tag-base tag-off tag-meat px-4 py-2 rounded-full text-[14px]" onclick="toggleTag(this)">猪肉</div>
+                    <div class="tag-base tag-off tag-meat px-4 py-2 rounded-full text-[14px]" onclick="toggleTag(this)">排骨</div>
+                    <div class="tag-base tag-off tag-meat px-4 py-2 rounded-full text-[14px]" onclick="toggleTag(this)">鸡蛋</div>
+                    <div class="tag-base tag-off tag-meat px-4 py-2 rounded-full text-[14px]" onclick="toggleTag(this)">鸡胸肉</div>
+                    <div class="tag-base tag-off tag-meat px-4 py-2 rounded-full text-[14px]" onclick="toggleTag(this)">鲜虾</div>
+                </div>
+            </section>
+            <section>
+                <h3 class="text-[15px] font-bold text-gray-800 mb-3 flex items-center gap-2">🥬 新鲜蔬菜</h3>
+                <div class="flex flex-wrap gap-2.5">
+                    <div class="tag-base tag-off tag-veg px-4 py-2 rounded-full text-[14px]" onclick="toggleTag(this)">西红柿</div>
+                    <div class="tag-base tag-off tag-veg px-4 py-2 rounded-full text-[14px]" onclick="toggleTag(this)">土豆</div>
+                    <div class="tag-base tag-off tag-veg px-4 py-2 rounded-full text-[14px]" onclick="toggleTag(this)">洋葱</div>
+                    <div class="tag-base tag-off tag-veg px-4 py-2 rounded-full text-[14px]" onclick="toggleTag(this)">西兰花</div>
+                    <div class="tag-base tag-off tag-veg px-4 py-2 rounded-full text-[14px]" onclick="toggleTag(this)">娃娃菜</div>
+                </div>
+            </section>
+            <section>
+                <h3 class="text-[15px] font-bold text-gray-800 mb-3 flex items-center gap-2">🍚 碳水辅料</h3>
+                <div class="flex flex-wrap gap-2.5">
+                    <div class="tag-base tag-off tag-carb px-4 py-2 rounded-full text-[14px]" onclick="toggleTag(this)">豆腐</div>
+                    <div class="tag-base tag-off tag-carb px-4 py-2 rounded-full text-[14px]" onclick="toggleTag(this)">面条</div>
+                    <div class="tag-base tag-off tag-carb px-4 py-2 rounded-full text-[14px]" onclick="toggleTag(this)">米饭</div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div id="tab-discover" class="tab-content hide-scrollbar">
+        <div class="sticky top-0 bg-[#F4F5F7]/95 backdrop-blur-xl z-10 px-5 pt-16 pb-3">
+            <h1 class="text-2xl font-extrabold text-gray-900 mb-4">探索</h1>
+            <div class="bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-center px-4 py-3">
+                <span class="text-gray-400 text-lg mr-2">🔍</span>
+                <input type="text" placeholder="搜索菜谱、食材或 UP 主" class="bg-transparent outline-none text-[15px] w-full text-gray-800 placeholder-gray-400">
+            </div>
+            <div class="flex gap-3 mt-4 overflow-x-auto hide-scrollbar pb-1">
+                <span class="whitespace-nowrap bg-gray-900 text-white px-3.5 py-1.5 rounded-lg text-[12px] font-medium">🔥 今日推荐</span>
+                <span class="whitespace-nowrap bg-white text-gray-600 px-3.5 py-1.5 rounded-lg text-[12px] font-medium shadow-sm">减脂餐</span>
+                <span class="whitespace-nowrap bg-white text-gray-600 px-3.5 py-1.5 rounded-lg text-[12px] font-medium shadow-sm">快手早餐</span>
+            </div>
+        </div>
+
+        <div class="px-5 mt-2 space-y-5">
+            <div class="bg-white rounded-[24px] shadow-sm overflow-hidden active:scale-[0.98] transition-transform cursor-pointer" onclick="openDetail('绝密番茄炒蛋', '🍅🍳')">
+                <div class="h-40 bg-orange-50 flex items-center justify-center text-6xl relative">
+                    🍅🍳
+                    <div class="absolute bottom-2 right-2 bg-black/50 backdrop-blur text-white text-[10px] px-2 py-1 rounded-md">▶ 10.2万播放</div>
+                </div>
+                <div class="p-4">
+                    <h3 class="text-[18px] font-bold text-gray-900 mb-1">绝密番茄炒蛋，汤汁拌饭神仙吃法</h3>
+                    <p class="text-[13px] text-gray-500 mb-3">零失败的国民家常菜，十分钟搞定一顿饭。</p>
+                    <div class="flex items-center gap-2">
+                        <div class="w-5 h-5 rounded-full bg-gray-200"></div>
+                        <span class="text-[11px] text-gray-500 font-medium">周末大厨</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-3 rounded-[20px] shadow-sm flex gap-4 active:scale-[0.98] transition-transform cursor-pointer" onclick="openDetail('西蓝花炒肉', '🥦🥩')">
+                <div class="w-24 h-24 rounded-[14px] bg-green-50 flex items-center justify-center text-4xl">🥦🥩</div>
+                <div class="flex flex-col justify-center flex-1">
+                    <h3 class="text-[16px] font-bold text-gray-900 mb-1">低脂版西蓝花炒肉</h3>
+                    <p class="text-[12px] text-gray-500 mb-2 line-clamp-1">减脂期也能大口吃肉</p>
+                    <span class="bg-gray-100 text-gray-500 w-max px-2 py-0.5 rounded text-[11px]">15分钟 · 简单</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-table" class="tab-content table-surface hide-scrollbar relative">
+        <div class="relative z-10 px-6 pt-16 pb-4 flex justify-between items-start">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-full bg-white flex items-center justify-center text-2xl shadow-sm border border-gray-100">🧑‍🍳</div>
+                <div>
+                    <h1 class="text-[22px] font-extrabold text-[#4A4036] tracking-tight">我的餐桌</h1>
+                    <p class="text-[#8B7E6A] text-[13px] mt-0.5 font-medium">已珍藏 3 道私家佳肴</p>
+                </div>
+            </div>
+            <button class="w-10 h-10 rounded-full bg-white/60 backdrop-blur-md flex items-center justify-center text-[#8B7E6A] shadow-sm active:scale-95" onclick="showToast('跳转至账号设置')">⚙️</button>
+        </div>
+
+        <div class="relative z-10 px-6 mt-6 grid grid-cols-2 gap-x-6 gap-y-12 pb-10">
+            <div class="plate-wrapper flex flex-col items-center group cursor-pointer" onclick="openDetail('绝密番茄炒蛋', '🍅🍳')">
+                <div class="plate-ui w-[140px] h-[140px] rounded-full flex items-center justify-center relative">
+                    <div class="absolute inset-3 rounded-full plate-inner"></div>
+                    <span class="text-5xl relative z-10 group-hover:scale-110 transition-transform duration-300">🍅🍳</span>
+                </div>
+                <div class="plate-label mt-4 px-4 py-1.5 rounded-full text-[13px] font-bold text-[#5C5042]">绝密番茄炒蛋</div>
+            </div>
+
+            <div class="plate-wrapper flex flex-col items-center group cursor-pointer mt-12" onclick="openDetail('土豆炖排骨', '🥔🍖')">
+                <div class="plate-ui w-[140px] h-[140px] rounded-full flex items-center justify-center relative">
+                    <div class="absolute inset-3 rounded-full plate-inner"></div>
+                    <span class="text-5xl relative z-10 group-hover:scale-110 transition-transform duration-300">🥔🍖</span>
+                </div>
+                <div class="plate-label mt-4 px-4 py-1.5 rounded-full text-[13px] font-bold text-[#5C5042]">土豆炖排骨</div>
+            </div>
+
+            <div class="plate-wrapper flex flex-col items-center group cursor-pointer" onclick="openDetail('清炒大虾', '🦐🍋')">
+                <div class="plate-ui w-[140px] h-[140px] rounded-full flex items-center justify-center relative">
+                    <div class="absolute inset-3 rounded-full plate-inner"></div>
+                    <span class="text-5xl relative z-10 group-hover:scale-110 transition-transform duration-300">🦐🍋</span>
+                </div>
+                <div class="plate-label mt-4 px-4 py-1.5 rounded-full text-[13px] font-bold text-[#5C5042]">清炒大虾</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="page-detail" class="modal-layer hide-scrollbar">
+        <div class="sticky top-0 w-full bg-orange-50 z-20 rounded-t-[32px] pt-2 pb-2" onclick="closeDetail()">
+            <div class="modal-drag-indicator"></div>
+        </div>
+
+        <div class="h-[240px] bg-orange-50 relative flex items-center justify-center text-8xl -mt-8 pt-8" id="detail-icon">
+            🍅🍳
+        </div>
+
+        <div class="px-6 pt-6">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h1 class="text-[24px] font-extrabold text-gray-900 leading-tight mb-1" id="detail-title">绝密番茄炒蛋</h1>
+                    <p class="text-[13px] text-gray-500">10分钟 · 简单 · 350大卡</p>
+                </div>
+                <button class="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center active:scale-90 transition-transform" onclick="toggleFavorite(this)">
+                    <svg class="icon-heart transition-colors" xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" stroke="#9CA3AF" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 256 256"><path d="M128,216S28,160,28,92A52,52,0,0,1,128,72.34,52,52,0,0,1,228,92C228,160,128,216,128,216Z"></path></svg>
+                </button>
+            </div>
+
+            <h2 class="text-[16px] font-bold text-gray-900 mb-3 mt-6">核心公式</h2>
+            <div class="bg-[#F4F5F7] rounded-[16px] p-4 mb-8 flex flex-wrap items-center justify-center gap-2">
+                <span class="bg-white text-gray-800 px-3 py-1.5 rounded-lg text-[13px] font-bold shadow-sm">核心食材</span>
+                <span class="text-gray-400 font-bold">+</span>
+                <span class="bg-white text-gray-800 px-3 py-1.5 rounded-lg text-[13px] font-bold shadow-sm">辅助配料</span>
+            </div>
+            
+            <p class="text-[14px] text-gray-600 leading-relaxed bg-orange-50/50 p-4 rounded-xl">
+                💡 <b>要点：</b>这是通用的详情页组件，真实开发中将由 API 动态下发内容。
+            </p>
+        </div>
+
+        <div class="fixed bottom-0 w-full max-w-[430px] p-5 bg-white border-t border-gray-50 pb-8 z-50">
+            <button class="w-full btn-bili font-bold py-4 rounded-[16px] flex justify-center items-center gap-2" onclick="playVideo()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 256 256"><path d="M232.4,114.5l-136-72A16.08,16.08,0,0,0,72,56.9v142.2a16.08,16.08,0,0,0,24.4,13.7l136-72A15.82,15.82,0,0,0,232.4,114.5ZM88,183.4V72.6l104.7,55.4Z"></path></svg>
+                <span class="text-[16px]">跳转 B站 观看视频</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="absolute bottom-0 w-full z-40">
+        <div class="px-5 -mt-8 mb-4 relative block" id="fab-container">
+            <button id="generateBtn" class="w-full btn-off font-bold py-3.5 rounded-[16px] flex justify-center items-center shadow-lg" onclick="openDetail('匹配推荐菜谱', '✨🍳')">
+                <span id="btnText" class="text-[15px]">请先选择食材</span>
+            </button>
+        </div>
+
+        <nav class="glass-nav flex justify-around items-center pt-3">
+            <div class="tab-btn flex flex-col items-center gap-1 cursor-pointer text-gray-900" onclick="switchTab('home', this)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256"><path d="M168,24H88A24,24,0,0,0,64,48V208a24,24,0,0,0,24,24h80a24,24,0,0,0,24-24V48A24,24,0,0,0,168,24ZM88,40h80a8,8,0,0,1,8,8V96H80V48A8,8,0,0,1,88,40ZM176,208a8,8,0,0,1-8,8H88a8,8,0,0,1-8-8V112h96ZM104,68a8,8,0,0,1,8-8h16a8,8,0,0,1,0,16H112A8,8,0,0,1,104,68Zm0,80a8,8,0,0,1,8-8h16a8,8,0,0,1,0,16H112A8,8,0,0,1,104,148Z"></path></svg>
+                <span class="text-[10px] font-bold">冰箱</span>
+            </div>
+            <div class="tab-btn flex flex-col items-center gap-1 cursor-pointer text-gray-400 hover:text-gray-900" onclick="switchTab('discover', this)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24ZM74.08,197.5a64,64,0,0,1,107.84,0,87.83,87.83,0,0,1-107.84,0ZM96,120a32,32,0,1,1,32,32A32,32,0,0,1,96,120Zm97.76,66.41a79.66,79.66,0,0,0-36.06-28.75,48,48,0,1,0-59.4,0,79.66,79.66,0,0,0-36.06,28.75,88,88,0,1,1,131.52,0Z"></path></svg>
+                <span class="text-[10px] font-medium">探索</span>
+            </div>
+            <div class="tab-btn flex flex-col items-center gap-1 cursor-pointer text-gray-400 hover:text-gray-900" onclick="switchTab('table', this)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z" transform="rotate(45 128 128)"></path><circle cx="128" cy="128" r="88" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="16"></circle><circle cx="128" cy="128" r="48" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="16"></circle></svg>
+                <span class="text-[10px] font-medium">餐桌</span>
+            </div>
+        </nav>
+        <div class="w-full bg-white flex justify-center pb-2 pt-1"><div class="w-32 h-1.5 bg-gray-200 rounded-full"></div></div>
+    </div>
+</div>
+
+<script>
+    let isRandomizing = false;
+
+    // --- Toast 轻提示 ---
+    function showToast(message) {
+        const toast = document.getElementById('toast');
+        toast.innerText = message;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 2000);
+    }
+
+    // --- 路由与逻辑分离 ---
+    function switchTab(tabId, btnElement) {
+        // 1. 切换页面层
+        document.querySelectorAll('.tab-content').forEach(page => page.classList.remove('active'));
+        document.getElementById('tab-' + tabId).classList.add('active');
+        
+        // 2. 动态改变背景色（防止餐桌的燕麦色污染其他页面）
+        const wrapper = document.getElementById('app-wrapper');
+        if (tabId === 'table') {
+            wrapper.style.backgroundColor = 'var(--table-bg)';
+        } else {
+            wrapper.style.backgroundColor = 'var(--bg-color)';
+        }
+
+        // 3. 切换底部导航高亮
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('text-gray-900');
+            btn.classList.add('text-gray-400');
+            btn.querySelector('span').classList.remove('font-bold');
+            btn.querySelector('span').classList.add('font-medium');
+        });
+        btnElement.classList.add('text-gray-900');
+        btnElement.classList.remove('text-gray-400');
+        btnElement.querySelector('span').classList.add('font-bold');
+
+        // 4. 严格控制 FAB 按钮的生命周期（仅首页可见）
+        const fab = document.getElementById('fab-container');
+        fab.style.display = (tabId === 'home') ? 'block' : 'none';
+    }
+
+    // --- 食材点选逻辑 ---
+    function toggleTag(element) {
+        if (isRandomizing) return;
+        element.classList.toggle('active');
+        element.classList.toggle('tag-off');
+        updateFabState();
+    }
+
+    function updateFabState() {
+        const selectedCount = document.querySelectorAll('.tag-base.active').length;
+        const btn = document.getElementById('generateBtn');
+        const text = document.getElementById('btnText');
+
+        if (selectedCount > 0) {
+            btn.classList.remove('btn-off');
+            btn.classList.add('btn-main');
+            text.innerText = `查看这 ${selectedCount} 种食材能做什么`;
+        } else {
+            btn.classList.add('btn-off');
+            btn.classList.remove('btn-main');
+            text.innerText = '请先选择食材';
+        }
+    }
+
+    function clearAll() {
+        if (isRandomizing) return;
+        const activeTags = document.querySelectorAll('.tag-base.active');
+        if(activeTags.length > 0) {
+            activeTags.forEach(tag => {
+                tag.classList.remove('active', 'tag-highlight');
+                tag.classList.add('tag-off');
+            });
+            updateFabState();
+            showToast('已清空冰箱已选食材');
+        }
+    }
+
+    // --- Modal 交互 ---
+    function openDetail(title = '绝密番茄炒蛋', icon = '🍅🍳') {
+        document.getElementById('detail-title').innerText = title;
+        document.getElementById('detail-icon').innerText = icon;
+        document.getElementById('page-detail').classList.add('show');
+    }
+
+    function closeDetail() {
+        document.getElementById('page-detail').classList.remove('show');
+    }
+
+    function toggleFavorite(btn) {
+        const icon = btn.querySelector('.icon-heart');
+        icon.classList.toggle('active');
+        if(icon.classList.contains('active')) {
+            showToast('已摆放至我的餐桌');
+        } else {
+            showToast('已从餐桌撤下');
+        }
+    }
+
+    function playVideo() {
+        showToast('🚀 正在拉起 Bilibili 客户端...');
+        setTimeout(() => closeDetail(), 800);
+    }
+
+    // --- 盲盒随机引擎 ---
+    function startRandomizer() {
+        if (isRandomizing) return;
+        isRandomizing = true;
+        
+        document.querySelectorAll('.tag-base').forEach(tag => {
+            tag.classList.remove('active', 'tag-highlight');
+            tag.classList.add('tag-off');
+        });
+
+        const allTags = Array.from(document.querySelectorAll('.tag-base'));
+        let rounds = 0;
+        const interval = setInterval(() => {
+            allTags.forEach(t => t.classList.remove('tag-highlight'));
+            const randomIndexes = [];
+            for(let i=0; i<3; i++) randomIndexes.push(Math.floor(Math.random() * allTags.length));
+            randomIndexes.forEach(idx => allTags[idx].classList.add('tag-highlight'));
+            
+            rounds++;
+            if (rounds >= 10) {
+                clearInterval(interval);
+                allTags.forEach(t => t.classList.remove('tag-highlight'));
+                
+                const meatTags = document.querySelectorAll('.tag-meat');
+                const vegTags = document.querySelectorAll('.tag-veg');
+                const pickRandom = (nodeList, count) => Array.from(nodeList).sort(() => 0.5 - Math.random()).slice(0, count);
+                
+                const finalSelection = [...pickRandom(meatTags, 1), ...pickRandom(vegTags, 2)];
+                finalSelection.forEach(tag => { tag.classList.add('active'); tag.classList.remove('tag-off'); });
+                
+                isRandomizing = false;
+                updateFabState();
+                showToast('✨ 搭配完成，去看看做法吧！');
+                
+                const btn = document.getElementById('generateBtn');
+                btn.classList.add('scale-105');
+                setTimeout(() => btn.classList.remove('scale-105'), 200);
+            }
+        }, 75);
+    }
+</script>
+</body>
+</html>

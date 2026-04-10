@@ -394,6 +394,35 @@ export class RecipeDBManager {
   }
 
   /**
+   * 按 id 查单条菜谱详情，含 steps（调用前需已 ensureReady）。
+   * store 未就绪时返回 null，调用方按空态处理即可。
+   */
+  async getRecipeDetail(id: number): Promise<RecipeWithId | null> {
+    if (this.store === null) {
+      return null;
+    }
+    const rs = await this.store.querySql(
+      'SELECT id, name, steps, stuff_json, tools_json, methods_json, tags_json, emojis_json, difficulty ' +
+        'FROM recipe WHERE id = ?',
+      [id],
+    );
+    let result: RecipeWithId | null = null;
+    if (rs.goToFirstRow()) {
+      const name = rs.getString(rs.getColumnIndex('name'));
+      const steps = rs.getString(rs.getColumnIndex('steps'));
+      const stuffJson = rs.getString(rs.getColumnIndex('stuff_json'));
+      const toolsJson = rs.getString(rs.getColumnIndex('tools_json'));
+      const methodsJson = rs.getString(rs.getColumnIndex('methods_json'));
+      const tagsJson = rs.getString(rs.getColumnIndex('tags_json'));
+      const emojisJson = rs.getString(rs.getColumnIndex('emojis_json'));
+      const difficulty = rs.getString(rs.getColumnIndex('difficulty'));
+      result = this.rowToRecipeWithId(id, name, steps, stuffJson, toolsJson, methodsJson, tagsJson, emojisJson, difficulty);
+    }
+    rs.close();
+    return result;
+  }
+
+  /**
    * 从当前库读出全部菜谱（调用前需已 ensureReady）。
    */
   async readAllRecipes(): Promise<RecipeWithId[]> {

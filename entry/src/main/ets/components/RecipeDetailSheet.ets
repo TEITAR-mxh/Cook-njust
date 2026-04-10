@@ -7,6 +7,7 @@
  */
 import { AppColors } from '../constants/AppColors'
 import type { RecipeWithId } from '../model/recipe'
+import { RecipeDBManager } from '../data/RecipeDBManager'
 
 // ─────────────────────────────────────────────────────────────
 // 数据接口
@@ -82,6 +83,7 @@ export struct RecipeDetailSheet {
   @State private translateY: number = 1000
   @State private opacityValue: number = 0
   @State private detail: RecipeDetail = MOCK_DETAIL
+  @State private loadState: string = 'loading'  // 'loading' | 'ok' | 'empty'
 
   // ── 生命周期 ────────────────────────────────────────────────
 
@@ -94,12 +96,36 @@ export struct RecipeDetailSheet {
       this.translateY = 0
       this.opacityValue = 1
     })
-    // TODO: 待 RecipeDBManager 实现后，在此处加载完整数据（含 steps）
-    // RecipeDBManager.getInstance()
-    //   .getRecipeDetail(this.recipe?.id ?? 0)
-    //   .then((data: RecipeDetail | null) => {
-    //     if (data) this.detail = data
-    //   })
+    void this.loadStepsFromDB()
+  }
+
+  private async loadStepsFromDB(): Promise<void> {
+    const id = this.recipe?.id
+    if (id === undefined || id < 0) {
+      this.loadState = 'empty'
+      return
+    }
+    this.loadState = 'loading'
+    try {
+      const data = await RecipeDBManager.getInstance().getRecipeDetail(id)
+      if (data !== null && data.steps !== undefined && data.steps.length > 0) {
+        this.detail = {
+          id: this.detail.id,
+          name: this.detail.name,
+          emojis: this.detail.emojis,
+          difficulty: this.detail.difficulty,
+          tags: this.detail.tags,
+          stuff: this.detail.stuff,
+          tools: this.detail.tools,
+          steps: data.steps,
+        }
+        this.loadState = 'ok'
+      } else {
+        this.loadState = 'empty'
+      }
+    } catch {
+      this.loadState = 'empty'
+    }
   }
 
   // ── 私有方法 ─────────────────────────────────────────────────
@@ -130,6 +156,7 @@ export struct RecipeDetailSheet {
       // 重新打开（组件已挂载但 isVisible 从 false 变 true）时刷新数据并播放入场。
       // 首次打开的入场动画由 aboutToAppear 负责，此处处理重复打开场景。
       this.syncFromProp()
+      void this.loadStepsFromDB()
       animateTo({ duration: 400, curve: Curve.Friction }, () => {
         this.translateY = 0
         this.opacityValue = 1
@@ -267,7 +294,18 @@ export struct RecipeDetailSheet {
         .padding({ left: 20, right: 20, top: 16, bottom: 12 })
         .width('100%')
 
-      if (this.detail.steps.length > 0) {
+      if (this.loadState === 'loading') {
+        Row({ space: 8 }) {
+          LoadingProgress()
+            .width(20)
+            .height(20)
+            .color(AppColors.BRAND_COLOR)
+          Text('步骤加载中…')
+            .fontSize(13)
+            .fontColor(AppColors.GRAY_400)
+        }
+        .padding({ left: 20, top: 8, bottom: 20 })
+      } else if (this.loadState === 'ok' && this.detail.steps.length > 0) {
         ForEach(this.detail.steps, (step: string, index: number) => {
           Row({ space: 12 }) {
             // 步骤序号徽标

@@ -30,15 +30,17 @@ export const meatItems: StuffItem[] = [
   { name: '猪肉', emoji: '🐷' },
   { name: '鸡蛋', emoji: '🥚' },
   { name: '虾', emoji: '🦐' },
+  { name: '虾仁', emoji: '🦐' },
   { name: '牛肉', emoji: '🐮' },
   { name: '骨头', emoji: '🦴' },
-  { name: '鱼（Todo）', emoji: '🐟' },
+  { name: '肉', emoji: '🥩' },
 ];
 
 export const stapleItems: StuffItem[] = [
   { name: '面食', emoji: '🍝' },
   { name: '面包', emoji: '🍞' },
   { name: '米', emoji: '🍚' },
+  { name: '米饭', emoji: '🍚' },
   { name: '方便面', emoji: '🍜' },
 ];
 

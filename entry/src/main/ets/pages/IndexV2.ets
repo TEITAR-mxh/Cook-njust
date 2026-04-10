@@ -41,6 +41,8 @@ struct IndexV2 {
   @State searchHits: RecipeWithId[] = []
   @State libraryKeyword: string = ''
   @State libraryHits: RecipeWithId[] = []
+  @State libraryActiveTag: string = '今日推荐'   // 当前激活的分类标签
+  @State libraryActiveDifficulty: string = ''    // 当前激活的难度筛选，空字符串表示不筛选
   @State discoverPick: RecipeWithId = { id: -1, name: '', stuff: [], tools: [], steps: [] }
   @State historyIds: number[] = []
   @State favoriteIds: number[] = []
@@ -208,8 +210,17 @@ struct IndexV2 {
   }
 
   private runLibrarySearch(): void {
-    const all = RecipeRepository.getInstance().getAll();
-    this.libraryHits = RecipeSearchService.filterLibraryByName(all, this.libraryKeyword);
+    let result: RecipeWithId[];
+    if (this.libraryActiveTag === '搜索结果') {
+      // 搜索结果页：以冰箱筛选结果为基础，仅叠加难度过滤
+      result = RecipeSearchService.filterByDifficulty(this.searchHits, this.libraryActiveDifficulty);
+    } else {
+      const all = RecipeRepository.getInstance().getAll();
+      result = RecipeSearchService.filterLibraryByName(all, this.libraryKeyword);
+      result = RecipeSearchService.filterByTag(result, this.libraryActiveTag);
+      result = RecipeSearchService.filterByDifficulty(result, this.libraryActiveDifficulty);
+    }
+    this.libraryHits = result;
   }
 
   private emptyDiscoverPick(): RecipeWithId {
@@ -257,7 +268,7 @@ struct IndexV2 {
       r.tags = tg;
     }
     if (source.methods !== undefined) {
-      const mh: ('炒' | '煎' | '烘' | '炸')[] = [];
+      const mh: string[] = [];
       for (let j = 0; j < source.methods.length; j++) {
         mh.push(source.methods[j]);
       }
@@ -688,6 +699,35 @@ struct IndexV2 {
               }
               .width('100%')
             }
+            // 🍳 厨具
+            Column({ space: 12 }) {
+              Text('🍳 厨具')
+                .fontSize(15)
+                .fontColor(AppColors.GRAY_800)
+                .fontWeight(FontWeight.Bold)
+                .alignSelf(ItemAlign.Start)
+
+              Flex({
+                direction: FlexDirection.Row,
+                wrap: FlexWrap.Wrap,
+                alignItems: ItemAlign.Center
+              }) {
+                ForEach(toolItems, (item: StuffItem) => {
+                  IngredientTag({
+                    label: item.label ?? item.name,
+                    emoji: item.emoji,
+                    tagType: TagType.TOOL,
+                    isActive: this.curTool === item.name,
+                    isHighlighted: false,
+                    onTagClick: () => {
+                      this.toggleTool(item.name);
+                    }
+                  })
+                    .margin({ right: 10, bottom: 10 })
+                }, (item: StuffItem) => item.name)
+              }
+              .width('100%')
+            }
           }
           .width('100%')
           .padding({ left: 20, right: 20 })
@@ -725,9 +765,10 @@ struct IndexV2 {
         .enabled(this.selectedStuff.length > 0)
         .onClick(() => {
           if (this.selectedStuff.length > 0) {
-            // 显示匹配结果(可以跳转到菜谱Tab或弹窗)
-            this.showToast(`找到 ${this.searchHits.length} 道菜谱`);
-            this.mainTabIndex = 1; // 跳转到菜谱Tab查看结果
+            this.libraryActiveTag = '搜索结果';
+            this.libraryActiveDifficulty = '';
+            this.runLibrarySearch();
+            this.mainTabIndex = 1; // 跳转到菜谱Tab
           }
         })
       }
@@ -783,43 +824,77 @@ struct IndexV2 {
         })
 
         // 分类标签
-        Row({ space: 12 }) {
-          Text('🔥 今日推荐')
-            .fontSize(12)
-            .fontColor(Color.White)
-            .fontWeight(FontWeight.Medium)
-            .padding({ left: 14, right: 14, top: 6, bottom: 6 })
-            .backgroundColor(AppColors.GRAY_900)
-            .borderRadius(8)
+        Scroll() {
+          Row({ space: 8 }) {
+            // 搜索结果标签（有冰箱筛选结果时显示）
+            if (this.searchHits.length > 0) {
+              Text(`🔎 搜索结果 ${this.searchHits.length}`)
+                .fontSize(12)
+                .fontColor(this.libraryActiveTag === '搜索结果' ? Color.White : AppColors.BRAND_COLOR)
+                .fontWeight(FontWeight.Medium)
+                .padding({ left: 14, right: 14, top: 6, bottom: 6 })
+                .backgroundColor(this.libraryActiveTag === '搜索结果' ? AppColors.BRAND_COLOR : '#FFF0F1')
+                .borderRadius(8)
+                .shadow({
+                  radius: 2,
+                  color: 'rgba(0,0,0,0.05)',
+                  offsetX: 0,
+                  offsetY: 1
+                })
+                .onClick(() => {
+                  this.libraryActiveTag = '搜索结果';
+                  this.libraryActiveDifficulty = '';
+                  this.runLibrarySearch();
+                })
+            }
 
-          Text('减脂餐')
-            .fontSize(12)
-            .fontColor(AppColors.GRAY_600)
-            .fontWeight(FontWeight.Medium)
-            .padding({ left: 14, right: 14, top: 6, bottom: 6 })
-            .backgroundColor(Color.White)
-            .borderRadius(8)
-            .shadow({
-              radius: 2,
-              color: 'rgba(0,0,0,0.05)',
-              offsetX: 0,
-              offsetY: 1
-            })
+            ForEach(['今日推荐', '减脂餐', '快手早餐'], (tag: string) => {
+              Text(tag === '今日推荐' ? '🔥 今日推荐' : tag)
+                .fontSize(12)
+                .fontColor(this.libraryActiveTag === tag ? Color.White : AppColors.GRAY_600)
+                .fontWeight(FontWeight.Medium)
+                .padding({ left: 14, right: 14, top: 6, bottom: 6 })
+                .backgroundColor(this.libraryActiveTag === tag ? AppColors.GRAY_900 : Color.White)
+                .borderRadius(8)
+                .shadow({
+                  radius: 2,
+                  color: 'rgba(0,0,0,0.05)',
+                  offsetX: 0,
+                  offsetY: 1
+                })
+                .onClick(() => {
+                  this.libraryActiveTag = this.libraryActiveTag === tag ? '' : tag;
+                  this.runLibrarySearch();
+                })
+            }, (tag: string) => tag)
 
-          Text('快手早餐')
-            .fontSize(12)
-            .fontColor(AppColors.GRAY_600)
-            .fontWeight(FontWeight.Medium)
-            .padding({ left: 14, right: 14, top: 6, bottom: 6 })
-            .backgroundColor(Color.White)
-            .borderRadius(8)
-            .shadow({
-              radius: 2,
-              color: 'rgba(0,0,0,0.05)',
-              offsetX: 0,
-              offsetY: 1
-            })
+            // 难度筛选标签
+            ForEach(['简单', '普通', '困难'], (diff: string) => {
+              Text(diff)
+                .fontSize(12)
+                .fontColor(this.libraryActiveDifficulty === diff ? Color.White : AppColors.GRAY_600)
+                .fontWeight(FontWeight.Medium)
+                .padding({ left: 14, right: 14, top: 6, bottom: 6 })
+                .backgroundColor(this.libraryActiveDifficulty === diff ?
+                  (diff === '简单' ? '#22C55E' : diff === '普通' ? '#F59E0B' : '#EF4444') :
+                  Color.White)
+                .borderRadius(8)
+                .shadow({
+                  radius: 2,
+                  color: 'rgba(0,0,0,0.05)',
+                  offsetX: 0,
+                  offsetY: 1
+                })
+                .onClick(() => {
+                  this.libraryActiveDifficulty = this.libraryActiveDifficulty === diff ? '' : diff;
+                  this.runLibrarySearch();
+                })
+            }, (diff: string) => diff)
+          }
+          .padding({ right: 4 })
         }
+        .scrollable(ScrollDirection.Horizontal)
+        .scrollBar(BarState.Off)
         .width('100%')
         .margin({ top: 16 })
       }
@@ -831,6 +906,24 @@ struct IndexV2 {
       // 滚动内容区域
       Scroll() {
         Column({ space: 20 }) {
+          // 搜索结果模式：显示已选食材提示条
+          if (this.libraryActiveTag === '搜索结果') {
+            Row({ space: 6 }) {
+              Text('🧊')
+                .fontSize(14)
+              Text(`已选：${this.selectedStuff.join('、')}${this.curTool.length > 0 ? ' · ' + this.curTool : ''}`)
+                .fontSize(13)
+                .fontColor(AppColors.GRAY_600)
+                .layoutWeight(1)
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+            }
+            .width('100%')
+            .padding({ left: 14, right: 14, top: 8, bottom: 8 })
+            .backgroundColor('#FFF0F1')
+            .borderRadius(10)
+          }
+
           // 如果有搜索结果,显示卡片列表(统一使用小图模式)
           if (this.libraryHits.length > 0) {
             ForEach(this.libraryHits, (item: RecipeWithId) => {
@@ -853,7 +946,7 @@ struct IndexV2 {
                 .fontSize(48)
                 .opacity(0.3)
 
-              Text(this.recipeCount === 0 ? '暂无菜谱数据' : '暂无匹配的菜名')
+              Text(this.recipeCount === 0 ? '暂无菜谱数据' : '暂无匹配的菜谱')
                 .fontSize(14)
                 .fontColor(AppColors.GRAY_500)
             }

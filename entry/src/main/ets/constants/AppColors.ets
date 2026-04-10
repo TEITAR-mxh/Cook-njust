@@ -36,6 +36,10 @@ export class AppColors {
   static readonly CARB_BORDER: string = '#FDE047'
   static readonly CARB_TEXT: string = '#D97706'
 
+  static readonly TOOL_BG: string = '#EFF6FF'
+  static readonly TOOL_BORDER: string = '#93C5FD'
+  static readonly TOOL_TEXT: string = '#2563EB'
+
   // Bilibili 品牌色
   static readonly BILI_PINK: string = '#FB7299'
 

@@ -9,6 +9,7 @@ export enum TagType {
   MEAT = 'meat',
   VEG = 'veg',
   CARB = 'carb',
+  TOOL = 'tool',
   DEFAULT = 'default'
 }
 
@@ -43,6 +44,8 @@ export struct IngredientTag {
         return AppColors.VEG_BG
       case TagType.CARB:
         return AppColors.CARB_BG
+      case TagType.TOOL:
+        return AppColors.TOOL_BG
       default:
         return AppColors.CARD_BG
     }
@@ -62,6 +65,8 @@ export struct IngredientTag {
         return AppColors.VEG_BORDER
       case TagType.CARB:
         return AppColors.CARB_BORDER
+      case TagType.TOOL:
+        return AppColors.TOOL_BORDER
       default:
         return AppColors.GRAY_200
     }
@@ -86,6 +91,8 @@ export struct IngredientTag {
         return AppColors.VEG_TEXT
       case TagType.CARB:
         return AppColors.CARB_TEXT
+      case TagType.TOOL:
+        return AppColors.TOOL_TEXT
       default:
         return AppColors.GRAY_600
     }

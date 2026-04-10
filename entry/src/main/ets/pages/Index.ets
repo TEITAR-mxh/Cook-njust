@@ -226,7 +226,7 @@ struct Index {
       r.tags = tg;
     }
     if (source.methods !== undefined) {
-      const mh: ('炒' | '煎' | '烘' | '炸')[] = [];
+      const mh: string[] = [];
       for (let j = 0; j < source.methods.length; j++) {
         mh.push(source.methods[j]);
       }

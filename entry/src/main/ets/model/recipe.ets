@@ -11,7 +11,7 @@ export interface RecipeItem {
   emojis?: string[]
   difficulty?: Difficulty | ''
   tags?: string[]
-  methods?: ('炒' | '煎' | '烘' | '炸')[]
+  methods?: string[]
   tools: string[]
 }
 

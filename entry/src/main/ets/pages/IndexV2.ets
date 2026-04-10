@@ -12,7 +12,6 @@ import { common } from '@kit.AbilityKit';
 import { router } from '@kit.ArkUI';
 import { meatItems, stapleItems, toolItems, vegetableItems } from '../data/foodCatalog';
 import { RecipeRepository } from '../data/RecipeRepository';
-import { RecipeDBManager } from '../data/RecipeDBManager';
 import type { RecipeWithId, SearchMode, StuffItem } from '../model/recipe';
 import { RecipeSearchService } from '../service/RecipeSearchService';
 import { CookPreferences } from '../store/CookPreferences';
@@ -108,10 +107,8 @@ struct IndexV2 {
       console.error('RecipeRepository.load failed');
       return;
     }
-    // 初始化 SQLite 库（含 steps）；失败不阻塞主流程，详情页降级显示"暂无步骤"
-    RecipeDBManager.getInstance().ensureReady(host).catch(() => {
-      console.error('RecipeDBManager.ensureReady failed');
-    });
+    // RecipeRepository.load() 内部已 await DB 初始化，getAll() 直接返回含 difficulty/methods 的完整数据
+
     try {
       const settings = await CookPreferences.getSettings(host);
       this.keepLocalData = settings.keepLocalData;

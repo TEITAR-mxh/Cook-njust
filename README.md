@@ -30,22 +30,22 @@
 | 菜谱 Tab | 关键词全文搜索 | ✅ |
 | 菜谱 Tab | 点击卡片跳转详情弹窗 | ✅ |
 | 发现 Tab | 随机食谱抽取（含淡入淡出动画） | ✅ |
-| 餐桌 Tab | 收藏网格 + 历史入口 | ✅ |
+| 餐桌 Tab | 收藏网格 + 历史入口 + 设置入口 | ✅ |
 | 全局 | RecipeDetailSheet 底部弹窗详情页 | ✅ |
 | 全局 | 详情页烹饪步骤区（含 Loading / 空态） | ✅ |
 | 全局 | Toast 毛玻璃通知组件 | ✅ |
 | 全局 | 沉浸式 UI（透明导航栏 + 安全区适配） | ✅ |
 | 数据 | CookPreferences 持久化（收藏 / 历史 / 搜索模式） | ✅ |
 | 数据 | RecipeRepository 单例（JSON 索引化加载） | ✅ |
-| 数据 | RecipeDBManager SQLite 库（含 steps 字段） | ✅ |
-| 设置 | keepLocalData 本地数据保留开关 | ✅ |
+| 数据 | RecipeDBManager SQLite 库（含 steps 字段，SHA256 哈希增量导入） | ✅ |
+| 设置 | SettingsPage 独立设置页（数据统计 + keepLocalData 开关 + 关于） | ✅ |
 
 ### UI 组件库
 
 | 组件 | 说明 | 状态 |
 |:---|:---|:---:|
-| `RecipeCard.ets` | 大/小双模式食谱卡片，含收藏星标 | ✅ |
-| `RecipeDetailSheet.ets` | 底部弹窗，含标签行、食材/工具、烹饪步骤与收藏切换 | ✅ |
+| `RecipeCard.ets` | 大/小双模式食谱卡片，含收藏星标、difficulty 难度标签（三色）、methods 烹饪方式标签 | ✅ |
+| `RecipeDetailSheet.ets` | 底部弹窗，含标签行、食材/工具、烹饪步骤与收藏切换，已移除视频跳转 | ✅ |
 | `IngredientTag.ets` | 颜色编码食材标签 | ✅ |
 | `ToastView.ets` | 毛玻璃风格通知 | ✅ |
 | `PlateCard.ets` | 3D 盘子效果卡片 | ✅ |
@@ -53,11 +53,9 @@
 
 ---
 
-## 更新计划
+## 待解决问题
 
-### 待解决问题清单
-
-**P0 — 功能缺失（阻塞核心使用流程）**
+### P0 — 功能缺失（阻塞核心使用流程）
 
 - 冰箱 Tab 缺少**厨具选择器 UI**（状态与持久化已实现，无前端控件）
 - 冰箱 Tab 缺少**搜索模式切换 UI**（三种模式已实现，无切换入口）
@@ -65,16 +63,16 @@
 - 首次启动**隐私同意弹窗**缺失（华为应用市场上架强制要求）
 - `recipe.json` **步骤数据缺失**（599 条菜谱均无 `steps` 字段，详情页步骤区空白）
 
-**P1 — 数据与展示问题**
+### P1 — 数据与展示问题
 
-- RecipeCard 播放量、作者、时长均为**硬编码占位值**
+- `model/recipe.ets` 中 `methods` 类型仅限 `('炒' | '煎' | '烘' | '炸')[]`（4 种），但 `recipe.json` 实际含 24 种烹饪方式，超出部分在 DB 导入时被过滤丢弃
 - 收藏列表被 `.slice(0, 6)` 硬截断，未适配 500 条存储上限
 - `foodCatalog` 部分食材存在 `Todo` 占位符，厨具 emoji 缺失
 
-**P2 — 体验与合规**
+### P2 — 体验与合规
 
-- 设置页用户名 / ID 硬编码，合规链接不可点击，版本号未动态读取
-- 隐私政策 / 用户协议页面缺失（上架阻塞项）
+- 设置页用户名 / ID 硬编码（"美食达人" / "cook_2024"），版本号静态写死（"v1.0.0"）
+- 隐私政策 / 用户协议页面缺失，点击无跳转（上架阻塞项）
 - 搜索后强制切换 Tab，缺乏就地反馈
 
 ### 合规上架风险
@@ -88,36 +86,38 @@
 
 ---
 
-### 团队分工
+## 团队分工
 
 | 编号 | 成员角色 | 核心职责 | 具体负责任务 | 交付物 |
 |:---:|:---|:---|:---|:---|
-| 1 | 数据库工程师 | RDB 架构搭建与数据生命周期管理 | 1. 设计并实现 `RecipeDBManager.ets` ✅<br>2. 定义包含 `id`、`name`、`steps` 等字段的表结构（移除 `bv` 字段）✅<br>3. 编写首次启动时 JSON 读取与 DB 写入初始化逻辑 ✅ | 稳定运行的关系型数据库模块及表结构定义 |
+| 1 | 数据库工程师 | RDB 架构搭建与数据生命周期管理 | 1. 设计并实现 `RecipeDBManager.ets` ✅<br>2. 定义包含 `id`、`name`、`steps` 等字段的表结构（移除 `bv` 字段）✅<br>3. 编写首次启动时 JSON 读取与 DB 写入初始化逻辑（SHA256 哈希增量导入）✅<br>4. 将 `model/recipe.ets` 中 `methods` 类型扩展为 `string[]`（待完成） | 稳定运行的关系型数据库模块及表结构定义 |
 | 2 | 内容 / 数据策略研发 | AI 数据清洗与批量生成 | 1. 编写数据处理脚本，在初始数据填充阶段拦截原始 JSON<br>2. 运用 AI 能力为每道菜批量生成 3–5 步真实 `steps`<br>3. 确保内容符合烹饪常识，封装为数组入库 | 包含高质量做菜步骤的初始化数据集 |
-| 3 | 鸿蒙前端开发 A | 首页（Index / Home）页面重构 | 1. 升级 `RecipeCard` 组件<br>2. 新增 `difficulty`（难度）和 `methods`（烹饪方式）UI 元素<br>3. 保证首页列表对数据库异步查询结果的正确响应与渲染 | 升级后的首页列表 UI 组件（支持新字段渲染） |
-| 4 | 鸿蒙前端开发 B | 详情页（RecipeDetailSheet）重构 | ~~1. 彻底移除原视频跳转（`bv`）相关 UI 与交互逻辑~~ ✅ 已完成<br>~~2. 重新排版基础信息（`name`、`stuff`、`tags`、`tools` 等）~~ ✅ 已完成<br>~~3. 页面下方新增「烹饪步骤」区域，接入 DB 查询与三态渲染~~ ✅ 已完成 | 清爽、无冗余代码且包含详细步骤的详情页 |
+| 3 | 鸿蒙前端开发 A | 首页（Index / Home）页面重构 | 1. 升级 `RecipeCard` 组件 ✅<br>2. 新增 `difficulty`（难度）和 `methods`（烹饪方式）UI 元素 ✅<br>3. 保证首页列表对数据库异步查询结果的正确响应与渲染 ✅ | 升级后的首页列表 UI 组件（支持新字段渲染） |
+| 4 | 鸿蒙前端开发 B | 详情页（RecipeDetailSheet）重构 | 1. 彻底移除原视频跳转（`bv`）相关 UI 与交互逻辑 ✅<br>2. 重新排版基础信息（`name`、`stuff`、`tags`、`tools` 等）✅<br>3. 页面下方新增「烹饪步骤」区域，接入 DB 查询与三态渲染 ✅ | 清爽、无冗余代码且包含详细步骤的详情页 |
 | 5 | QA / 测试工程师 | 数据流转验证、全链路质量保障与应用上架合规优化 | 1. 测试 JSON → RDB 迁移数据完整性（无遗漏、无乱码）<br>2. 抽查生成烹饪步骤是否符合现实逻辑<br>3. 验证前后端数据流转，检查异步查询时 UI 是否闪烁或崩溃<br>4. 负责应用上架 | 数据迁移专项测试报告、端到端 UI 验收报告、应用上架 |
 
-### 冲刺路线
+---
+
+## 冲刺路线
 
 ```
 [Week 1：开发与内容补全]
-成员 1 (DB)    ──── [RecipeDBManager] ✅ ── [表结构 & 初始化逻辑] ✅ ──▶
-成员 2 (内容)  ──── [steps 批量生成] ───── [数据入库验证] ─────────────▶
-成员 3 (前端A) ──── [RecipeCard 升级] ──── [难度/方式字段渲染] ─────────▶
-成员 4 (前端B) ──── [基础信息重排版] ✅ ── [步骤区域接入 DB] ✅ ────────▶
-成员 5 (QA)   ──── [测试用例编写] ──────── [迁移测试方案] ──────────────▶
+成员 1 (DB)    ──── [RecipeDBManager] ✅ ── [表结构 & 初始化逻辑] ✅ ── [methods 类型扩展] ──▶
+成员 2 (内容)  ──── [steps 批量生成] ───── [数据入库验证] ─────────────────────────────────▶
+成员 3 (前端A) ──── [RecipeCard 升级] ✅ ── [难度/方式字段渲染] ✅ ──────────────────────────▶
+成员 4 (前端B) ──── [基础信息重排版] ✅ ── [步骤区域接入 DB] ✅ ──────────────────────────────▶
+成员 5 (QA)   ──── [测试用例编写] ──────── [迁移测试方案] ──────────────────────────────────▶
 
 [Week 2：联调、测试与提审]
-成员 1-4      ──── [功能联调] ─────────── [Bug 修复] ────────────────────▶
-成员 5 (QA)   ──── [全链路测试] ─────────  [上架素材准备] ─────────────────▶
-成员 5 (QA)   ──── [AGC 后台填报] ──────── [审核提交与跟进] ──────────────▶
+成员 1-4      ──── [功能联调] ─────────── [Bug 修复] ────────────────────────────────────────▶
+成员 5 (QA)   ──── [全链路测试] ─────────  [上架素材准备] ──────────────────────────────────▶
+成员 5 (QA)   ──── [AGC 后台填报] ──────── [审核提交与跟进] ────────────────────────────────▶
 ```
 
-### V1.0 完成标准
+## V1.0 完成标准
 
-- **数据层**：RDB 初始化完成 ✅，全部食谱含 3–5 步 `steps`（待内容补全），`bv` 字段彻底移除 ✅
-- **首页**：`RecipeCard` 正确展示 `difficulty` 与 `methods`，无硬编码占位内容
+- **数据层**：RDB 初始化完成 ✅，全部食谱含 3–5 步 `steps`（待内容补全），`bv` 字段彻底移除 ✅，`methods` 类型扩展为 `string[]`（待成员 1 修复）
+- **首页**：`RecipeCard` 正确展示 `difficulty` 与 `methods` ✅，无硬编码占位内容
 - **详情页**：烹饪步骤有序列表可读 ✅，无视频跳转残留代码 ✅
 - **合规基线**：首次启动隐私同意弹窗 + 隐私政策 / 用户协议页面均可访问
 - **质量保障**：全链路测试通过（食材选择 → 搜索 → 详情 → 步骤 → 收藏 → 历史）
@@ -130,29 +130,33 @@
 ```
 entry/src/main/ets/
 ├── components/         # 可复用 UI 组件
-│   ├── RecipeCard.ets
-│   ├── RecipeDetailSheet.ets
-│   ├── IngredientTag.ets
-│   ├── ToastView.ets
-│   ├── PlateCard.ets
-│   └── RandomPickerButton.ets
+│   ├── RecipeCard.ets          # 大/小双模式食谱卡片（含 difficulty/methods 标签）
+│   ├── RecipeDetailSheet.ets   # 底部弹窗（含步骤三态渲染，已移除视频跳转）
+│   ├── IngredientTag.ets       # 颜色编码食材标签
+│   ├── ToastView.ets           # 毛玻璃风格通知
+│   ├── PlateCard.ets           # 3D 盘子效果卡片
+│   └── RandomPickerButton.ets  # 随机食材抽取按钮
 ├── constants/          # 设计 Token 与主题色
 │   └── AppColors.ets
 ├── data/               # 数据层
-│   ├── RecipeRepository.ets   # JSON 索引化加载（内存搜索）
-│   ├── RecipeDBManager.ets    # SQLite 库（含 steps，hash 增量导入）
+│   ├── RecipeRepository.ets    # JSON 索引化加载（内存搜索，从 DB 读取）
+│   ├── RecipeDBManager.ets     # SQLite 库（含 steps，SHA256 哈希增量导入）
 │   └── foodCatalog.ets
 ├── model/              # 类型定义
+│   └── recipe.ets              # RecipeItem / RecipeWithId / SearchMode（methods 类型待扩展）
 ├── pages/              # 页面
-│   ├── IndexV2.ets     # 主入口（当前）
-│   ├── FavoritesPage.ets
-│   └── HistoryPage.ets
+│   ├── IndexV2.ets             # 主入口（当前）
+│   ├── SettingsPage.ets        # 独立设置页（数据统计 + 开关 + 关于）
+│   ├── FavoritesPage.ets       # 收藏列表
+│   └── HistoryPage.ets         # 浏览历史
 ├── service/            # 业务逻辑服务
-│   └── RecipeSearchService.ets
+│   └── RecipeSearchService.ets # 严格 / 宽松 / 生存三种搜索算法
 ├── store/              # 持久化
-│   └── CookPreferences.ets
+│   └── CookPreferences.ets     # HarmonyOS Preferences 封装
+├── utils/              # 工具函数
+│   └── IngredientTypeMapper.ets
 └── entryability/       # 应用生命周期
-    └── EntryAbility.ets
+    └── EntryAbility.ets        # 沉浸式 UI 初始化
 ```
 
 ---

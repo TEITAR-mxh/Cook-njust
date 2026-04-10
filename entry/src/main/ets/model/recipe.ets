@@ -5,9 +5,9 @@ export type Difficulty = '简单' | '普通' | '困难'
 
 export interface RecipeItem {
   name: string
-  link?: string
-  bv?: string
   stuff: string[]
+  /** 制作步骤纯文本，可为空数组 */
+  steps?: string[]
   emojis?: string[]
   difficulty?: Difficulty | ''
   tags?: string[]

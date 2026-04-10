@@ -13,7 +13,6 @@ export struct RecipeDetailSheet {
   @Prop isFavorite: boolean = false
 
   onFavoriteToggle?: () => void
-  onPlayVideo?: () => void
 
   @State translateY: number = 1000
   @State opacityValue: number = 0
@@ -45,6 +44,14 @@ export struct RecipeDetailSheet {
    */
   private closeSheet() {
     this.isVisible = false
+  }
+
+  private formatStepsText(steps: string[]): string {
+    const lines: string[] = []
+    for (let i = 0; i < steps.length; i++) {
+      lines.push(`${i + 1}. ${steps[i]}`)
+    }
+    return lines.join('\n\n')
   }
 
   build() {
@@ -165,58 +172,43 @@ export struct RecipeDetailSheet {
               .borderRadius(16)
               .margin({ left: 24, right: 24 })
 
-              // 提示文本
-              Text('💡 这道菜的详细做法可以通过下方的视频链接查看。')
-                .fontSize(14)
-                .fontColor(AppColors.GRAY_600)
-                .lineHeight(22)
+              if (this.recipe.steps !== undefined && this.recipe.steps.length > 0) {
+                Column({ space: 10 }) {
+                  Text('制作步骤')
+                    .fontSize(16)
+                    .fontColor(AppColors.GRAY_900)
+                    .fontWeight(FontWeight.Bold)
+                    .alignSelf(ItemAlign.Start)
+
+                  Text(this.formatStepsText(this.recipe.steps))
+                    .fontSize(14)
+                    .fontColor(AppColors.GRAY_800)
+                    .lineHeight(24)
+                    .width('100%')
+                }
+                .width('100%')
                 .padding(16)
-                .backgroundColor('rgba(255, 245, 235, 0.5)')
-                .borderRadius(12)
+                .backgroundColor(AppColors.BG_COLOR)
+                .borderRadius(16)
                 .margin({ left: 24, right: 24 })
+                .alignItems(HorizontalAlign.Start)
+              } else {
+                Text('💡 步骤尚未收录，可在后续版本数据中查看。')
+                  .fontSize(14)
+                  .fontColor(AppColors.GRAY_600)
+                  .lineHeight(22)
+                  .padding(16)
+                  .backgroundColor('rgba(255, 245, 235, 0.5)')
+                  .borderRadius(12)
+                  .margin({ left: 24, right: 24 })
+              }
             }
             .width('100%')
-            .padding({ bottom: 120 })
+            .padding({ bottom: 32 })
           }
           .layoutWeight(1)
           .scrollBar(BarState.Off)
           .backgroundColor(Color.White)
-
-          // 底部操作栏
-          Column() {
-            Button() {
-              Row({ space: 8 }) {
-                Text('▶')
-                  .fontSize(18)
-                  .fontColor(Color.White)
-
-                Text('跳转 B站 观看视频')
-                  .fontSize(16)
-                  .fontColor(Color.White)
-                  .fontWeight(FontWeight.Bold)
-              }
-            }
-            .width('100%')
-            .height(48)
-            .backgroundColor(AppColors.BILI_PINK)
-            .borderRadius(16)
-            .shadow({
-              radius: 20,
-              color: 'rgba(251, 114, 153, 0.5)',
-              offsetX: 0,
-              offsetY: 8
-            })
-            .onClick(() => {
-              if (this.onPlayVideo) {
-                this.onPlayVideo()
-              }
-            })
-          }
-          .width('100%')
-          .padding({ left: 20, right: 20, top: 16, bottom: 24 })
-          .backgroundColor(Color.White)
-          .borderWidth({ top: 1 })
-          .borderColor(AppColors.GRAY_50)
         }
         .width('100%')
         .height('95%')

@@ -1,8 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { router } from '@kit.ArkUI';
 import { RecipeRepository } from '../data/RecipeRepository';
-import type { RecipeWithId } from '../model/recipe';
-import { RecipeVideoLauncher } from '../service/RecipeVideoLauncher';
 import { CookPreferences } from '../store/CookPreferences';
 import { getSystemSafeTopVp } from '../util/StatusBarInset';
 
@@ -63,30 +61,12 @@ struct FavoritesPage {
     }
   }
 
-  private openVideo(item: RecipeWithId): void {
-    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
-    if (host === undefined) {
-      return;
-    }
-    RecipeVideoLauncher.open(host, item, this.keepLocalData, () => {
-      void this.load();
-    });
-  }
-
   private rowTitle(recipeId: number): string {
     const r = RecipeRepository.getInstance().getById(recipeId);
     if (r !== null) {
       return r.name;
     }
     return '';
-  }
-
-  private rowClickable(recipeId: number): boolean {
-    const r = RecipeRepository.getInstance().getById(recipeId);
-    if (r === null) {
-      return false;
-    }
-    return RecipeVideoLauncher.recipeVideoUri(r) !== null;
   }
 
   private onToggleFavorite(recipeId: number): void {
@@ -121,21 +101,9 @@ struct FavoritesPage {
           .layoutWeight(1)
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .fontColor(this.rowClickable(recipeId) ? '#18A058' : Color.Black)
-        if (this.rowClickable(recipeId)) {
-          Text('›')
-            .fontSize(18)
-            .fontColor('#CCCCCC')
-            .padding({ left: 4 })
-        }
+          .fontColor(Color.Black)
       }
       .layoutWeight(1)
-      .onClick(() => {
-        const r = RecipeRepository.getInstance().getById(recipeId);
-        if (r !== null) {
-          this.openVideo(r);
-        }
-      })
 
       if (this.keepLocalData) {
         Text('★')

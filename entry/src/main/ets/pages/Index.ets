@@ -4,7 +4,6 @@ import { meatItems, stapleItems, toolItems, vegetableItems } from '../data/foodC
 import { RecipeRepository } from '../data/RecipeRepository';
 import type { RecipeWithId, SearchMode, StuffItem } from '../model/recipe';
 import { RecipeSearchService } from '../service/RecipeSearchService';
-import { RecipeVideoLauncher } from '../service/RecipeVideoLauncher';
 import { CookPreferences } from '../store/CookPreferences';
 import { getSystemSafeTopVp } from '../util/StatusBarInset';
 
@@ -24,8 +23,7 @@ struct Index {
   @State libraryKeyword: string = ''
   @State libraryHits: RecipeWithId[] = []
   /** 发现 Tab：随机选中的菜谱；id 为 -1 表示未选 */
-  @State discoverPick: RecipeWithId = { id: -1, name: '', stuff: [], tools: [] }
-  @State discoverNoVideoHint: string = ''
+  @State discoverPick: RecipeWithId = { id: -1, name: '', stuff: [], tools: [], steps: [] }
   /** 浏览历史：id 从新到旧，与 Preferences 一致 */
   @State historyIds: number[] = []
   /** 收藏：id 顺序为最近收藏在前 */
@@ -181,7 +179,7 @@ struct Index {
   }
 
   private emptyDiscoverPick(): RecipeWithId {
-    const r: RecipeWithId = { id: -1, name: '', stuff: [], tools: [] };
+    const r: RecipeWithId = { id: -1, name: '', stuff: [], tools: [], steps: [] };
     return r;
   }
 
@@ -203,11 +201,12 @@ struct Index {
       stuff: stuffCopy,
       tools: toolsCopy,
     };
-    if (source.link !== undefined) {
-      r.link = source.link;
-    }
-    if (source.bv !== undefined) {
-      r.bv = source.bv;
+    if (source.steps !== undefined) {
+      const st: string[] = [];
+      for (let k = 0; k < source.steps.length; k++) {
+        st.push(source.steps[k]);
+      }
+      r.steps = st;
     }
     if (source.emojis !== undefined) {
       const em: string[] = [];
@@ -236,26 +235,17 @@ struct Index {
     return r;
   }
 
-  /** 从全库中随机选一道「可打开视频」的菜谱 */
+  /** 从全库中随机选一道菜谱 */
   private pickRandomDiscover(): void {
     const all = RecipeRepository.getInstance().getAll();
     const candidates: RecipeWithId[] = [];
     for (let i = 0; i < all.length; i++) {
-      const it = all[i];
-      if (RecipeVideoLauncher.recipeVideoUri(it) !== null) {
-        candidates.push(it);
-      }
+      candidates.push(all[i]);
     }
     if (candidates.length === 0) {
       this.discoverPick = this.emptyDiscoverPick();
-      if (all.length > 0) {
-        this.discoverNoVideoHint = '暂无可打开视频的菜谱';
-      } else {
-        this.discoverNoVideoHint = '';
-      }
       return;
     }
-    this.discoverNoVideoHint = '';
 
     let pool: RecipeWithId[] = candidates;
     const curId = this.discoverPick.id;
@@ -273,28 +263,6 @@ struct Index {
 
     const idx = Math.floor(Math.random() * pool.length);
     this.discoverPick = this.cloneRecipeForDiscoverState(pool[idx]);
-  }
-
-  private openRecipeVideo(item: RecipeWithId): void {
-    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
-    if (host === undefined) {
-      return;
-    }
-    RecipeVideoLauncher.open(host, item, this.keepLocalData, () => {
-      void this.refreshHistory();
-    });
-  }
-
-  private recipeRowClickable(item: RecipeWithId): boolean {
-    return RecipeVideoLauncher.recipeVideoUri(item) !== null;
-  }
-
-  private recipeRowClickableFromId(recipeId: number): boolean {
-    const r = RecipeRepository.getInstance().getById(recipeId);
-    if (r === null) {
-      return false;
-    }
-    return RecipeVideoLauncher.recipeVideoUri(r) !== null;
   }
 
   private async persistCookIfNeeded(): Promise<void> {
@@ -409,22 +377,13 @@ struct Index {
           .layoutWeight(1)
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .fontColor(this.recipeRowClickable(item) ? '#18A058' : Color.Black)
+          .fontColor(Color.Black)
         Text((item.difficulty !== undefined && item.difficulty.length > 0) ? item.difficulty : ' ')
           .fontSize(12)
           .fontColor('#888888')
           .width(40)
-        if (this.recipeRowClickable(item)) {
-          Text('›')
-            .fontSize(18)
-            .fontColor('#CCCCCC')
-            .padding({ left: 4 })
-        }
       }
       .layoutWeight(1)
-      .onClick(() => {
-        this.openRecipeVideo(item);
-      })
 
       if (this.keepLocalData) {
         Text(this.isRecipeFavorite(item.id) ? '★' : '☆')
@@ -456,23 +415,14 @@ struct Index {
           .layoutWeight(1)
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .fontColor(this.recipeRowClickable(this.discoverPick) ? '#18A058' : Color.Black)
+          .fontColor(Color.Black)
         Text((this.discoverPick.difficulty !== undefined && this.discoverPick.difficulty.length > 0) ?
           this.discoverPick.difficulty : ' ')
           .fontSize(12)
           .fontColor('#888888')
           .width(40)
-        if (this.recipeRowClickable(this.discoverPick)) {
-          Text('›')
-            .fontSize(18)
-            .fontColor('#CCCCCC')
-            .padding({ left: 4 })
-        }
       }
       .layoutWeight(1)
-      .onClick(() => {
-        this.openRecipeVideo(this.discoverPick);
-      })
 
       if (this.keepLocalData && this.discoverPick.id >= 0) {
         Text(this.isRecipeFavorite(this.discoverPick.id) ? '★' : '☆')
@@ -694,7 +644,7 @@ struct Index {
             .fontWeight(FontWeight.Medium)
             .alignSelf(ItemAlign.Start)
 
-          Text('不知道吃什么？随机从全库挑一道能看视频的。')
+          Text('不知道吃什么？随机从全库挑一道菜谱。')
             .fontSize(14)
             .fontColor('#888888')
             .alignSelf(ItemAlign.Start)
@@ -732,14 +682,6 @@ struct Index {
           .margin({ top: 8 })
           .alignSelf(ItemAlign.Start)
 
-          if (this.discoverNoVideoHint.length > 0) {
-            Text(this.discoverNoVideoHint)
-              .fontSize(14)
-              .fontColor('#888888')
-              .alignSelf(ItemAlign.Start)
-              .margin({ top: 12 })
-          }
-
           if (this.recipeCount === 0) {
             Text('暂无菜谱数据')
               .fontSize(14)
@@ -747,13 +689,11 @@ struct Index {
               .alignSelf(ItemAlign.Start)
               .margin({ top: 16 })
           } else if (this.discoverPick.id < 0) {
-            if (this.discoverNoVideoHint.length === 0) {
-              Text('点击「随机一道」开始')
-                .fontSize(14)
-                .fontColor('#888888')
-                .alignSelf(ItemAlign.Start)
-                .margin({ top: 16 })
-            }
+            Text('点击「随机一道」开始')
+              .fontSize(14)
+              .fontColor('#888888')
+              .alignSelf(ItemAlign.Start)
+              .margin({ top: 16 })
           } else {
             Column({ space: 8 }) {
               Text('今日推荐')

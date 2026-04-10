@@ -15,7 +15,6 @@ export struct RecipeCard {
   @Prop recipe: RecipeWithId
   @Prop mode: RecipeCardMode = RecipeCardMode.LARGE
   @Prop isFavorite: boolean = false
-  @Prop hasVideo: boolean = false
 
   onCardClick?: () => void
   onFavoriteClick?: () => void
@@ -47,26 +46,6 @@ export struct RecipeCard {
         .width('100%')
         .height('100%')
         .justifyContent(FlexAlign.Center)
-
-        // 播放量标签 (右下角)
-        if (this.hasVideo) {
-          Row({ space: 4 }) {
-            Text('▶')
-              .fontSize(10)
-              .fontColor(Color.White)
-
-            Text('10.2万播放')
-              .fontSize(10)
-              .fontColor(Color.White)
-          }
-          .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-          .backgroundColor('rgba(0,0,0,0.5)')
-          .borderRadius(6)
-          .backdropBlur(8)
-          .position({ x: '100%', y: '100%' })
-          .markAnchor({ x: '100%', y: '100%' })
-          .translate({ x: -8, y: -8 })
-        }
 
         // 收藏按钮 (右上角)
         Column() {

@@ -5,9 +5,13 @@
  * - Scroll 容器保证内容超屏可滚动
  * - aboutToAppear 预留 RecipeDBManager 接口位置
  */
+import { pasteboard } from '@kit.BasicServicesKit'
 import { AppColors } from '../constants/AppColors'
 import type { RecipeWithId } from '../model/recipe'
 import { RecipeDBManager } from '../data/RecipeDBManager'
+import { ShoppingListService } from '../service/ShoppingListService'
+import { CookingFocusView } from './CookingFocusView'
+import { ToastView } from './ToastView'
 
 // ─────────────────────────────────────────────────────────────
 // 数据接口
@@ -76,6 +80,7 @@ function pickTagColor(index: number): TagColor {
 export struct RecipeDetailSheet {
   @Link @Watch('onVisibleChange') isVisible: boolean
   @Prop recipe: RecipeWithId | null = null
+  @Prop selectedStuff: string[] = []
   @Prop isFavorite: boolean = false
 
   onFavoriteToggle?: () => void
@@ -84,6 +89,9 @@ export struct RecipeDetailSheet {
   @State private opacityValue: number = 0
   @State private detail: RecipeDetail = MOCK_DETAIL
   @State private loadState: string = 'loading'  // 'loading' | 'ok' | 'empty'
+  @State private focusModeVisible: boolean = false
+  @State private toastMessage: string = ''
+  @State private toastVisible: boolean = false
 
   // ── 生命周期 ────────────────────────────────────────────────
 
@@ -144,6 +152,38 @@ export struct RecipeDetailSheet {
       stuff: this.recipe.stuff,
       tools: this.recipe.tools,
       steps: [],
+    }
+  }
+
+  private showToast(message: string): void {
+    this.toastMessage = message
+    this.toastVisible = false
+    setTimeout(() => {
+      this.toastVisible = true
+    }, 0)
+  }
+
+  private handleCopyMissingItems(): void {
+    const diffResult = ShoppingListService.diff(this.selectedStuff, this.detail.stuff)
+    if (diffResult.missingItems.length === 0) {
+      this.showToast('食材已齐，可以开做了！')
+      return
+    }
+
+    const text = ShoppingListService.toClipboardText(
+      this.detail.name,
+      diffResult.missingItems,
+      diffResult.matchedItems
+    )
+
+    try {
+      const systemPasteboard = pasteboard.getSystemPasteboard()
+      const pasteData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, text)
+      systemPasteboard.setDataSync(pasteData)
+      this.showToast('缺失食材已复制到剪贴板')
+    } catch (err) {
+      console.error('Copy to clipboard failed', JSON.stringify(err))
+      this.showToast('复制失败，请稍后重试')
     }
   }
 
@@ -248,12 +288,29 @@ export struct RecipeDetailSheet {
   // ── @Builder：分类列表区（食材 / 工具） ─────────────────────
 
   @Builder
-  ItemListSection(title: string, items: string[], emptyHint: string) {
+  ItemListSection(title: string, items: string[], emptyHint: string, allowCopyAction: boolean = false) {
     Column({ space: 10 }) {
-      Text(title)
-        .fontSize(15)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(AppColors.GRAY_800)
+      Row() {
+        Text(title)
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.GRAY_800)
+
+        Blank()
+
+        if (allowCopyAction) {
+          Text('复制缺料')
+            .fontSize(12)
+            .fontColor(AppColors.BRAND_COLOR)
+            .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+            .backgroundColor(AppColors.GRAY_100)
+            .borderRadius(10)
+            .onClick(() => {
+              this.handleCopyMissingItems()
+            })
+        }
+      }
+      .width('100%')
 
       if (items.length > 0) {
         Flex({ wrap: FlexWrap.Wrap }) {
@@ -274,11 +331,12 @@ export struct RecipeDetailSheet {
         Text(emptyHint)
           .fontSize(13)
           .fontColor(AppColors.GRAY_400)
+          .padding({ top: 8, bottom: 16 })
       }
     }
     .width('100%')
+    .padding({ left: 20, right: 20, top: 16, bottom: 16 })
     .alignItems(HorizontalAlign.Start)
-    .padding({ left: 20, right: 20, top: 16, bottom: 12 })
   }
 
   // ── @Builder：烹饪步骤区 ────────────────────────────────────
@@ -286,13 +344,30 @@ export struct RecipeDetailSheet {
   @Builder
   StepsSection() {
     Column({ space: 0 }) {
-      // 区域标题
-      Text('烹饪步骤')
-        .fontSize(15)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(AppColors.GRAY_800)
-        .padding({ left: 20, right: 20, top: 16, bottom: 12 })
-        .width('100%')
+      Row() {
+        Text('烹饪步骤')
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.GRAY_800)
+
+        Blank()
+
+        Text('专注模式')
+          .fontSize(12)
+          .fontColor(AppColors.BRAND_COLOR)
+          .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+          .backgroundColor(AppColors.GRAY_100)
+          .borderRadius(10)
+          .onClick(() => {
+            if (this.detail.steps.length > 0) {
+              this.focusModeVisible = true
+            } else {
+              this.showToast('暂无烹饪步骤信息')
+            }
+          })
+      }
+      .padding({ left: 20, right: 20, top: 16, bottom: 12 })
+      .width('100%')
 
       if (this.loadState === 'loading') {
         Row({ space: 8 }) {
@@ -300,7 +375,7 @@ export struct RecipeDetailSheet {
             .width(20)
             .height(20)
             .color(AppColors.BRAND_COLOR)
-          Text('步骤加载中…')
+          Text('加载中')
             .fontSize(13)
             .fontColor(AppColors.GRAY_400)
         }
@@ -308,7 +383,6 @@ export struct RecipeDetailSheet {
       } else if (this.loadState === 'ok' && this.detail.steps.length > 0) {
         ForEach(this.detail.steps, (step: string, index: number) => {
           Row({ space: 12 }) {
-            // 步骤序号徽标
             Text(`${index + 1}`)
               .fontSize(12)
               .fontColor(Color.White)
@@ -319,7 +393,6 @@ export struct RecipeDetailSheet {
               .backgroundColor(AppColors.BRAND_COLOR)
               .borderRadius(12)
 
-            // 步骤内容
             Text(step)
               .fontSize(14)
               .fontColor(AppColors.GRAY_600)
@@ -332,7 +405,7 @@ export struct RecipeDetailSheet {
           .backgroundColor(index % 2 === 0 ? Color.White : AppColors.GRAY_50)
         }, (step: string, index: number) => `${index}-${step}`)
       } else {
-        Text('暂无烹饪步骤，敬请期待…')
+        Text('暂无烹饪步骤信息')
           .fontSize(13)
           .fontColor(AppColors.GRAY_400)
           .padding({ left: 20, right: 20, top: 8, bottom: 16 })
@@ -415,7 +488,7 @@ export struct RecipeDetailSheet {
               this.TagsSection()
 
               // 食材
-              this.ItemListSection('🧂 食材', this.detail.stuff, '暂无食材信息')
+              this.ItemListSection('🧂 食材', this.detail.stuff, '暂无食材信息', true)
 
               Divider()
                 .color(AppColors.GRAY_100)
@@ -450,6 +523,14 @@ export struct RecipeDetailSheet {
         .translate({ y: this.translateY })
         .alignSelf(ItemAlign.End)
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
+
+        ToastView({ message: this.toastMessage, visible: this.toastVisible })
+
+        CookingFocusView({
+          visible: $focusModeVisible,
+          recipeName: this.detail.name,
+          steps: this.detail.steps
+        })
       }
       .width('100%')
       .height('100%')

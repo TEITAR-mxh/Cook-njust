@@ -439,30 +439,7 @@ struct IndexV2 {
     }
   }
 
-  private async onKeepLocalChange(isOn: boolean): Promise<void> {
-    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
-    if (!host) {
-      return;
-    }
-    try {
-      await CookPreferences.setKeepLocalData(host, isOn);
-      this.keepLocalData = isOn;
-      if (!isOn) {
-        await CookPreferences.clearCookPersisted(host);
-        this.historyIds = [];
-        this.favoriteIds = [];
-      } else {
-        this.selectedStuff = await CookPreferences.getSelectedStuff(host);
-        this.curTool = await CookPreferences.getCurTool(host);
-        this.searchMode = await CookPreferences.getSearchMode(host);
-        await this.refreshHistory();
-        await this.refreshFavorites();
-      }
-      this.runSearch();
-    } catch {
-      console.error('CookPreferences.setKeepLocalData failed');
-    }
-  }
+
 
   // ===== 新增的 UI 辅助方法 =====
   private showToast(message: string): void {
@@ -1492,6 +1469,7 @@ struct IndexV2 {
         RecipeDetailSheet({
           isVisible: $detailSheetVisible,
           recipe: this.selectedRecipe,
+          selectedStuff: this.selectedStuff.concat([]),
           isFavorite: this.isRecipeFavorite(this.selectedRecipe.id),
           onFavoriteToggle: () => {
             if (this.selectedRecipe) {

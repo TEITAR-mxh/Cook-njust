@@ -9,7 +9,26 @@ export interface UserSettings {
   keepLocalData: boolean
 }
 
+/** 用户个人信息 */
+export interface UserProfile {
+  nickname: string
+  avatar: string // 头像emoji或图片URL
+}
+
 const DEFAULT_SETTINGS: UserSettings = { keepLocalData: true };
+const DEFAULT_PROFILE: UserProfile = { nickname: '美食家', avatar: '👨' };
+
+export function sliceRecipeIds(ids: number[], offset: number, limit: number): number[] {
+  if (limit <= 0 || offset < 0 || offset >= ids.length) {
+    return [];
+  }
+  const out: number[] = [];
+  const end = Math.min(ids.length, offset + limit);
+  for (let i = offset; i < end; i++) {
+    out.push(ids[i]);
+  }
+  return out;
+}
 
 /**
  * Preferences 内的字段名（单文件多 key）。
@@ -17,12 +36,14 @@ const DEFAULT_SETTINGS: UserSettings = { keepLocalData: true };
  */
 export class CookPreferenceKeys {
   static readonly SETTINGS: string = 'settings'
+  static readonly PROFILE: string = 'profile'
   /** 后续：食材多选，建议存 JSON 字符串 string[] */
   static readonly STUFF: string = 'stuff'
   static readonly TOOL: string = 'tool'
   static readonly MODE: string = 'mode'
   static readonly FAVORITES: string = 'favorites'
   static readonly HISTORY: string = 'history'
+  static readonly PRIVACY_ACCEPTED: string = 'privacy_accepted'
 }
 
 /**
@@ -96,7 +117,37 @@ export class CookPreferences {
     await CookPreferences.setSettings(context, { keepLocalData: keep });
   }
 
-  /** 关闭「保留本地数据」时可清空已持久化的选料（与 Web 行为接近） */
+  /** 获取用户个人信息 */
+  static async getUserProfile(context: common.Context): Promise<UserProfile> {
+    const p = await CookPreferences.getStore(context);
+    const rawVal = await p.get(CookPreferenceKeys.PROFILE, '');
+    const raw = CookPreferences.getSettingsString(rawVal);
+    if (raw.length === 0) {
+      return { nickname: DEFAULT_PROFILE.nickname, avatar: DEFAULT_PROFILE.avatar };
+    }
+    try {
+      const parsed: UserProfile = JSON.parse(raw) as UserProfile;
+      return {
+        nickname: parsed.nickname || DEFAULT_PROFILE.nickname,
+        avatar: parsed.avatar || DEFAULT_PROFILE.avatar
+      };
+    } catch {
+      return { nickname: DEFAULT_PROFILE.nickname, avatar: DEFAULT_PROFILE.avatar };
+    }
+  }
+
+  /** 设置用户个人信息 */
+  static async setUserProfile(context: common.Context, profile: UserProfile): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    const toSave: UserProfile = {
+      nickname: profile.nickname || DEFAULT_PROFILE.nickname,
+      avatar: profile.avatar || DEFAULT_PROFILE.avatar
+    };
+    await p.put(CookPreferenceKeys.PROFILE, JSON.stringify(toSave));
+    await p.flush();
+  }
+
+  /** 关闭「保留本地数据」时可清空已持久化的选料（与 Web 行伪接近） */
   static async clearCookPersisted(context: common.Context): Promise<void> {
     const p = await CookPreferences.getStore(context);
     await p.put(CookPreferenceKeys.STUFF, '[]');
@@ -140,6 +191,11 @@ export class CookPreferences {
     const p = await CookPreferences.getStore(context);
     const raw = CookPreferences.getSettingsString(await p.get(CookPreferenceKeys.FAVORITES, ''));
     return CookPreferences.parseRecipeIdArray(raw);
+  }
+
+  static async getFavoriteIdsPage(context: common.Context, offset: number, limit: number): Promise<number[]> {
+    const ids = await CookPreferences.getFavoriteIds(context);
+    return sliceRecipeIds(ids, offset, limit);
   }
 
   static async setFavoriteIds(context: common.Context, ids: number[]): Promise<void> {
@@ -190,6 +246,18 @@ export class CookPreferences {
   static async clearHistory(context: common.Context): Promise<void> {
     const p = await CookPreferences.getStore(context);
     await p.put(CookPreferenceKeys.HISTORY, '[]');
+    await p.flush();
+  }
+
+  static async hasAcceptedPrivacy(context: common.Context): Promise<boolean> {
+    const p = await CookPreferences.getStore(context);
+    const raw = await p.get(CookPreferenceKeys.PRIVACY_ACCEPTED, false);
+    return raw === true;
+  }
+
+  static async setPrivacyAccepted(context: common.Context, accepted: boolean): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.PRIVACY_ACCEPTED, accepted);
     await p.flush();
   }
 

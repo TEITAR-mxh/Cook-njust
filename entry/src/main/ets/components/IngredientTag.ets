@@ -18,18 +18,13 @@ export struct IngredientTag {
   @Prop label: string = ''
   @Prop tagType: TagType = TagType.DEFAULT
   @Prop isActive: boolean = false
-  @Prop isHighlighted: boolean = false  // 随机动画中的高亮状态
+  @Prop isHighlighted: boolean = false
   @Prop emoji: string = ''
   onTagClick?: () => void
 
-  // 用于点击动效的状态
   @State scaleValue: number = 1.0
 
-  /**
-   * 根据激活状态和类型返回背景色
-   */
   private getBackgroundColor(): string {
-    // 高亮状态(随机动画中)
     if (this.isHighlighted) {
       return AppColors.GRAY_300
     }
@@ -51,9 +46,6 @@ export struct IngredientTag {
     }
   }
 
-  /**
-   * 根据激活状态和类型返回边框色
-   */
   private getBorderColor(): string {
     if (!this.isActive) {
       return AppColors.GRAY_200
@@ -72,11 +64,7 @@ export struct IngredientTag {
     }
   }
 
-  /**
-   * 根据激活状态和类型返回文字色
-   */
   private getTextColor(): string {
-    // 高亮状态(随机动画中)
     if (this.isHighlighted) {
       return '#FFFFFF'
     }
@@ -105,7 +93,7 @@ export struct IngredientTag {
       .fontWeight(this.isActive ? FontWeight.Bold : FontWeight.Normal)
       .padding({ left: 16, right: 16, top: 8, bottom: 8 })
       .backgroundColor(this.getBackgroundColor())
-      .borderRadius(100) // 原型中的 rounded-full
+      .borderRadius(100)
       .borderWidth(1)
       .borderColor(this.getBorderColor())
       .shadow({
@@ -121,7 +109,6 @@ export struct IngredientTag {
       })
       .onTouch((event) => {
         if (event.type === TouchType.Down) {
-          // 原型中的 :active { transform: scale(0.92) }
           this.scaleValue = 0.92
         } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
           this.scaleValue = 1.0

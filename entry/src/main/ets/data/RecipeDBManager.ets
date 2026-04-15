@@ -85,6 +85,24 @@ interface RawRecipeRow {
   steps?: string[]
 }
 
+
+export function sanitizeStringArray(value: string[] | undefined): string[] {
+  if (value === undefined) {
+    return [];
+  }
+  const out: string[] = [];
+  for (let i = 0; i < value.length; i++) {
+    const item = value[i];
+    if (typeof item === 'string') {
+      const trimmed = item.trim();
+      if (trimmed.length > 0) {
+        out.push(trimmed);
+      }
+    }
+  }
+  return out;
+}
+
 const HEX_DIGITS: string[] = [
   '0', '1', '2', '3', '4', '5', '6', '7',
   '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
@@ -111,7 +129,7 @@ function fallbackFingerprint(bytes: Uint8Array): string {
   return `fnv1a:${bytes.length}:${h.toString(16)}`;
 }
 
-async function sha256HexOfBytes(bytes: Uint8Array): Promise<string> {
+export async function sha256HexOfBytes(bytes: Uint8Array): Promise<string> {
   try {
     const md = cryptoFramework.createMd('SHA256');
     await md.update({ data: bytes });
@@ -124,37 +142,15 @@ async function sha256HexOfBytes(bytes: Uint8Array): Promise<string> {
 
 function parseStringArrayJson(text: string): string[] {
   try {
-    const v = JSON.parse(text) as string[];
-    if (!Array.isArray(v)) {
-      return [];
-    }
-    const out: string[] = [];
-    for (let i = 0; i < v.length; i++) {
-      const s = v[i];
-      if (typeof s === 'string') {
-        out.push(s);
-      }
-    }
-    return out;
+    return sanitizeStringArray(JSON.parse(text) as string[]);
   } catch {
     return [];
   }
 }
 
-function parseMethodsJson(text: string): ('炒' | '煎' | '烘' | '炸')[] {
+function parseMethodsJson(text: string): string[] {
   try {
-    const arr = JSON.parse(text) as string[];
-    if (!Array.isArray(arr)) {
-      return [];
-    }
-    const out: ('炒' | '煎' | '烘' | '炸')[] = [];
-    for (let i = 0; i < arr.length; i++) {
-      const m = arr[i];
-      if (m === '炒' || m === '煎' || m === '烘' || m === '炸') {
-        out.push(m);
-      }
-    }
-    return out;
+    return sanitizeStringArray(JSON.parse(text) as string[]);
   } catch {
     return [];
   }
@@ -162,18 +158,7 @@ function parseMethodsJson(text: string): ('炒' | '煎' | '烘' | '炸')[] {
 
 function parseStepsJson(text: string): string[] {
   try {
-    const v = JSON.parse(text) as string[];
-    if (!Array.isArray(v)) {
-      return [];
-    }
-    const out: string[] = [];
-    for (let i = 0; i < v.length; i++) {
-      const s = v[i];
-      if (typeof s === 'string') {
-        out.push(s);
-      }
-    }
-    return out;
+    return sanitizeStringArray(JSON.parse(text) as string[]);
   } catch {
     return [];
   }
@@ -335,18 +320,12 @@ export class RecipeDBManager {
           row.tags = item.tags;
         }
         if (item.methods !== undefined) {
-          const mh: ('炒' | '煎' | '烘' | '炸')[] = [];
-          for (let j = 0; j < item.methods.length; j++) {
-            const m = item.methods[j];
-            if (m === '炒' || m === '煎' || m === '烘' || m === '炸') {
-              mh.push(m);
-            }
-          }
-          if (mh.length > 0) {
-            row.methods = mh;
+          const normalizedMethods = sanitizeStringArray(item.methods);
+          if (normalizedMethods.length > 0) {
+            row.methods = normalizedMethods;
           }
         }
-        const stepsArr = item.steps ?? [];
+        const stepsArr = sanitizeStringArray(item.steps);
         const diffStr = row.difficulty !== undefined ? String(row.difficulty) : '';
         const bucket: relationalStore.ValuesBucket = {
           id: i,

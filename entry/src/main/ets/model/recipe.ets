@@ -11,6 +11,7 @@ export interface RecipeItem {
   emojis?: string[]
   difficulty?: Difficulty | ''
   tags?: string[]
+  /** 保留 recipe.json 中的完整烹饪方式枚举，避免入库时被硬编码过滤 */
   methods?: string[]
   tools: string[]
 }

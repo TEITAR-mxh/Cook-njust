@@ -4,6 +4,7 @@
 export class AppColors {
   // 品牌色
   static readonly BRAND_COLOR: string = '#FF4757'
+  static readonly BRAND_COLOR_LIGHT: string = '#FFE4E6'
   static readonly BRAND_GRADIENT_START: string = '#FF6B6B'
   static readonly BRAND_GRADIENT_END: string = '#FF4757'
 

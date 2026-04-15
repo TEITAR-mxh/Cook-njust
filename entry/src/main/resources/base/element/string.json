@@ -11,6 +11,14 @@
     {
       "name": "EntryAbility_label",
       "value": "label"
+    },
+    {
+      "name": "permission_read_imagevideo_reason",
+      "value": "用于选择图片作为头像"
+    },
+    {
+      "name": "permission_write_imagevideo_reason",
+      "value": "用于保存选择的头像图片"
     }
   ]
 }

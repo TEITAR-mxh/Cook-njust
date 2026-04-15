@@ -23,6 +23,10 @@
 
 | 模块 | 功能 | 状态 |
 |:---|:---|:---:|
+| 开机页 | StartupPage 品牌动画（Logo 弹入 + 副标题上滑 + 装饰光晕，最短停留 2400ms） | ✅ |
+| 开机页 | 首次启动隐私同意弹窗（含拒绝退出 / 同意进入） | ✅ |
+| 开机页 | 离场淡出动画（缩小 + 透明度过渡后跳转首页） | ✅ |
+| 法律文档页 | LegalDocPage 隐私政策 / 用户协议页面 | ✅ |
 | 冰箱 Tab | 食材 Tag 多选（三类颜色编码） | ✅ |
 | 冰箱 Tab | 随机食材抽取按钮 | ✅ |
 | 冰箱 Tab | 严格 / 宽松 / 生存三种搜索引擎 | ✅ |
@@ -33,9 +37,11 @@
 | 餐桌 Tab | 收藏网格 + 历史入口 + 设置入口 | ✅ |
 | 全局 | RecipeDetailSheet 底部弹窗详情页 | ✅ |
 | 全局 | 详情页烹饪步骤区（含 Loading / 空态） | ✅ |
+| 全局 | 专注烹饪模式（全屏 Swiper 大字步骤 + 屏幕常亮） | ✅ |
+| 全局 | 采购清单（对比已选食材 / 输出缺料 / 剪贴板导出） | ✅ |
 | 全局 | Toast 毛玻璃通知组件 | ✅ |
 | 全局 | 沉浸式 UI（透明导航栏 + 安全区适配） | ✅ |
-| 数据 | CookPreferences 持久化（收藏 / 历史 / 搜索模式） | ✅ |
+| 数据 | CookPreferences 持久化（收藏 / 历史 / 搜索模式 / 隐私协议确认状态） | ✅ |
 | 数据 | RecipeRepository 单例（JSON 索引化加载） | ✅ |
 | 数据 | RecipeDBManager SQLite 库（含 steps 字段，SHA256 哈希增量导入） | ✅ |
 | 设置 | SettingsPage 独立设置页（数据统计 + keepLocalData 开关 + 关于） | ✅ |
@@ -45,7 +51,8 @@
 | 组件 | 说明 | 状态 |
 |:---|:---|:---:|
 | `RecipeCard.ets` | 大/小双模式食谱卡片，含收藏星标、difficulty 难度标签（三色）、methods 烹饪方式标签 | ✅ |
-| `RecipeDetailSheet.ets` | 底部弹窗，含标签行、食材/工具、烹饪步骤与收藏切换，已移除视频跳转 | ✅ |
+| `RecipeDetailSheet.ets` | 底部弹窗，含标签行、食材/工具、烹饪步骤、采购清单、专注烹饪入口 | ✅ |
+| `CookingFocusView.ets` | 全屏专注烹饪覆盖层，Swiper 翻页 + 大字阅读 + 屏幕常亮 | ✅ |
 | `IngredientTag.ets` | 颜色编码食材标签 | ✅ |
 | `ToastView.ets` | 毛玻璃风格通知 | ✅ |
 | `PlateCard.ets` | 3D 盘子效果卡片 | ✅ |
@@ -55,32 +62,23 @@
 
 ## 待解决问题
 
-### P0 — 功能缺失（阻塞核心使用流程）
-
-- 冰箱 Tab 缺少**厨具选择器 UI**（状态与持久化已实现，无前端控件）
-- 冰箱 Tab 缺少**搜索模式切换 UI**（三种模式已实现，无切换入口）
-- 菜谱 Tab 分类 Chip **不可筛选**（Tag 无 onClick，未对接过滤逻辑）
-- 首次启动**隐私同意弹窗**缺失（华为应用市场上架强制要求）
-- `recipe.json` **步骤数据缺失**（599 条菜谱均无 `steps` 字段，详情页步骤区空白）
-
 ### P1 — 数据与展示问题
 
 - `model/recipe.ets` 中 `methods` 类型仅限 `('炒' | '煎' | '烘' | '炸')[]`（4 种），但 `recipe.json` 实际含 24 种烹饪方式，超出部分在 DB 导入时被过滤丢弃
 - 收藏列表被 `.slice(0, 6)` 硬截断，未适配 500 条存储上限
 - `foodCatalog` 部分食材存在 `Todo` 占位符，厨具 emoji 缺失
 
-### P2 — 体验与合规
+### P2 — 体验
 
 - 设置页用户名 / ID 硬编码（"美食达人" / "cook_2024"），版本号静态写死（"v1.0.0"）
-- 隐私政策 / 用户协议页面缺失，点击无跳转（上架阻塞项）
 - 搜索后强制切换 Tab，缺乏就地反馈
 
-### 合规上架风险
+### 合规上架状态
 
 | 审核要求 | 当前状态 | 风险等级 |
 |:---|:---:|:---:|
-| 首次启动隐私同意弹窗 | ❌ 缺失 | 🔴 阻塞审核 |
-| 隐私政策 / 用户协议页面 | ❌ 点击无效 | 🔴 阻塞审核 |
+| 首次启动隐私同意弹窗 | ✅ 已完成 | — |
+| 隐私政策 / 用户协议页面 | ✅ 已完成 | — |
 | `app.json5` 描述、图标、标签完整性 | ⚠️ 需核查 | 🟡 可能阻塞 |
 | AGC 后台数据安全说明 | ❌ 缺失 | 🟡 可能阻塞 |
 
@@ -119,7 +117,7 @@
 - **数据层**：RDB 初始化完成 ✅，全部食谱含 3–5 步 `steps`（待内容补全），`bv` 字段彻底移除 ✅，`methods` 类型扩展为 `string[]`（待成员 1 修复）
 - **首页**：`RecipeCard` 正确展示 `difficulty` 与 `methods` ✅，无硬编码占位内容
 - **详情页**：烹饪步骤有序列表可读 ✅，无视频跳转残留代码 ✅
-- **合规基线**：首次启动隐私同意弹窗 + 隐私政策 / 用户协议页面均可访问
+- **合规基线**：首次启动隐私同意弹窗 ✅，隐私政策 / 用户协议页面均可访问 ✅
 - **质量保障**：全链路测试通过（食材选择 → 搜索 → 详情 → 步骤 → 收藏 → 历史）
 - **上架准备**：AGC 应用信息、隐私安全问卷填写完整，审核材料齐备
 
@@ -131,7 +129,8 @@
 entry/src/main/ets/
 ├── components/         # 可复用 UI 组件
 │   ├── RecipeCard.ets          # 大/小双模式食谱卡片（含 difficulty/methods 标签）
-│   ├── RecipeDetailSheet.ets   # 底部弹窗（含步骤三态渲染，已移除视频跳转）
+│   ├── RecipeDetailSheet.ets   # 底部弹窗（含步骤三态渲染、采购清单、专注烹饪入口）
+│   ├── CookingFocusView.ets    # 全屏专注烹饪覆盖层（Swiper 翻页 + 屏幕常亮）
 │   ├── IngredientTag.ets       # 颜色编码食材标签
 │   ├── ToastView.ets           # 毛玻璃风格通知
 │   ├── PlateCard.ets           # 3D 盘子效果卡片
@@ -145,14 +144,17 @@ entry/src/main/ets/
 ├── model/              # 类型定义
 │   └── recipe.ets              # RecipeItem / RecipeWithId / SearchMode（methods 类型待扩展）
 ├── pages/              # 页面
+│   ├── StartupPage.ets         # 开机品牌动画页（含隐私同意弹窗，最短停留 2400ms）
+│   ├── LegalDocPage.ets        # 隐私政策 / 用户协议法律文档页
 │   ├── IndexV2.ets             # 主入口（当前）
 │   ├── SettingsPage.ets        # 独立设置页（数据统计 + 开关 + 关于）
 │   ├── FavoritesPage.ets       # 收藏列表
 │   └── HistoryPage.ets         # 浏览历史
 ├── service/            # 业务逻辑服务
-│   └── RecipeSearchService.ets # 严格 / 宽松 / 生存三种搜索算法
+│   ├── RecipeSearchService.ets # 严格 / 宽松 / 生存三种搜索算法
+│   └── ShoppingListService.ets # 采购清单（缺料对比 + 文本导出）
 ├── store/              # 持久化
-│   └── CookPreferences.ets     # HarmonyOS Preferences 封装
+│   └── CookPreferences.ets     # HarmonyOS Preferences 封装（含隐私协议确认状态）
 ├── utils/              # 工具函数
 │   └── IngredientTypeMapper.ets
 └── entryability/       # 应用生命周期
@@ -166,3 +168,53 @@ entry/src/main/ets/
 - **IDE**：DevEco Studio
 - **SDK**：HarmonyOS 6.0.2 (API 22)
 - **构建**：`node ./hvigor/hvigor-wrapper.js --mode module -p module=entry@default assembleHap`
+
+---
+
+## 更新说明
+
+### 5. 开机动画延长（2026-04-16）
+
+- 入场动画各阶段时长整体延长约 30%：
+  - 背景光晕淡入：900ms → 1200ms
+  - Logo 弹入：680ms（延迟 60ms）→ 880ms（延迟 80ms）
+  - 副标题上滑：520ms（延迟 300ms）→ 660ms（延迟 420ms）
+  - 状态行淡入：380ms（延迟 520ms）→ 500ms（延迟 720ms）
+- 新增最短停留时长 **2400ms**：即使 Preferences 读取极快，也会等待入场动画完整播放后再触发离场跳转
+
+### 4. 专注烹饪模式
+
+- 已保留并继续完善 `entry/src/main/ets/components/CookingFocusView.ets`
+- 当前已具备：
+  - 全屏覆盖展示
+  - `Swiper` 左右翻页
+  - 大字号步骤阅读
+  - 屏幕常亮锁
+- 已在 `RecipeDetailSheet.ets` 中加入：
+  - `focusModeVisible` 状态
+  - `CookingFocusView` 挂载关系
+  - "开始烹饪"入口预留
+
+### 3. 详情页采购清单闭环
+
+- 已在 `RecipeDetailSheet.ets` 的食材区域加入"复制缺料"入口
+- 已在详情页内部接入局部 `ToastView` 状态
+- 当前逻辑：
+  - 食材齐全时提示"食材已齐，可以开做了"
+  - 存在缺料时复制采购清单到系统剪贴板
+  - 成功或失败均通过详情页内 Toast 反馈
+
+### 2. 详情页数据透传
+
+- 已从 `entry/src/main/ets/pages/IndexV2.ets` 向 `entry/src/main/ets/components/RecipeDetailSheet.ets` 单向透传 `selectedStuff`
+- 详情页使用：`@Prop selectedStuff: string[] = []`
+- 父级透传时使用新数组引用：`this.selectedStuff.concat([])`
+
+### 1. 采购清单能力
+
+- 已新增 `entry/src/main/ets/service/ShoppingListService.ets`
+- 当前已具备：
+  - 对比"已选食材"与"菜谱所需食材"
+  - 输出缺失食材 `missingItems`
+  - 输出已匹配食材 `matchedItems`
+- 已提供采购清单文本导出模板

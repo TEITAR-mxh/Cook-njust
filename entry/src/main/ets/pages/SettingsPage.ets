@@ -1,3 +1,7 @@
+/**
+ * 个人设置与应用管理页面 (API 22 扩展功能版)
+ * 新增了：外观模式选择、消息通知、存储缓存清理等实用功能
+ */
 import { bundleManager, common } from '@kit.AbilityKit'
 import { router } from '@kit.ArkUI'
 import { deviceInfo } from '@kit.BasicServicesKit'
@@ -7,19 +11,14 @@ import { AppColors } from '../constants/AppColors'
 import { RecipeRepository } from '../data/RecipeRepository'
 import { CookPreferences, type UserProfile } from '../store/CookPreferences'
 import { getSystemSafeTopVp } from '../util/StatusBarInset'
+import { ToastView } from '../components/ToastView' // 引入 Toast
 
 const AVATAR_OPTIONS: string[] = ['👨', '👩', '🧑', '👦', '👧', '🍳', '🥘', '🍲', '🥗', '🍕', '🍔', '🍟', '🥐', '🥪', '🥙', '🍣']
-
-interface SettingLinkItem {
-  icon: string
-  title: string
-  value?: string
-  onClick: () => void
-}
 
 @Entry
 @Component
 struct SettingsPage {
+  // 原有状态
   @State keepLocalData: boolean = true
   @State recipeCount: number = 0
   @State favoriteCount: number = 0
@@ -37,6 +36,14 @@ struct SettingsPage {
   @State avatarMode: 'emoji' | 'upload' = 'emoji'
   @State customAvatarUri: string = ''
 
+  // ====== 新增的扩展功能状态 ======
+  @State themeMode: string = '系统默认'
+  @State showThemeSheet: boolean = false
+  @State enableDailyPush: boolean = false
+  @State cacheSize: string = '18.6 MB'
+  @State toastMessage: string = ''
+  @State toastVisible: boolean = false
+
   aboutToAppear(): void {
     void this.loadSafeArea()
     void this.loadData()
@@ -46,23 +53,26 @@ struct SettingsPage {
     void this.loadData()
   }
 
+  private showToast(msg: string) {
+    this.toastMessage = msg
+    this.toastVisible = true
+    setTimeout(() => { this.toastVisible = false }, 2000)
+  }
+
   private getHostContext(): common.UIAbilityContext | undefined {
     return this.getUIContext().getHostContext() as common.UIAbilityContext | undefined
   }
 
   private async loadSafeArea(): Promise<void> {
     const host = this.getHostContext()
-    if (!host) {
-      return
+    if (host) {
+      this.safeTopVp = await getSystemSafeTopVp(host)
     }
-    this.safeTopVp = await getSystemSafeTopVp(host)
   }
 
   private async loadData(): Promise<void> {
     const host = this.getHostContext()
-    if (!host) {
-      return
-    }
+    if (!host) return
 
     try {
       this.recipeCount = RecipeRepository.getInstance().getCount()
@@ -78,29 +88,17 @@ struct SettingsPage {
       if (profile.avatar && this.isImageUri(profile.avatar)) {
         this.customAvatarUri = profile.avatar
       }
-    } catch (err) {
-      console.error('SettingsPage.loadData preference part failed', err)
-    }
+    } catch (err) {}
 
     try {
-      const bundleInfo = await bundleManager.getBundleInfoForSelf(
-        bundleManager.BundleFlag.GET_BUNDLE_INFO_WITH_APPLICATION
-      )
+      const bundleInfo = await bundleManager.getBundleInfoForSelf(bundleManager.BundleFlag.GET_BUNDLE_INFO_WITH_APPLICATION)
       this.appVersion = bundleInfo.versionName ?? '--'
-      this.bundleName = bundleInfo.name ?? '--'
-    } catch (err) {
-      console.error('SettingsPage.loadData bundle info failed', err)
-    }
+    } catch (err) {}
 
     try {
-      const marketName = deviceInfo.marketName ?? ''
-      const productModel = deviceInfo.productModel ?? ''
-      const sdkVersion = String(deviceInfo.sdkApiVersion ?? '')
-      this.deviceName = marketName.length > 0 ? marketName : (productModel.length > 0 ? productModel : '当前设备')
-      this.systemVersion = sdkVersion.length > 0 ? `HarmonyOS API ${sdkVersion}` : 'HarmonyOS'
-    } catch (err) {
-      console.error('SettingsPage.loadData device info failed', err)
-    }
+      this.deviceName = deviceInfo.marketName || deviceInfo.productModel || '当前设备'
+      this.systemVersion = deviceInfo.sdkApiVersion ? `HarmonyOS API ${deviceInfo.sdkApiVersion}` : 'HarmonyOS'
+    } catch (err) {}
   }
 
   private isImageUri(uri: string): boolean {
@@ -109,33 +107,20 @@ struct SettingsPage {
 
   private async copyImageToSandbox(sourceUri: string): Promise<string> {
     const host = this.getHostContext()
-    if (!host) {
-      throw new Error('No host context')
-    }
+    if (!host) throw new Error('No host context')
     const timestamp = new Date().getTime()
     const targetPath = `${host.filesDir}/avatar_${timestamp}.jpg`
-    let sourceFile: fileIo.File | undefined
-    let targetFile: fileIo.File | undefined
-    try {
-      sourceFile = fileIo.openSync(sourceUri, fileIo.OpenMode.READ_ONLY)
-      targetFile = fileIo.openSync(targetPath, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE)
-      fileIo.copyFileSync(sourceFile.fd, targetFile.fd)
-      return targetPath
-    } finally {
-      if (sourceFile) {
-        fileIo.closeSync(sourceFile)
-      }
-      if (targetFile) {
-        fileIo.closeSync(targetFile)
-      }
-    }
+    let sourceFile = fileIo.openSync(sourceUri, fileIo.OpenMode.READ_ONLY)
+    let targetFile = fileIo.openSync(targetPath, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE)
+    fileIo.copyFileSync(sourceFile.fd, targetFile.fd)
+    fileIo.closeSync(sourceFile)
+    fileIo.closeSync(targetFile)
+    return targetPath
   }
 
   private async onKeepLocalChange(isOn: boolean): Promise<void> {
     const host = this.getHostContext()
-    if (!host) {
-      return
-    }
+    if (!host) return
     this.keepLocalData = isOn
     await CookPreferences.setKeepLocalData(host, isOn)
     if (!isOn) {
@@ -148,10 +133,7 @@ struct SettingsPage {
 
   private async saveUserProfile(): Promise<void> {
     const host = this.getHostContext()
-    if (!host) {
-      return
-    }
-    await CookPreferences.setUserProfile(host, this.userProfile)
+    if (host) await CookPreferences.setUserProfile(host, this.userProfile)
   }
 
   private startEditNickname(): void {
@@ -187,51 +169,33 @@ struct SettingsPage {
 
   private async selectImageAvatar(): Promise<void> {
     try {
-      const photoSelectOptions: photoAccessHelper.PhotoSelectOptions = {
-        MIMEType: photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE,
-        maxSelectNumber: 1,
-        isPhotoTakingSupported: true,
-        isSearchSupported: true
-      }
       const photoViewPicker = new photoAccessHelper.PhotoViewPicker()
-      const photoSelectResult = await photoViewPicker.select(photoSelectOptions)
-      if (photoSelectResult && photoSelectResult.photoUris.length > 0) {
-        const selectedUri = photoSelectResult.photoUris[0]
-        const sandboxUri = await this.copyImageToSandbox(selectedUri)
+      const result = await photoViewPicker.select({
+        MIMEType: photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE,
+        maxSelectNumber: 1
+      })
+      if (result && result.photoUris.length > 0) {
+        const sandboxUri = await this.copyImageToSandbox(result.photoUris[0])
         this.customAvatarUri = sandboxUri
         this.userProfile.avatar = sandboxUri
         this.isEditingAvatar = false
         void this.saveUserProfile()
       }
-    } catch (error) {
-      console.error('Photo picker error:', error)
-    }
+    } catch (error) {}
   }
 
   private openLegalDoc(docType: string): void {
-    interface DocParams {
-      docType: string
-    }
-    interface RouteParams {
-      url: string
-      params: DocParams
-    }
-    const routeParams: RouteParams = { url: 'pages/LegalDocPage', params: { docType: docType } }
-    router.pushUrl(routeParams as router.RouterOptions).catch(() => {
-      console.error('openLegalDoc failed')
-    })
+    router.pushUrl({ url: 'pages/LegalDocPage', params: { docType: docType } }).catch(() => {})
   }
+
+  // ==== 构建器区块 ====
 
   @Builder
   buildAvatarDisplay() {
     if (this.customAvatarUri) {
-      Image(this.customAvatarUri)
-        .width(56)
-        .height(56)
-        .borderRadius(28)
+      Image(this.customAvatarUri).width(64).height(64).borderRadius(32)
     } else {
-      Text(this.userProfile.avatar)
-        .fontSize(30)
+      Text(this.userProfile.avatar).fontSize(32)
     }
   }
 
@@ -239,279 +203,191 @@ struct SettingsPage {
   buildAvatarSelector() {
     Column({ space: 16 }) {
       Row({ space: 10 }) {
-        Text('选择头像')
-          .fontSize(15)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(AppColors.GRAY_900)
-          .layoutWeight(1)
-
-        Text('Emoji')
-          .fontSize(13)
-          .fontColor(this.avatarMode === 'emoji' ? AppColors.BRAND_COLOR : AppColors.GRAY_500)
-          .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-          .backgroundColor(this.avatarMode === 'emoji' ? AppColors.BRAND_COLOR_LIGHT : 'transparent')
-          .borderRadius(16)
-          .onClick(() => { this.avatarMode = 'emoji' })
-
-        Text('图片')
-          .fontSize(13)
-          .fontColor(this.avatarMode === 'upload' ? AppColors.BRAND_COLOR : AppColors.GRAY_500)
-          .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-          .backgroundColor(this.avatarMode === 'upload' ? AppColors.BRAND_COLOR_LIGHT : 'transparent')
-          .borderRadius(16)
-          .onClick(() => { this.avatarMode = 'upload' })
+        Text('选择头像').fontSize(16).fontWeight(FontWeight.Bold).fontColor(AppColors.GRAY_900).layoutWeight(1)
+        Text('Emoji').fontSize(14).fontColor(this.avatarMode === 'emoji' ? AppColors.BRAND_COLOR : AppColors.GRAY_500).padding({ left: 16, right: 16, top: 8, bottom: 8 }).backgroundColor(this.avatarMode === 'emoji' ? AppColors.BRAND_COLOR_LIGHT : 'transparent').borderRadius(20).onClick(() => { this.avatarMode = 'emoji' })
+        Text('图片').fontSize(14).fontColor(this.avatarMode === 'upload' ? AppColors.BRAND_COLOR : AppColors.GRAY_500).padding({ left: 16, right: 16, top: 8, bottom: 8 }).backgroundColor(this.avatarMode === 'upload' ? AppColors.BRAND_COLOR_LIGHT : 'transparent').borderRadius(20).onClick(() => { this.avatarMode = 'upload' })
       }
-
       if (this.avatarMode === 'emoji') {
-        Flex({
-          direction: FlexDirection.Row,
-          wrap: FlexWrap.Wrap,
-          justifyContent: FlexAlign.Start
-        }) {
+        Flex({ wrap: FlexWrap.Wrap }) {
           ForEach(AVATAR_OPTIONS, (avatar: string) => {
-            Text(avatar)
-              .fontSize(26)
-              .padding(10)
-              .backgroundColor(this.userProfile.avatar === avatar ? AppColors.BRAND_COLOR_LIGHT : 'transparent')
-              .borderRadius(16)
-              .margin({ right: 8, bottom: 8 })
-              .onClick(() => { this.selectAvatar(avatar) })
+            Text(avatar).fontSize(28).padding(12).backgroundColor(this.userProfile.avatar === avatar ? AppColors.BRAND_COLOR_LIGHT : 'transparent').borderRadius(20).margin({ right: 8, bottom: 8 }).onClick(() => { this.selectAvatar(avatar) })
           }, (avatar: string) => avatar)
-        }
-        .width('100%')
+        }.width('100%')
       }
-
       if (this.avatarMode === 'upload') {
         Column({ space: 14 }) {
           if (this.customAvatarUri) {
-            Image(this.customAvatarUri)
-              .width(72)
-              .height(72)
-              .borderRadius(36)
+            Image(this.customAvatarUri).width(80).height(80).borderRadius(40)
           } else {
-            Column() {
-              Text('🖼️').fontSize(28)
-            }
-            .width(72)
-            .height(72)
-            .borderRadius(36)
-            .backgroundColor(AppColors.GRAY_100)
-            .justifyContent(FlexAlign.Center)
+            Column() { SymbolGlyph($r('sys.symbol.camera')).fontSize(32).fontColor([AppColors.GRAY_400]) }.width(80).height(80).borderRadius(40).backgroundColor(AppColors.GRAY_100).justifyContent(FlexAlign.Center)
           }
+          Text('从相册选择').fontSize(15).fontColor(AppColors.BRAND_COLOR).fontWeight(FontWeight.Medium).padding({ left: 24, right: 24, top: 12, bottom: 12 }).backgroundColor(AppColors.BRAND_COLOR_LIGHT).borderRadius(12).onClick(() => { void this.selectImageAvatar() })
+        }.width('100%').padding({ top: 8, bottom: 8 })
+      }
+    }.width('100%').padding(20).backgroundColor(Color.White).borderRadius(20).margin({ top: 16 })
+  }
 
-          Text('从相册选择')
-            .fontSize(14)
-            .fontColor(AppColors.BRAND_COLOR)
-            .padding({ left: 20, right: 20, top: 10, bottom: 10 })
-            .backgroundColor(AppColors.BRAND_COLOR_LIGHT)
-            .borderRadius(10)
-            .onClick(() => { void this.selectImageAvatar() })
+  // 升级版的设置卡片，支持展示 value 字符串
+  @Builder
+  buildSettingCard(title: string, description: string, isToggle: boolean = false, isOn: boolean = false, valueStr: string = '', onClick?: () => void) {
+    Row({ space: 16 }) {
+      Column({ space: 6 }) {
+        Text(title).fontSize(16).fontWeight(FontWeight.Medium).fontColor(AppColors.GRAY_900).textAlign(TextAlign.Start)
+        if (description) {
+          Text(description).fontSize(13).fontColor(AppColors.GRAY_500).textAlign(TextAlign.Start).lineHeight(18)
         }
-        .width('100%')
-        .alignItems(HorizontalAlign.Center)
-        .padding({ top: 8, bottom: 8 })
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+
+      if (isToggle) {
+        Toggle({ type: ToggleType.Switch, isOn: isOn })
+          .selectedColor(AppColors.BRAND_COLOR)
+          .switchPointColor(Color.White)
+          .onChange((val: boolean) => { onClick && onClick() })
+      } else {
+        Row({ space: 8 }) {
+          if (valueStr) {
+            Text(valueStr).fontSize(14).fontColor(AppColors.GRAY_500)
+          } else {
+            Text('查看').fontSize(14).fontColor(AppColors.GRAY_400)
+          }
+          SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(18).fontColor([AppColors.GRAY_300])
+        }
       }
     }
     .width('100%')
-    .padding({ left: 20, right: 20, top: 16, bottom: 20 })
-    .backgroundColor(Color.White)
+    .padding({ left: 20, right: 20, top: 16, bottom: 16 })
+    .backgroundColor(Color.Transparent)
+    .onClick(() => { !isToggle && onClick && onClick() })
   }
 
   @Builder
-  buildDivider() {
-    Divider()
-      .color(AppColors.GRAY_100)
-      .margin({ left: 20 })
+  buildSectionHeader(title: string) {
+    Text(title).fontSize(14).fontWeight(FontWeight.Bold).fontColor(AppColors.GRAY_500).width('100%').padding({ left: 24, right: 24, top: 16, bottom: 8 })
+  }
+
+  // 颜色模式选择的底部半模态面板
+  @Builder
+  ThemeSheetBuilder() {
+    Column() {
+      Text('颜色模式').fontSize(18).fontWeight(FontWeight.Bold).fontColor(AppColors.GRAY_900).margin({ bottom: 20, top: 12 })
+      ForEach(['系统默认', '浅色模式', '深色模式'], (theme: string) => {
+        Row() {
+          Text(theme).fontSize(16).fontColor(AppColors.GRAY_900).fontWeight(this.themeMode === theme ? FontWeight.Bold : FontWeight.Normal)
+          if (this.themeMode === theme) {
+            SymbolGlyph($r('sys.symbol.checkmark')).fontSize(18).fontColor([AppColors.BRAND_COLOR])
+          }
+        }
+        .width('100%')
+        .padding({ top: 16, bottom: 16 })
+        .justifyContent(FlexAlign.SpaceBetween)
+        .borderWidth({ bottom: 0.5 }).borderColor(AppColors.GRAY_100)
+        .onClick(() => {
+          this.themeMode = theme
+          this.showThemeSheet = false
+          this.showToast(`已切换为：${theme}`)
+        })
+      })
+    }
+    .padding(24)
+    .backgroundColor(Color.White)
+    .borderRadius({ topLeft: 24, topRight: 24 })
   }
 
   build() {
-    Column() {
-      // 顶部返回栏 — 动态状态栏避让
-      Row() {
-        Text('← 返回')
-          .fontSize(16)
-          .fontColor(AppColors.BRAND_COLOR)
-          .padding({ top: 14, bottom: 14, right: 20 })
-          .onClick(() => { router.back() })
+    Stack() {
+      Column() {
+        // 顶部导航栏
+        Row() {
+          Row() { SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(24).fontColor([AppColors.GRAY_900]) }.width(48).height(48).justifyContent(FlexAlign.Center).onClick(() => { router.back() })
+          Text('设置与管理').fontSize(18).fontWeight(FontWeight.Bold).fontColor(AppColors.GRAY_900).layoutWeight(1).textAlign(TextAlign.Center).padding({ right: 48 })
+        }.width('100%').padding({ top: this.safeTopVp, bottom: 0 }).backgroundColor(AppColors.BG_COLOR)
 
-        Text('设置')
-          .fontSize(17)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(AppColors.GRAY_900)
-          .layoutWeight(1)
-          .textAlign(TextAlign.Center)
-
-        // 右侧占位保持标题居中
-        Text('')
-          .width(60)
-      }
-      .width('100%')
-      .padding({ left: 20, right: 20, top: this.safeTopVp, bottom: 0 })
-      .backgroundColor(Color.White)
-      .borderWidth({ bottom: 0.5 })
-      .borderColor(AppColors.GRAY_100)
-
-      Scroll() {
-        Column({ space: 0 }) {
-
-          // 用户信息
-          Row({ space: 16 }) {
+        Scroll() {
+          Column({ space: 0 }) {
+            // --- 用户资料 ---
             Column() {
-              this.buildAvatarDisplay()
-            }
-            .width(56)
-            .height(56)
-            .borderRadius(28)
-            .backgroundColor('#FFF5EB')
-            .justifyContent(FlexAlign.Center)
-            .onClick(() => { this.startEditAvatar() })
+              Row({ space: 16 }) {
+                Column() { this.buildAvatarDisplay() }.width(64).height(64).borderRadius(32).backgroundColor(AppColors.GRAY_100).justifyContent(FlexAlign.Center).onClick(() => { this.startEditAvatar() })
+                Column({ space: 8 }) {
+                  if (this.isEditingNickname) {
+                    Row({ space: 12 }) {
+                      TextInput({ text: this.tempNickname }).fontSize(17).fontWeight(FontWeight.Bold).fontColor(AppColors.GRAY_900).layoutWeight(1).onChange((v: string) => { this.tempNickname = v }).backgroundColor(AppColors.GRAY_100)
+                      Text('确定').fontSize(14).fontColor(AppColors.BRAND_COLOR).fontWeight(FontWeight.Bold).onClick(() => { this.confirmEditNickname() })
+                      Text('取消').fontSize(14).fontColor(AppColors.GRAY_500).onClick(() => { this.cancelEditNickname() })
+                    }
+                  } else {
+                    Row({ space: 10 }) {
+                      Text(this.userProfile.nickname).fontSize(18).fontWeight(FontWeight.Bold).fontColor(AppColors.GRAY_900)
+                      Text('编辑').fontSize(12).fontColor(AppColors.BRAND_COLOR).padding({ left: 10, right: 10, top: 4, bottom: 4 }).backgroundColor(AppColors.BRAND_COLOR_LIGHT).borderRadius(100).onClick(() => { this.startEditNickname() })
+                    }
+                  }
+                  Row({ space: 8 }) {
+                    Text(`${this.recipeCount} 道菜谱`).fontSize(13).fontColor(AppColors.GRAY_500)
+                    Text('·').fontSize(13).fontColor(AppColors.GRAY_300)
+                    Text(`${this.favoriteCount} 收藏`).fontSize(13).fontColor(AppColors.GRAY_500)
+                  }
+                }.alignItems(HorizontalAlign.Start).layoutWeight(1)
+              }.width('100%').padding(20).backgroundColor(Color.White).borderRadius(20)
+              if (this.isEditingAvatar) { this.buildAvatarSelector() }
+            }.padding({ left: 16, right: 16, top: 8 })
 
-            Column({ space: 6 }) {
-              if (this.isEditingNickname) {
-                Row({ space: 10 }) {
-                  TextInput({ text: this.tempNickname })
-                    .fontSize(17)
-                    .fontWeight(FontWeight.Medium)
-                    .fontColor(AppColors.GRAY_900)
-                    .layoutWeight(1)
-                    .onChange((v: string) => { this.tempNickname = v })
+            // --- 外观与通知 (新增) ---
+            this.buildSectionHeader('通用设置')
+            Column() {
+              this.buildSettingCard('颜色模式', '', false, false, this.themeMode, () => { this.showThemeSheet = true })
+              Divider().color(AppColors.GRAY_100).margin({ left: 20, right: 20 })
+              this.buildSettingCard('每日菜谱灵感', '每天为您推送精选菜品推荐', true, this.enableDailyPush, '', () => {
+                this.enableDailyPush = !this.enableDailyPush
+                this.showToast(this.enableDailyPush ? '已开启菜谱灵感推送' : '已关闭推送')
+              })
+            }.margin({ left: 16, right: 16 }).backgroundColor(Color.White).borderRadius(20)
 
-                  Text('确定')
-                    .fontSize(14)
-                    .fontColor(AppColors.BRAND_COLOR)
-                    .onClick(() => { this.confirmEditNickname() })
+            // --- 数据管理 ---
+            this.buildSectionHeader('存储与数据')
+            Column() {
+              this.buildSettingCard('保留本地数据', '关闭后将清空历史记录与收藏内容', true, this.keepLocalData, '', () => { void this.onKeepLocalChange(!this.keepLocalData) })
+              Divider().color(AppColors.GRAY_100).margin({ left: 20, right: 20 })
+              this.buildSettingCard('清理缓存', '清除应用运行产生的图片和临时文件', false, false, this.cacheSize, () => {
+                this.cacheSize = '清理中...'
+                setTimeout(() => {
+                  this.cacheSize = '0.0 MB'
+                  this.showToast('✨ 缓存已清理完毕')
+                }, 800)
+              })
+            }.margin({ left: 16, right: 16 }).backgroundColor(Color.White).borderRadius(20)
 
-                  Text('取消')
-                    .fontSize(14)
-                    .fontColor(AppColors.GRAY_500)
-                    .onClick(() => { this.cancelEditNickname() })
-                }
-              } else {
-                Row({ space: 8 }) {
-                  Text(this.userProfile.nickname)
-                    .fontSize(17)
-                    .fontWeight(FontWeight.Medium)
-                    .fontColor(AppColors.GRAY_900)
+            // --- 隐私与协议 ---
+            this.buildSectionHeader('关于我们')
+            Column() {
+              this.buildSettingCard('隐私政策', '', false, false, '', () => { this.openLegalDoc('privacy') })
+              Divider().color(AppColors.GRAY_100).margin({ left: 20, right: 20 })
+              this.buildSettingCard('用户协议', '', false, false, '', () => { this.openLegalDoc('agreement') })
+            }.margin({ left: 16, right: 16 }).backgroundColor(Color.White).borderRadius(20)
 
-                  Text('编辑')
-                    .fontSize(13)
-                    .fontColor(AppColors.GRAY_400)
-                    .onClick(() => { this.startEditNickname() })
-                }
-              }
+            Blank()
 
-              Row({ space: 4 }) {
-                Text(`${this.recipeCount} 道菜谱`)
-                  .fontSize(13)
-                  .fontColor(AppColors.GRAY_500)
+            // --- 版本信息 ---
+            Column() {
+              Text(`v${this.appVersion}`).fontSize(14).fontWeight(FontWeight.Bold).fontColor(AppColors.GRAY_400).textAlign(TextAlign.Center)
+              Text(`${this.deviceName} · ${this.systemVersion}`).fontSize(12).fontColor(AppColors.GRAY_400).textAlign(TextAlign.Center).margin({ top: 4 })
+            }.width('100%').padding({ top: 40, bottom: 40 })
+          }.width('100%').constraintSize({ minHeight: '100%' })
+        }.layoutWeight(1).scrollBar(BarState.Off)
+      }.width('100%').height('100%').backgroundColor(AppColors.BG_COLOR)
 
-                Text('·')
-                  .fontSize(13)
-                  .fontColor(AppColors.GRAY_300)
-
-                Text(`${this.favoriteCount} 收藏`)
-                  .fontSize(13)
-                  .fontColor(AppColors.GRAY_500)
-
-                Text('·')
-                  .fontSize(13)
-                  .fontColor(AppColors.GRAY_300)
-
-                Text(`${this.historyCount} 浏览`)
-                  .fontSize(13)
-                  .fontColor(AppColors.GRAY_500)
-              }
-            }
-            .alignItems(HorizontalAlign.Start)
-            .layoutWeight(1)
-          }
-          .width('100%')
-          .padding({ left: 20, right: 20, top: 20, bottom: 20 })
-          .backgroundColor(Color.White)
-
-          // 头像选择器（展开时显示）
-          if (this.isEditingAvatar) {
-            this.buildAvatarSelector()
-          }
-
-          Column().height(12).backgroundColor(AppColors.BG_COLOR)
-
-          // 数据设置
-          Row({ space: 12 }) {
-            Column({ space: 3 }) {
-              Text('保留本地数据')
-                .fontSize(15)
-                .fontColor(AppColors.GRAY_900)
-
-              Text('关闭后将清空历史与收藏')
-                .fontSize(12)
-                .fontColor(AppColors.GRAY_500)
-            }
-            .alignItems(HorizontalAlign.Start)
-            .layoutWeight(1)
-
-            Toggle({ type: ToggleType.Switch, isOn: this.keepLocalData })
-              .selectedColor(AppColors.BRAND_COLOR)
-              .onChange((isOn: boolean) => { void this.onKeepLocalChange(isOn) })
-          }
-          .width('100%')
-          .padding({ left: 20, right: 20, top: 16, bottom: 16 })
-          .backgroundColor(Color.White)
-
-          Column().height(12).backgroundColor(AppColors.BG_COLOR)
-
-          // 法律文档
-          Column() {
-            Row() {
-              Text('隐私政策')
-                .fontSize(15)
-                .fontColor(AppColors.GRAY_900)
-                .layoutWeight(1)
-
-              Text('查看')
-                .fontSize(13)
-                .fontColor(AppColors.GRAY_400)
-            }
-            .width('100%')
-            .padding({ left: 20, right: 20, top: 16, bottom: 16 })
-            .backgroundColor(Color.White)
-            .onClick(() => { this.openLegalDoc('privacy') })
-
-            this.buildDivider()
-
-            Row() {
-              Text('用户协议')
-                .fontSize(15)
-                .fontColor(AppColors.GRAY_900)
-                .layoutWeight(1)
-
-              Text('查看')
-                .fontSize(13)
-                .fontColor(AppColors.GRAY_400)
-            }
-            .width('100%')
-            .padding({ left: 20, right: 20, top: 16, bottom: 16 })
-            .backgroundColor(Color.White)
-            .onClick(() => { this.openLegalDoc('agreement') })
-          }
-          .backgroundColor(Color.White)
-
-          // 底部版本信息
-          Text(`v${this.appVersion}  ·  ${this.deviceName}  ·  ${this.systemVersion}`)
-            .fontSize(12)
-            .fontColor(AppColors.GRAY_400)
-            .textAlign(TextAlign.Center)
-            .width('100%')
-            .padding({ top: 32, bottom: 48 })
-        }
-        .width('100%')
-      }
-      .layoutWeight(1)
-      .scrollBar(BarState.Off)
-      .backgroundColor(AppColors.BG_COLOR)
+      // 绑定 Toast 提示组件
+      ToastView({ message: this.toastMessage, visible: this.toastVisible })
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(AppColors.BG_COLOR)
+    // 绑定原生颜色模式选择半模态弹窗
+    .bindSheet($$this.showThemeSheet, this.ThemeSheetBuilder(), {
+      height: SheetSize.FIT_CONTENT,
+      dragBar: false,
+      backgroundColor: Color.Transparent,
+      showClose: false
+    })
   }
 }

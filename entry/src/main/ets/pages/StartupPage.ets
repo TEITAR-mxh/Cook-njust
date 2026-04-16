@@ -92,7 +92,7 @@ struct StartupPage {
   @State exitScale: number = 1
 
   /** 开机画面最短停留时长（ms），保证动画完整播放 */
-  private static readonly MIN_DISPLAY_MS: number = 2400
+  private static readonly MIN_DISPLAY_MS: number = 1800
   private startTime: number = 0
 
   private privacyDialogController: CustomDialogController = new CustomDialogController({

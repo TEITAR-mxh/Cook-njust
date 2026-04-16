@@ -278,6 +278,8 @@ export struct RecipeCard {
         this.buildSmallCard()
       }
     }
+    .width('100%')
+    // .height('100%')
     .onTouch((event) => {
       if (event.type === TouchType.Down) {
         this.scaleValue = 0.98
@@ -288,5 +290,6 @@ export struct RecipeCard {
         }
       }
     })
+    .hitTestBehavior(HitTestMode.Default) // 确保整个卡片区域都可点击
   }
 }

@@ -1,23 +1,12 @@
-/**
- * 菜谱详情半模态弹窗组件（重构版）
- * - 移除全部视频跳转相关逻辑
- * - 新增标签行、分类食材/工具区、烹饪步骤区
- * - Scroll 容器保证内容超屏可滚动
- * - aboutToAppear 预留 RecipeDBManager 接口位置
- */
 import { pasteboard } from '@kit.BasicServicesKit'
-import { AppColors } from '../constants/AppColors'
 import type { RecipeWithId } from '../model/recipe'
 import { RecipeDBManager } from '../data/RecipeDBManager'
 import { ShoppingListService } from '../service/ShoppingListService'
 import { CookingFocusView } from './CookingFocusView'
 import { ToastView } from './ToastView'
+import { DSColor, DSRadius, DSSpace, DSType, DSShadow, DSSheet, pickTagTone } from '../constants/DesignSystem'
+import { AppColors } from '../constants/AppColors'
 
-// ─────────────────────────────────────────────────────────────
-// 数据接口
-// ─────────────────────────────────────────────────────────────
-
-/** 详情页专用模型：在 RecipeWithId 基础上扩展 steps */
 interface RecipeDetail {
   id: number
   name: string
@@ -29,82 +18,54 @@ interface RecipeDetail {
   steps: string[]
 }
 
-// ─────────────────────────────────────────────────────────────
-// Mock 数据（DB 接口就绪前用于 UI 预览）
-// ─────────────────────────────────────────────────────────────
-
-const MOCK_DETAIL: RecipeDetail = {
+const EMPTY_DETAIL: RecipeDetail = {
   id: 0,
-  name: '番茄炒鸡蛋',
-  emojis: ['🍅', '🥚'],
-  difficulty: '简单',
-  tags: ['家常菜', '快手', '下饭', '素食可选'],
-  stuff: ['番茄', '鸡蛋', '葱', '食盐', '食用油', '白糖'],
-  tools: ['炒锅', '锅铲'],
-  steps: [
-    '鸡蛋打入碗中，加少许盐，用筷子充分打散备用。',
-    '番茄洗净后切成滚刀块，葱洗净后切末备用。',
-    '锅中倒入食用油，大火烧至七成热，倒入蛋液，用锅铲划散炒至金黄后盛出。',
-    '锅中再加少许油，下葱末爆香，放入番茄块翻炒约 1 分钟，炒出番茄汁。',
-    '加入炒好的鸡蛋，翻炒均匀，根据口味加盐和少量白糖提鲜调味。',
-    '出锅装盘，趁热享用。',
-  ],
+  name: '',
+  emojis: [],
+  difficulty: '',
+  tags: [],
+  stuff: [],
+  tools: [],
+  steps: []
 }
-
-// ─────────────────────────────────────────────────────────────
-// 标签颜色池
-// ─────────────────────────────────────────────────────────────
-
-interface TagColor {
-  bg: string
-  text: string
-}
-
-const TAG_PALETTE: TagColor[] = [
-  { bg: '#FEF2F2', text: '#DC2626' },
-  { bg: '#F0FDF4', text: '#16A34A' },
-  { bg: '#FFFBEB', text: '#D97706' },
-  { bg: '#EFF6FF', text: '#2563EB' },
-  { bg: '#F5F3FF', text: '#7C3AED' },
-]
-
-function pickTagColor(index: number): TagColor {
-  return TAG_PALETTE[index % TAG_PALETTE.length]
-}
-
-// ─────────────────────────────────────────────────────────────
-// 组件
-// ─────────────────────────────────────────────────────────────
 
 @Component
 export struct RecipeDetailSheet {
-  @Link @Watch('onVisibleChange') isVisible: boolean
   @Prop recipe: RecipeWithId | null = null
   @Prop selectedStuff: string[] = []
   @Prop isFavorite: boolean = false
 
   onFavoriteToggle?: () => void
+  onRequestClose?: () => void
 
-  @State private translateY: number = 1000
-  @State private opacityValue: number = 0
-  @State private detail: RecipeDetail = MOCK_DETAIL
-  @State private loadState: string = 'loading'  // 'loading' | 'ok' | 'empty'
+  @State private detail: RecipeDetail = EMPTY_DETAIL
+  @State private loadState: 'loading' | 'ok' | 'empty' = 'loading'
   @State private focusModeVisible: boolean = false
   @State private toastMessage: string = ''
   @State private toastVisible: boolean = false
 
-  // ── 生命周期 ────────────────────────────────────────────────
+  private readonly contentScroller: Scroller = new Scroller()
 
   aboutToAppear(): void {
     this.syncFromProp()
-    // 组件始终在 isVisible 已为 true 时才被创建（父级条件渲染）。
-    // ArkUI 的 @Watch 对 @Link 初始值不触发，onVisibleChange 不会自动调用，
-    // 因此在此手动触发入场动画。
-    animateTo({ duration: 400, curve: Curve.Friction }, () => {
-      this.translateY = 0
-      this.opacityValue = 1
-    })
     void this.loadStepsFromDB()
+  }
+
+  private syncFromProp(): void {
+    if (!this.recipe) {
+      this.detail = EMPTY_DETAIL
+      return
+    }
+    this.detail = {
+      id: this.recipe.id,
+      name: this.recipe.name,
+      emojis: this.recipe.emojis ?? [],
+      difficulty: this.recipe.difficulty ?? '',
+      tags: this.recipe.tags ?? [],
+      stuff: this.recipe.stuff,
+      tools: this.recipe.tools,
+      steps: []
+    }
   }
 
   private async loadStepsFromDB(): Promise<void> {
@@ -113,6 +74,7 @@ export struct RecipeDetailSheet {
       this.loadState = 'empty'
       return
     }
+
     this.loadState = 'loading'
     try {
       const data = await RecipeDBManager.getInstance().getRecipeDetail(id)
@@ -125,7 +87,7 @@ export struct RecipeDetailSheet {
           tags: this.detail.tags,
           stuff: this.detail.stuff,
           tools: this.detail.tools,
-          steps: data.steps,
+          steps: data.steps
         }
         this.loadState = 'ok'
       } else {
@@ -133,25 +95,6 @@ export struct RecipeDetailSheet {
       }
     } catch {
       this.loadState = 'empty'
-    }
-  }
-
-  // ── 私有方法 ─────────────────────────────────────────────────
-
-  /** 将 @Prop recipe 映射到本地 detail（steps 等待 DB 填充） */
-  private syncFromProp(): void {
-    if (!this.recipe) {
-      return
-    }
-    this.detail = {
-      id: this.recipe.id,
-      name: this.recipe.name,
-      emojis: this.recipe.emojis ?? [],
-      difficulty: this.recipe.difficulty ?? '',
-      tags: this.recipe.tags ?? [],
-      stuff: this.recipe.stuff,
-      tools: this.recipe.tools,
-      steps: [],
     }
   }
 
@@ -163,10 +106,10 @@ export struct RecipeDetailSheet {
     }, 0)
   }
 
-  private handleCopyMissingItems(): void {
+  private copyMissingIngredients(): void {
     const diffResult = ShoppingListService.diff(this.selectedStuff, this.detail.stuff)
     if (diffResult.missingItems.length === 0) {
-      this.showToast('食材已齐，可以开做了！')
+      this.showToast('所有食材均已备好')
       return
     }
 
@@ -182,132 +125,124 @@ export struct RecipeDetailSheet {
       systemPasteboard.setDataSync(pasteData)
       this.showToast('缺失食材已复制到剪贴板')
     } catch (err) {
-      console.error('Copy to clipboard failed', JSON.stringify(err))
-      this.showToast('复制失败，请稍后重试')
+      console.error('复制到剪贴板失败', JSON.stringify(err))
+      this.showToast('复制失败，请重试')
     }
   }
 
-  private closeSheet(): void {
-    this.isVisible = false
-  }
-
-  onVisibleChange(): void {
-    if (this.isVisible) {
-      // 重新打开（组件已挂载但 isVisible 从 false 变 true）时刷新数据并播放入场。
-      // 首次打开的入场动画由 aboutToAppear 负责，此处处理重复打开场景。
-      this.syncFromProp()
-      void this.loadStepsFromDB()
-      animateTo({ duration: 400, curve: Curve.Friction }, () => {
-        this.translateY = 0
-        this.opacityValue = 1
-      })
-    } else {
-      // 关闭动画
-      animateTo({ duration: 300, curve: Curve.EaseOut }, () => {
-        this.translateY = 1000
-        this.opacityValue = 0
-      })
+  private requestClose(): void {
+    if (this.onRequestClose) {
+      this.onRequestClose()
     }
   }
 
-  // ── @Builder：拖拽指示器 ────────────────────────────────────
-
+  // ──────────────────────────────────────────────
+  // 拖拽条：视觉引导用户上拉/下拉操作面板
+  // ──────────────────────────────────────────────
   @Builder
-  DragHandle() {
+  private DragHandle() {
     Column() {
       Column()
-        .width(40)
+        .width(44)
         .height(5)
-        .backgroundColor('rgba(0,0,0,0.15)')
-        .borderRadius(10)
-        .margin({ top: 12, bottom: 10 })
+        .backgroundColor('#99B6C1D4')
+        .borderRadius(DSRadius.PILL)
     }
     .width('100%')
+    .padding({ top: DSSpace.SM, bottom: DSSpace.SM })
     .alignItems(HorizontalAlign.Center)
-    .backgroundColor('#FFF5EB')
-    .borderRadius({ topLeft: 28, topRight: 28 })
-    .onClick(() => this.closeSheet())
   }
 
-  // ── @Builder：Hero 区（Emoji + 菜名 + 难度） ────────────────
-
+  // ──────────────────────────────────────────────
+  // 头部：菜品大图、名称、难度标签
+  // ──────────────────────────────────────────────
   @Builder
-  HeroSection() {
-    Column({ space: 8 }) {
+  private HeroSection() {
+    Column({ space: DSSpace.SM }) {
       Text(this.detail.emojis.length > 0 ? this.detail.emojis.join('') : '🍽️')
-        .fontSize(72)
+        .fontSize(56)
 
-      Text(this.detail.name)
-        .fontSize(26)
+      Text(this.detail.name.length > 0 ? this.detail.name : '未命名菜谱')
+        .fontSize(DSType.HERO)
         .fontWeight(FontWeight.Bold)
-        .fontColor(AppColors.GRAY_900)
+        .fontColor(DSColor.TEXT_PRIMARY)
         .textAlign(TextAlign.Center)
 
       if (this.detail.difficulty.length > 0) {
         Text(this.detail.difficulty)
-          .fontSize(12)
-          .fontColor(AppColors.GRAY_500)
+          .fontSize(DSType.CAPTION)
+          .fontColor(DSColor.TEXT_SECONDARY)
           .padding({ left: 12, right: 12, top: 4, bottom: 4 })
-          .backgroundColor(AppColors.GRAY_100)
-          .borderRadius(20)
+          .backgroundColor(DSColor.BG_SOFT)
+          .borderRadius(DSRadius.PILL)
+          .borderWidth(1)
+          .borderColor(DSColor.STROKE_SOFT)
       }
     }
     .width('100%')
-    .padding({ top: 16, bottom: 20 })
+    .padding({ left: DSSpace.LG, right: DSSpace.LG, top: DSSpace.MD, bottom: DSSpace.MD })
     .alignItems(HorizontalAlign.Center)
-    .backgroundColor('#FFF5EB')
   }
 
-  // ── @Builder：标签行 ────────────────────────────────────────
-
+  // ──────────────────────────────────────────────
+  // 标签组：彩色 # 标签展示
+  // ──────────────────────────────────────────────
   @Builder
-  TagsSection() {
+  private TagsSection() {
     if (this.detail.tags.length > 0) {
-      Column({ space: 0 }) {
-        Flex({ wrap: FlexWrap.Wrap }) {
-          ForEach(this.detail.tags, (tag: string, index: number) => {
-            Text(`# ${tag}`)
-              .fontSize(12)
-              .fontColor(pickTagColor(index).text)
-              .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-              .backgroundColor(pickTagColor(index).bg)
-              .borderRadius(20)
-              .margin({ right: 8, bottom: 8 })
-          }, (tag: string) => tag)
-        }
-        .width('100%')
-        .padding({ left: 20, right: 12, top: 16, bottom: 8 })
-
-        Divider()
-          .color(AppColors.GRAY_100)
-          .margin({ left: 20, right: 20 })
+      Flex({ wrap: FlexWrap.Wrap }) {
+        ForEach(this.detail.tags, (tag: string, index: number) => {
+          Text(`# ${tag}`)
+            .fontSize(DSType.CAPTION)
+            .fontColor(this.getTagColor(index, 'text'))
+            .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+            .backgroundColor(this.getTagColor(index, 'bg'))
+            .borderRadius(DSRadius.PILL)
+            .borderWidth(1)
+            .borderColor(this.getTagColor(index, 'border'))
+            .margin({ right: 8, bottom: 8 })
+        }, (tag: string) => tag)
       }
+      .width('100%')
+      .padding({ left: DSSpace.LG, right: DSSpace.LG, top: DSSpace.SM, bottom: DSSpace.XS })
     }
   }
 
-  // ── @Builder：分类列表区（食材 / 工具） ─────────────────────
+  private getTagColor(index: number, type: 'bg' | 'border' | 'text'): string {
+    const tone = pickTagTone(index)
+    switch (type) {
+      case 'bg': return tone.bg
+      case 'border': return tone.border
+      case 'text': return tone.text
+      default: return '#FFFFFF'
+    }
+  }
 
+  // ──────────────────────────────────────────────
+  // 通用信息卡片：食材 / 工具
+  // copyEnabled = true 时，标题右侧出现「缺失食材」快捷复制按钮
+  // ──────────────────────────────────────────────
   @Builder
-  ItemListSection(title: string, items: string[], emptyHint: string, allowCopyAction: boolean = false) {
-    Column({ space: 10 }) {
+  private SectionCard(title: string, items: string[], emptyHint: string, copyEnabled: boolean = false) {
+    Column({ space: DSSpace.SM }) {
       Row() {
         Text(title)
-          .fontSize(15)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.GRAY_800)
+          .fontSize(DSType.TITLE)
+          .fontColor(DSColor.TEXT_PRIMARY)
+          .fontWeight(FontWeight.Medium)
 
         Blank()
 
-        if (allowCopyAction) {
-          Text('复制缺料')
-            .fontSize(12)
-            .fontColor(AppColors.BRAND_COLOR)
+        if (copyEnabled) {
+          Text('缺失食材')
+            .fontSize(DSType.CAPTION)
+            .fontColor(DSColor.BRAND_PRIMARY)
             .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-            .backgroundColor(AppColors.GRAY_100)
-            .borderRadius(10)
-            .onClick(() => {
-              this.handleCopyMissingItems()
-            })
+            .backgroundColor('#FFF2F0')
+            .borderRadius(DSRadius.SM)
+            .borderWidth(1)
+            .borderColor('#FFD6D1')
+            .onClick(() => this.copyMissingIngredients())
         }
       }
       .width('100%')
@@ -316,125 +251,142 @@ export struct RecipeDetailSheet {
         Flex({ wrap: FlexWrap.Wrap }) {
           ForEach(items, (item: string) => {
             Text(item)
-              .fontSize(13)
-              .fontColor(AppColors.GRAY_600)
-              .padding({ left: 12, right: 12, top: 5, bottom: 5 })
-              .backgroundColor(AppColors.GRAY_50)
-              .borderRadius(8)
+              .fontSize(DSType.BODY)
+              .fontColor(DSColor.TEXT_SECONDARY)
+              .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+              .backgroundColor('#FDFEFF')
+              .borderRadius(DSRadius.SM)
               .borderWidth(1)
-              .borderColor(AppColors.GRAY_200)
+              .borderColor(DSColor.STROKE_SOFT)
               .margin({ right: 8, bottom: 8 })
           }, (item: string) => item)
         }
         .width('100%')
       } else {
         Text(emptyHint)
-          .fontSize(13)
-          .fontColor(AppColors.GRAY_400)
-          .padding({ top: 8, bottom: 16 })
+          .fontSize(DSType.BODY)
+          .fontColor(DSColor.TEXT_TERTIARY)
       }
     }
     .width('100%')
-    .padding({ left: 20, right: 20, top: 16, bottom: 16 })
-    .alignItems(HorizontalAlign.Start)
+    .padding(DSSpace.MD)
+    .backgroundColor(DSColor.BG_ELEVATED)
+    .borderRadius(DSRadius.LG)
+    .borderWidth(1)
+    .borderColor(DSColor.STROKE_SOFT)
+    .shadow(DSShadow.CARD)
   }
 
-  // ── @Builder：烹饪步骤区 ────────────────────────────────────
-
+  // ──────────────────────────────────────────────
+  // 步骤卡片：编号气泡 + 步骤文本，支持专注模式
+  // ──────────────────────────────────────────────
   @Builder
-  StepsSection() {
-    Column({ space: 0 }) {
+  private StepsSection() {
+    Column({ space: DSSpace.SM }) {
       Row() {
-        Text('烹饪步骤')
-          .fontSize(15)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.GRAY_800)
+        Text('步骤')
+          .fontSize(DSType.TITLE)
+          .fontColor(DSColor.TEXT_PRIMARY)
+          .fontWeight(FontWeight.Medium)
 
         Blank()
 
         Text('专注模式')
-          .fontSize(12)
-          .fontColor(AppColors.BRAND_COLOR)
+          .fontSize(DSType.CAPTION)
+          .fontColor(DSColor.BRAND_PRIMARY)
           .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-          .backgroundColor(AppColors.GRAY_100)
-          .borderRadius(10)
+          .backgroundColor('#FFF2F0')
+          .borderRadius(DSRadius.SM)
+          .borderWidth(1)
+          .borderColor('#FFD6D1')
           .onClick(() => {
             if (this.detail.steps.length > 0) {
               this.focusModeVisible = true
             } else {
-              this.showToast('暂无烹饪步骤信息')
+              this.showToast('暂无步骤数据')
             }
           })
       }
-      .padding({ left: 20, right: 20, top: 16, bottom: 12 })
       .width('100%')
 
       if (this.loadState === 'loading') {
         Row({ space: 8 }) {
           LoadingProgress()
-            .width(20)
-            .height(20)
-            .color(AppColors.BRAND_COLOR)
-          Text('加载中')
-            .fontSize(13)
-            .fontColor(AppColors.GRAY_400)
+            .width(18)
+            .height(18)
+            .color(DSColor.BRAND_PRIMARY)
+          Text('加载步骤中…')
+            .fontSize(DSType.BODY)
+            .fontColor(DSColor.TEXT_TERTIARY)
         }
-        .padding({ left: 20, top: 8, bottom: 20 })
+        .padding({ top: DSSpace.SM, bottom: DSSpace.SM })
       } else if (this.loadState === 'ok' && this.detail.steps.length > 0) {
-        ForEach(this.detail.steps, (step: string, index: number) => {
-          Row({ space: 12 }) {
-            Text(`${index + 1}`)
-              .fontSize(12)
-              .fontColor(Color.White)
-              .fontWeight(FontWeight.Bold)
-              .width(24)
-              .height(24)
-              .textAlign(TextAlign.Center)
-              .backgroundColor(AppColors.BRAND_COLOR)
-              .borderRadius(12)
+        Column({ space: 8 }) {
+          ForEach(this.detail.steps, (step: string, index: number) => {
+            Row({ space: 12 }) {
+              // 步骤编号气泡
+              Text(`${index + 1}`)
+                .fontSize(DSType.CAPTION)
+                .fontColor(Color.White)
+                .fontWeight(FontWeight.Bold)
+                .width(24)
+                .height(24)
+                .textAlign(TextAlign.Center)
+                .backgroundColor(DSColor.BRAND_PRIMARY)
+                .borderRadius(DSRadius.PILL)
 
-            Text(step)
-              .fontSize(14)
-              .fontColor(AppColors.GRAY_600)
-              .lineHeight(22)
-              .layoutWeight(1)
-          }
-          .width('100%')
-          .padding({ left: 20, right: 20, top: 12, bottom: 12 })
-          .alignItems(VerticalAlign.Top)
-          .backgroundColor(index % 2 === 0 ? Color.White : AppColors.GRAY_50)
-        }, (step: string, index: number) => `${index}-${step}`)
+              Text(step)
+                .fontSize(DSType.BODY)
+                .fontColor(DSColor.TEXT_SECONDARY)
+                .lineHeight(22)
+                .layoutWeight(1)
+            }
+            .padding(DSSpace.SM)
+            .backgroundColor(index % 2 === 0 ? '#FCFDFF' : '#F4F7FC')
+            .borderRadius(DSRadius.MD)
+            .borderWidth(1)
+            .borderColor(DSColor.STROKE_SOFT)
+            .alignItems(VerticalAlign.Top)
+          }, (step: string, index: number) => `${index}-${step}`)
+        }
+        .width('100%')
       } else {
-        Text('暂无烹饪步骤信息')
-          .fontSize(13)
-          .fontColor(AppColors.GRAY_400)
-          .padding({ left: 20, right: 20, top: 8, bottom: 16 })
+        Text('暂无步骤信息')
+          .fontSize(DSType.BODY)
+          .fontColor(DSColor.TEXT_TERTIARY)
       }
     }
     .width('100%')
-    .alignItems(HorizontalAlign.Start)
+    .padding(DSSpace.MD)
+    .backgroundColor(DSColor.BG_ELEVATED)
+    .borderRadius(DSRadius.LG)
+    .borderWidth(1)
+    .borderColor(DSColor.STROKE_SOFT)
+    .shadow(DSShadow.CARD)
   }
 
-  // ── @Builder：底部操作栏 ────────────────────────────────────
-
+  // ──────────────────────────────────────────────
+  // 底部操作栏：收藏 + 完成
+  // 使用 backdropBlur 实现毛玻璃浮层效果
+  // ──────────────────────────────────────────────
   @Builder
-  BottomBar() {
-    Row() {
+  private BottomBar() {
+    Row({ space: DSSpace.MD }) {
       // 收藏按钮
       Row({ space: 6 }) {
         Text(this.isFavorite ? '★' : '☆')
-          .fontSize(20)
-          .fontColor(this.isFavorite ? '#FFB020' : AppColors.GRAY_400)
+          .fontSize(18)
+          .fontColor(this.isFavorite ? '#D97706' : DSColor.TEXT_TERTIARY)
 
         Text(this.isFavorite ? '已收藏' : '收藏')
-          .fontSize(14)
-          .fontColor(this.isFavorite ? '#D97706' : AppColors.GRAY_500)
+          .fontSize(DSType.BODY)
+          .fontColor(this.isFavorite ? '#A04E0A' : DSColor.TEXT_SECONDARY)
       }
-      .padding({ left: 20, right: 20, top: 11, bottom: 11 })
-      .backgroundColor(this.isFavorite ? '#FFFBEB' : AppColors.GRAY_50)
-      .borderRadius(14)
+      .padding({ left: 16, right: 16, top: 10, bottom: 10 })
+      .backgroundColor(this.isFavorite ? '#FFF4DE' : '#F4F7FC')
+      .borderRadius(DSRadius.MD)
       .borderWidth(1)
-      .borderColor(this.isFavorite ? '#FDE047' : AppColors.GRAY_200)
+      .borderColor(this.isFavorite ? '#FFD7A0' : DSColor.STROKE_SOFT)
       .onClick(() => {
         if (this.onFavoriteToggle) {
           this.onFavoriteToggle()
@@ -445,95 +397,90 @@ export struct RecipeDetailSheet {
 
       // 完成按钮
       Text('完成')
-        .fontSize(14)
+        .fontSize(DSType.BODY)
         .fontColor(Color.White)
         .fontWeight(FontWeight.Medium)
-        .padding({ left: 32, right: 32, top: 12, bottom: 12 })
-        .backgroundColor(AppColors.BRAND_COLOR)
-        .borderRadius(14)
-        .onClick(() => this.closeSheet())
+        .padding({ left: 30, right: 30, top: 12, bottom: 12 })
+        .backgroundColor(DSColor.BRAND_PRIMARY)
+        .borderRadius(DSRadius.MD)
+        .shadow({
+          radius: 10,
+          color: '#332D3B66',
+          offsetX: 0,
+          offsetY: 4
+        })
+        .onClick(() => this.requestClose())
     }
     .width('100%')
-    .padding({ left: 20, right: 20, top: 12, bottom: 24 })
-    .backgroundColor(Color.White)
+    .padding({ left: DSSpace.LG, right: DSSpace.LG, top: DSSpace.SM, bottom: DSSpace.SM })
+    .backgroundColor('#F8FAFFEE')
+    .backdropBlur(16)
     .borderWidth({ top: 1 })
-    .borderColor(AppColors.GRAY_100)
+    .borderColor(DSColor.STROKE_SOFT)
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
   }
 
-  // ── 主 build ─────────────────────────────────────────────────
-
   build() {
-    if (this.recipe) {
-      Stack() {
-        // 背景遮罩
-        Column()
-          .width('100%')
-          .height('100%')
-          .backgroundColor('rgba(0,0,0,0.35)')
-          .opacity(this.opacityValue)
-          .onClick(() => this.closeSheet())
+    // 整体 Stack：内容列 + Toast + 专注模式覆层
+    Stack() {
+      Column() {
+        // 自定义拖拽条（bindSheet 已设置 dragBar:false，此处为精致替代）
+        this.DragHandle()
 
-        // 弹窗面板
-        Column() {
-          // 拖拽指示器
-          this.DragHandle()
-
-          // Hero 头部
-          this.HeroSection()
-
-          // 可滚动内容区
-          Scroll() {
-            Column({ space: 0 }) {
-              // 标签行（无标签时自动隐藏）
-              this.TagsSection()
-
-              // 食材
-              this.ItemListSection('🧂 食材', this.detail.stuff, '暂无食材信息', true)
-
-              Divider()
-                .color(AppColors.GRAY_100)
-                .margin({ left: 20, right: 20 })
-
-              // 工具
-              this.ItemListSection('🍳 工具', this.detail.tools, '暂无工具信息')
-
-              Divider()
-                .color(AppColors.GRAY_100)
-                .margin({ left: 20, right: 20 })
-
-              // 烹饪步骤
-              this.StepsSection()
-            }
-            .width('100%')
-            .alignItems(HorizontalAlign.Start)
+        // 可滚动内容区 - 包含菜品头部信息、标签和所有内容
+        // nestedScroll 策略：
+        //   - 向下（SELF_FIRST）：列表内容优先滚动，到底后传给父级面板上拉展开
+        //   - 向上（PARENT_FIRST）：顶部拉取时先交给面板处理（吸附收起），再由列表响应
+        Scroll(this.contentScroller) {
+          Column({ space: DSSpace.MD }) {
+            // 菜品头部信息（现在可以随内容一起滚动）
+            this.HeroSection()
+            
+            // 标签组
+            this.TagsSection()
+            
+            // 内容卡片
+            this.SectionCard('食材', this.detail.stuff, '暂无食材信息', true)
+            this.SectionCard('烹饪工具', this.detail.tools, '暂无工具信息')
+            this.StepsSection()
+            
+            // 底部留白
+            Row().height(DSSpace.SM)
           }
-          .layoutWeight(1)
-          .scrollBar(BarState.Off)
-          .edgeEffect(EdgeEffect.Spring)
-          .backgroundColor(Color.White)
-
-          // 底部操作栏
-          this.BottomBar()
+          .padding({ left: DSSpace.LG, right: DSSpace.LG, bottom: DSSpace.SM })
+          .width('100%')
         }
-        .width('100%')
-        .height('92%')
-        .backgroundColor(Color.White)
-        .borderRadius({ topLeft: 28, topRight: 28 })
-        .shadow({ radius: 40, color: 'rgba(0,0,0,0.12)', offsetX: 0, offsetY: -10 })
-        .translate({ y: this.translateY })
-        .alignSelf(ItemAlign.End)
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
-
-        ToastView({ message: this.toastMessage, visible: this.toastVisible })
-
-        CookingFocusView({
-          visible: $focusModeVisible,
-          recipeName: this.detail.name,
-          steps: this.detail.steps
+        .layoutWeight(1)
+        .scrollBar(BarState.Auto)
+        .scrollBarColor('#803B4968')
+        .scrollBarWidth(3)
+        .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: false })
+        // 阻尼系数：0.78 让手指离开后快速减速，避免过度惯性遮挡内容
+        .friction(DSSheet.SCROLL_FRICTION)
+        // 核心嵌套滚动配置：解决列表滑动与面板拖拽之间的手势冲突
+        .nestedScroll({
+          scrollForward: NestedScrollMode.SELF_FIRST,
+          scrollBackward: NestedScrollMode.PARENT_FIRST
         })
+
+        // 底部毛玻璃操作栏（固定不随内容滚动）
+        this.BottomBar()
       }
       .width('100%')
       .height('100%')
+
+      // Toast 轻提示（浮层，不干扰主内容触控）
+      ToastView({ message: this.toastMessage, visible: this.toastVisible })
+
+      // 专注烹饪模式（全屏覆层，步骤卡片轮播）
+      CookingFocusView({
+        visible: $focusModeVisible,
+        recipeName: this.detail.name,
+        steps: this.detail.steps
+      })
     }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(AppColors.BG_COLOR) // 使用应用主题背景色，不透明
   }
 }

@@ -30,9 +30,9 @@ export class RecipeRepository {
   }
 
   getById(id: number): RecipeWithId | null {
-    if (id < 0 || id >= this.recipes.length) {
-      return null;
-    }
-    return this.recipes[id];
+    // 修复：不能直接用 id 当作数组索引访问！
+    // 数组索引是从 0 开始的连续数字，而 recipe.json 中的 id 可能是从 1 开始甚至断层的。
+    // 这里改用 find 迭代查找真实的 id 属性，彻底解决打开详情页时数据串位或崩溃的问题。
+    return this.recipes.find(recipe => recipe.id === id) || null;
   }
 }

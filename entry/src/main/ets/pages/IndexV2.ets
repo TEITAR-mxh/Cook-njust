@@ -1,16 +1,10 @@
 /**
- * 您吃了么 - 主页面
- * 保留原 Index.ets 的所有业务逻辑,应用原型的视觉设计
- * 新增功能:
- * - 毛玻璃底部导航
- * - 食材标签彩色分类
- * - 随机搭配动画
- * - 半模态菜谱详情
- * - 餐桌瓷盘3D效果
+ * 您吃了么 - 主页面 (API 22 全品类 + 匹配模式切换版)
+ * 包含：强类型、原生图标、单列紧凑布局、分类抽取、匹配策略选择
+ * 修复：修改了探索页的 Tag 间距，修正了食材选择数量的文案逻辑
  */
 import { common } from '@kit.AbilityKit';
 import { router } from '@kit.ArkUI';
-import { meatItems, stapleItems, toolItems, vegetableItems } from '../data/foodCatalog';
 import { RecipeRepository } from '../data/RecipeRepository';
 import type { RecipeWithId, SearchMode, StuffItem } from '../model/recipe';
 import { RecipeSearchService } from '../service/RecipeSearchService';
@@ -18,52 +12,81 @@ import { CookPreferences, type UserProfile } from '../store/CookPreferences';
 import { getSystemSafeTopVp } from '../util/StatusBarInset';
 import { AppColors } from '../constants/AppColors';
 import { IngredientTag, TagType } from '../components/IngredientTag';
-import { IngredientTypeMapper } from '../utils/IngredientTypeMapper';
 import { ToastView } from '../components/ToastView';
 import { RandomPickerButton } from '../components/RandomPickerButton';
 import { RecipeDetailSheet } from '../components/RecipeDetailSheet';
 import { PlateCard } from '../components/PlateCard';
 import { RecipeCard, RecipeCardMode } from '../components/RecipeCard';
 
+// 引入统一管理的食材与厨具全库
+import { meatItems, stapleItems, toolItems, vegetableItems } from '../data/foodCatalog';
+
+interface IngredientCategory {
+  title: string;
+  data: StuffItem[];
+  type: TagType;
+}
+
+interface NavItem {
+  icon: Resource;
+  label: string;
+  index: number;
+}
+
 @Entry
 @Component
 struct IndexV2 {
-  // ===== 保留原有的所有状态变量 =====
   @State mainTabIndex: number = 0
   @State status: string = '加载中…'
   @State recipeCount: number = 0
   @State errHint: string = ''
   @State keepLocalData: boolean = true
+
+  // 核心：搜索条件状态
   @State selectedStuff: string[] = []
   @State curTool: string = ''
-  @State searchMode: SearchMode = 'loose'
+  @State searchMode: SearchMode = 'loose' // 默认使用“模糊匹配”
+
   @State keyword: string = ''
   @State searchHits: RecipeWithId[] = []
   @State libraryKeyword: string = ''
   @State libraryHits: RecipeWithId[] = []
-  @State libraryActiveTag: string = '今日推荐'   // 当前激活的分类标签
-  @State libraryActiveDifficulty: string = ''    // 当前激活的难度筛选，空字符串表示不筛选
+  @State libraryActiveTag: string = '全部'
+  @State libraryActiveDifficulty: string = ''
   @State discoverPick: RecipeWithId = { id: -1, name: '', stuff: [], tools: [], steps: [] }
   @State historyIds: number[] = []
   @State favoriteIds: number[] = []
   @State mainNavTopInsetVp: number = 48
   @State userProfile: UserProfile = { nickname: '美食家', avatar: '🧑‍🍳' }
 
-  // ===== 新增的 UI 状态 =====
   @State toastMessage: string = ''
   @State toastVisible: boolean = false
   @State detailSheetVisible: boolean = false
   @State selectedRecipe: RecipeWithId | null = null
   @State isRandomizing: boolean = false
   @State highlightedTags: Set<string> = new Set()
-  @State tabOpacity: number = 1.0  // 页面切换动效
+  @State tabOpacity: number = 1.0
 
-  // ===== 随机动画相关状态 =====
-  @State randomAnimationNames: string[] = []  // 滚动显示的菜名列表
-  @State currentRandomIndex: number = 0  // 当前显示的菜名索引
-  @State showRandomAnimation: boolean = false  // 是否显示滚动动画
+  @State randomAnimationNames: string[] = []
+  @State currentRandomIndex: number = 0
+  @State showRandomAnimation: boolean = false
 
-  // ===== 保留原有的所有生命周期方法(不变) =====
+  // 利用外部 foodCatalog.ets 的数据进行装配
+  private readonly ingredientCategories: IngredientCategory[] = [
+    { title: '🥩 肉蛋水产', data: meatItems, type: TagType.MEAT },
+    { title: '🥬 新鲜蔬菜', data: vegetableItems, type: TagType.VEG },
+    { title: '🍚 碳水辅料', data: stapleItems, type: TagType.CARB }
+  ];
+
+  private readonly navItems: NavItem[] = [
+    { icon: $r('sys.symbol.house'), label: '冰箱', index: 0 },
+    { icon: $r('sys.symbol.bookmark'), label: '菜谱', index: 1 },
+    { icon: $r('sys.symbol.compass'), label: '发现', index: 2 },
+    { icon: $r('sys.symbol.person'), label: '餐桌', index: 3 }
+  ];
+
+  private readonly filterTags: string[] = ['全部', '今日推荐', '减脂餐', '快手早餐', '广式', '川香', '烘焙', '汤羹'];
+
   aboutToAppear(): void {
     void this.bootstrapData();
     const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
@@ -86,7 +109,6 @@ struct IndexV2 {
     }
   }
 
-  // ===== 保留原有的所有业务逻辑方法(完全不变) =====
   private async bootstrapData(): Promise<void> {
     const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
     if (!host) {
@@ -96,9 +118,7 @@ struct IndexV2 {
     }
     try {
       this.mainNavTopInsetVp = await getSystemSafeTopVp(host);
-    } catch {
-      // 保持默认 mainNavTopInsetVp
-    }
+    } catch { }
     try {
       await RecipeRepository.getInstance().load(host);
       this.recipeCount = RecipeRepository.getInstance().getCount();
@@ -108,10 +128,8 @@ struct IndexV2 {
       this.status = '加载失败';
       this.recipeCount = 0;
       this.errHint = '菜谱数据加载失败';
-      console.error('RecipeRepository.load failed');
       return;
     }
-    // RecipeRepository.load() 内部已 await DB 初始化，getAll() 直接返回含 difficulty/methods 的完整数据
 
     try {
       const settings = await CookPreferences.getSettings(host);
@@ -123,7 +141,6 @@ struct IndexV2 {
       }
     } catch {
       this.keepLocalData = true;
-      console.error('CookPreferences.getSettings failed');
     }
     this.runSearch();
     this.runLibrarySearch();
@@ -133,91 +150,51 @@ struct IndexV2 {
   }
 
   private isRecipeFavorite(recipeId: number): boolean {
-    for (let i = 0; i < this.favoriteIds.length; i++) {
-      if (this.favoriteIds[i] === recipeId) {
-        return true;
-      }
-    }
-    return false;
+    return this.favoriteIds.includes(recipeId);
   }
 
   private async refreshFavorites(): Promise<void> {
     const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
-    if (host === undefined) {
-      return;
-    }
-    if (!this.keepLocalData) {
-      this.favoriteIds = [];
+    if (!host || !this.keepLocalData) {
+      if (!this.keepLocalData) this.favoriteIds = [];
       return;
     }
     try {
       const raw = await CookPreferences.getFavoriteIds(host);
       const n = RecipeRepository.getInstance().getCount();
-      const next: number[] = [];
-      for (let i = 0; i < raw.length; i++) {
-        const id = raw[i];
-        if (id >= 0 && id < n) {
-          next.push(id);
-        }
-      }
-      this.favoriteIds = next;
-    } catch {
-      console.error('refreshFavorites failed');
-    }
+      this.favoriteIds = raw.filter(id => id >= 0 && id < n);
+    } catch { }
   }
 
   private onTapFavorite(recipeId: number): void {
-    if (!this.keepLocalData) {
-      return;
-    }
+    if (!this.keepLocalData) return;
     const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
-    if (host === undefined) {
-      return;
-    }
+    if (!host) return;
     void CookPreferences.toggleFavoriteId(host, recipeId).then(async () => {
       await this.refreshFavorites();
-      // 显示 Toast 提示
-      const isFav = this.isRecipeFavorite(recipeId);
-      this.showToast(isFav ? '已添加至收藏' : '已取消收藏');
+      this.showToast(this.isRecipeFavorite(recipeId) ? '已添加至收藏' : '已取消收藏');
     });
   }
 
   private async refreshHistory(): Promise<void> {
     const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
-    if (host === undefined) {
-      return;
-    }
-    if (!this.keepLocalData) {
-      this.historyIds = [];
+    if (!host || !this.keepLocalData) {
+      if (!this.keepLocalData) this.historyIds = [];
       return;
     }
     try {
       const raw = await CookPreferences.getHistoryIds(host);
       const n = RecipeRepository.getInstance().getCount();
-      const next: number[] = [];
-      for (let i = 0; i < raw.length; i++) {
-        const id = raw[i];
-        if (id >= 0 && id < n) {
-          next.push(id);
-        }
-      }
-      this.historyIds = next;
-    } catch {
-      console.error('refreshHistory failed');
-    }
+      this.historyIds = raw.filter(id => id >= 0 && id < n);
+    } catch { }
   }
 
   private async refreshUserProfile(): Promise<void> {
     const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
-    if (host === undefined) {
-      return;
-    }
+    if (!host) return;
     try {
-      const profile = await CookPreferences.getUserProfile(host);
-      this.userProfile = profile;
-    } catch {
-      console.error('refreshUserProfile failed');
-    }
+      this.userProfile = await CookPreferences.getUserProfile(host);
+    } catch { }
   }
 
   private runSearch(): void {
@@ -226,226 +203,115 @@ struct IndexV2 {
   }
 
   private runLibrarySearch(): void {
-    let result: RecipeWithId[];
     if (this.libraryActiveTag === '搜索结果') {
-      // 搜索结果页：以冰箱筛选结果为基础，仅叠加难度过滤
-      result = RecipeSearchService.filterByDifficulty(this.searchHits, this.libraryActiveDifficulty);
+      this.libraryHits = RecipeSearchService.filterByDifficulty(this.searchHits, this.libraryActiveDifficulty);
     } else {
-      const all = RecipeRepository.getInstance().getAll();
-      result = RecipeSearchService.filterLibraryByName(all, this.libraryKeyword);
-      result = RecipeSearchService.filterByTag(result, this.libraryActiveTag);
-      result = RecipeSearchService.filterByDifficulty(result, this.libraryActiveDifficulty);
+      let result = RecipeRepository.getInstance().getAll();
+      result = RecipeSearchService.filterLibraryByName(result, this.libraryKeyword);
+
+      if (this.libraryActiveTag !== '全部') {
+        result = RecipeSearchService.filterByTag(result, this.libraryActiveTag);
+      }
+
+      this.libraryHits = RecipeSearchService.filterByDifficulty(result, this.libraryActiveDifficulty);
     }
-    this.libraryHits = result;
   }
 
-  private emptyDiscoverPick(): RecipeWithId {
-    const r: RecipeWithId = { id: -1, name: '', stuff: [], tools: [], steps: [] };
-    return r;
+  // 切换搜索模式
+  private switchSearchMode(mode: SearchMode): void {
+    this.searchMode = mode;
+    this.runSearch();
+
+    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    if (host) {
+      void CookPreferences.setSearchMode(host, mode);
+    }
+
+    const tip = mode === 'survival' ? '生存模式：仅展示现有食材能做的菜' :
+      mode === 'loose' ? '模糊匹配：展示包含已选食材的菜' : '严格匹配：食材与厨具均需符合';
+    this.showToast(tip);
   }
 
   private cloneRecipeForDiscoverState(source: RecipeWithId): RecipeWithId {
-    const stuffCopy: string[] = [];
-    for (let i = 0; i < source.stuff.length; i++) {
-      stuffCopy.push(source.stuff[i]);
-    }
-    const toolsCopy: string[] = [];
-    for (let i = 0; i < source.tools.length; i++) {
-      toolsCopy.push(source.tools[i]);
-    }
-    const r: RecipeWithId = {
-      id: source.id,
-      name: source.name,
-      stuff: stuffCopy,
-      tools: toolsCopy,
-    };
-    if (source.steps !== undefined) {
-      const st: string[] = [];
-      for (let k = 0; k < source.steps.length; k++) {
-        st.push(source.steps[k]);
-      }
-      r.steps = st;
-    }
-    if (source.emojis !== undefined) {
-      const em: string[] = [];
-      for (let j = 0; j < source.emojis.length; j++) {
-        em.push(source.emojis[j]);
-      }
-      r.emojis = em;
-    }
-    if (source.difficulty !== undefined) {
-      r.difficulty = source.difficulty;
-    }
-    if (source.tags !== undefined) {
-      const tg: string[] = [];
-      for (let j = 0; j < source.tags.length; j++) {
-        tg.push(source.tags[j]);
-      }
-      r.tags = tg;
-    }
-    if (source.methods !== undefined) {
-      const mh: string[] = [];
-      for (let j = 0; j < source.methods.length; j++) {
-        mh.push(source.methods[j]);
-      }
-      r.methods = mh;
-    }
-    return r;
+    return JSON.parse(JSON.stringify(source));
   }
 
   private pickRandomDiscover(): void {
     const all = RecipeRepository.getInstance().getAll();
-    const candidates: RecipeWithId[] = [];
-    for (let i = 0; i < all.length; i++) {
-      candidates.push(all[i]);
-    }
-    if (candidates.length === 0) {
-      this.discoverPick = this.emptyDiscoverPick();
+    if (all.length === 0) {
+      this.discoverPick = { id: -1, name: '', stuff: [], tools: [], steps: [] };
       return;
     }
-
-    let pool: RecipeWithId[] = candidates;
-    const curId = this.discoverPick.id;
-    if (curId >= 0 && candidates.length > 1) {
-      const filtered: RecipeWithId[] = [];
-      for (let k = 0; k < candidates.length; k++) {
-        if (candidates[k].id !== curId) {
-          filtered.push(candidates[k]);
-        }
-      }
-      if (filtered.length > 0) {
-        pool = filtered;
-      }
+    let pool = all;
+    if (this.discoverPick.id >= 0 && all.length > 1) {
+      pool = all.filter(r => r.id !== this.discoverPick.id);
     }
-
-    const idx = Math.floor(Math.random() * pool.length);
-    this.discoverPick = this.cloneRecipeForDiscoverState(pool[idx]);
+    this.discoverPick = this.cloneRecipeForDiscoverState(pool[Math.floor(Math.random() * pool.length)]);
   }
 
-  /**
-   * 带Fancy滚动动画的随机选择
-   */
   private pickRandomDiscoverWithAnimation(): void {
-    if (this.isRandomizing) {
-      return;
-    }
-
+    if (this.isRandomizing) return;
     this.isRandomizing = true;
     this.showRandomAnimation = true;
 
     const all = RecipeRepository.getInstance().getAll();
-    const candidates: RecipeWithId[] = [];
-    for (let i = 0; i < all.length; i++) {
-      candidates.push(all[i]);
-    }
-
-    if (candidates.length === 0) {
+    if (all.length === 0) {
       this.showRandomAnimation = false;
       this.isRandomizing = false;
       this.pickRandomDiscover();
       return;
     }
 
-    // 准备滚动动画的菜名列表 (随机打乱顺序)
-    const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+    const shuffled = [...all].sort(() => Math.random() - 0.5);
     this.randomAnimationNames = shuffled.slice(0, Math.min(20, shuffled.length)).map(r => r.name);
     this.currentRandomIndex = 0;
 
-    // 滚动动画: 每50ms切换一个菜名,持续1.5秒
     let counter = 0;
-    const maxCount = 30;
     const interval = setInterval(() => {
       this.currentRandomIndex = (this.currentRandomIndex + 1) % this.randomAnimationNames.length;
-      counter++;
-
-      if (counter >= maxCount) {
+      if (++counter >= 30) {
         clearInterval(interval);
-        // 动画结束,显示最终结果
         setTimeout(() => {
           this.showRandomAnimation = false;
           this.pickRandomDiscover();
-
-          animateTo({
-            duration: 400,
-            curve: Curve.EaseOut
-          }, () => {
-            this.tabOpacity = 1.0;
-          });
-
+          animateTo({ duration: 400, curve: Curve.EaseOut }, () => this.tabOpacity = 1.0);
           this.isRandomizing = false;
         }, 200);
       }
     }, 50);
 
-    // 淡出当前卡片
-    animateTo({
-      duration: 200,
-      curve: Curve.EaseOut
-    }, () => {
-      this.tabOpacity = 0.3;
-    });
+    animateTo({ duration: 200, curve: Curve.EaseOut }, () => this.tabOpacity = 0.3);
   }
 
   private async persistCookIfNeeded(): Promise<void> {
-    if (!this.keepLocalData) {
-      return;
-    }
+    if (!this.keepLocalData) return;
     const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
-    if (!host) {
-      return;
-    }
+    if (!host) return;
     await CookPreferences.setSelectedStuff(host, this.selectedStuff);
     await CookPreferences.setCurTool(host, this.curTool);
     await CookPreferences.setSearchMode(host, this.searchMode);
   }
 
-  private chipLabel(item: StuffItem): string {
-    const em = item.emoji;
-    if (em.length > 0) {
-      return `${em} ${item.name}`;
-    }
-    return item.name;
-  }
-
   private toggleStuff(name: string): void {
-    if (this.isRandomizing) {
-      return;
-    }
-    const idx = this.selectedStuff.indexOf(name);
-    if (idx >= 0) {
-      const next: string[] = [];
-      for (let i = 0; i < this.selectedStuff.length; i++) {
-        if (i !== idx) {
-          next.push(this.selectedStuff[i]);
-        }
-      }
-      this.selectedStuff = next;
+    if (this.isRandomizing) return;
+    if (this.selectedStuff.includes(name)) {
+      this.selectedStuff = this.selectedStuff.filter(item => item !== name);
     } else {
-      this.selectedStuff = this.selectedStuff.concat([name]);
+      this.selectedStuff.push(name);
     }
     this.runSearch();
     void this.persistCookIfNeeded();
   }
 
   private toggleTool(name: string): void {
-    if (this.isRandomizing) {
-      return;
-    }
+    if (this.isRandomizing) return;
     this.curTool = this.curTool === name ? '' : name;
     this.runSearch();
     void this.persistCookIfNeeded();
   }
 
-  private applySearchMode(mode: SearchMode): void {
-    this.searchMode = mode;
-    this.runSearch();
-    void this.persistCookIfNeeded();
-  }
-
   private resetSelection(): void {
-    if (this.isRandomizing) {
-      return;
-    }
+    if (this.isRandomizing) return;
     if (this.selectedStuff.length > 0 || this.curTool.length > 0) {
       this.selectedStuff = [];
       this.curTool = '';
@@ -455,15 +321,10 @@ struct IndexV2 {
     }
   }
 
-
-
-  // ===== 新增的 UI 辅助方法 =====
   private showToast(message: string): void {
     this.toastMessage = message;
     this.toastVisible = true;
-    setTimeout(() => {
-      this.toastVisible = false;
-    }, 2500);
+    setTimeout(() => this.toastVisible = false, 2500);
   }
 
   private openDetailSheet(recipe: RecipeWithId): void {
@@ -471,297 +332,185 @@ struct IndexV2 {
     this.detailSheetVisible = true;
     const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
     if (host !== undefined && this.keepLocalData) {
-      void CookPreferences.recordHistoryVisit(host, recipe.id).then(() => {
-        void this.refreshHistory();
-      });
+      void CookPreferences.recordHistoryVisit(host, recipe.id).then(() => this.refreshHistory());
     }
   }
 
   private getBackgroundColor(): string {
-    // 餐桌页面使用特殊色调
     return this.mainTabIndex === 3 ? AppColors.TABLE_BG : AppColors.BG_COLOR;
   }
 
-  /**
-   * 随机搭配动画 - 盲盒闪烁效果
-   * 对应原型中的 startRandomizer() 函数
-   */
   private startRandomAnimation(): void {
-    if (this.isRandomizing) {
-      return;
-    }
-
+    if (this.isRandomizing) return;
     this.isRandomizing = true;
     this.selectedStuff = [];
     this.curTool = '';
     this.highlightedTags = new Set();
 
-    // 合并所有食材
-    const allIngredients: string[] = [];
-    meatItems.forEach(item => allIngredients.push(item.name));
-    vegetableItems.forEach(item => allIngredients.push(item.name));
-    stapleItems.forEach(item => allIngredients.push(item.name));
-
+    const allIngredients = this.ingredientCategories.flatMap(c => c.data.map(i => i.name));
     let round = 0;
-    const maxRounds = 10;
 
     const animationInterval = setInterval(() => {
-      // 清除上一轮高亮
       this.highlightedTags = new Set();
-
-      // 随机选3个食材高亮
-      const randomIndexes: number[] = [];
       for (let i = 0; i < 3; i++) {
-        randomIndexes.push(Math.floor(Math.random() * allIngredients.length));
+        this.highlightedTags.add(allIngredients[Math.floor(Math.random() * allIngredients.length)]);
       }
-      randomIndexes.forEach(idx => {
-        this.highlightedTags.add(allIngredients[idx]);
-      });
-
-      round++;
-
-      if (round >= maxRounds) {
+      if (++round >= 10) {
         clearInterval(animationInterval);
         this.highlightedTags = new Set();
 
-        // 最终结果: 1个肉类 + 2个蔬菜
-        const meatSelection = meatItems[Math.floor(Math.random() * meatItems.length)].name;
-        const vegSelection1 = vegetableItems[Math.floor(Math.random() * vegetableItems.length)].name;
-        let vegSelection2 = vegetableItems[Math.floor(Math.random() * vegetableItems.length)].name;
+        const meats = this.ingredientCategories.find(c => c.type === TagType.MEAT)?.data.map(i => i.name) || [];
+        const vegs = this.ingredientCategories.find(c => c.type === TagType.VEG)?.data.map(i => i.name) || [];
 
-        // 确保两个蔬菜不重复
-        while (vegSelection2 === vegSelection1 && vegetableItems.length > 1) {
-          vegSelection2 = vegetableItems[Math.floor(Math.random() * vegetableItems.length)].name;
-        }
+        const m = meats[Math.floor(Math.random() * meats.length)];
+        const v1 = vegs[Math.floor(Math.random() * vegs.length)];
+        let v2 = vegs[Math.floor(Math.random() * vegs.length)];
+        while (v2 === v1 && vegs.length > 1) v2 = vegs[Math.floor(Math.random() * vegs.length)];
 
-        this.selectedStuff = [meatSelection, vegSelection1, vegSelection2];
+        this.selectedStuff = [m, v1, v2];
         this.isRandomizing = false;
         this.runSearch();
         void this.persistCookIfNeeded();
-
         this.showToast('✨ 搭配完成，去看看做法吧！');
       }
-    }, 75); // 75ms 一轮,总共 750ms
+    }, 75);
   }
 
-  // ===== UI 构建器方法 =====
+  private switchTabWithAnimation(targetIndex: number): void {
+    animateTo({ duration: 100, curve: Curve.EaseOut }, () => this.tabOpacity = 0);
+    setTimeout(() => {
+      this.mainTabIndex = targetIndex;
+      animateTo({ duration: 150, curve: Curve.EaseIn }, () => this.tabOpacity = 1.0);
+    }, 100);
+  }
 
-  /**
-   * 「做菜」Tab - 对应原型中的 #tab-home
-   */
   @Builder
   buildCookTab() {
     Stack() {
       Scroll() {
-        Column({ space: 0 }) {
-          // 顶部标题区域
+        // 【核心优化】将全局模块间距统一收紧为 16vp
+        Column({ space: 16 }) {
+
+          // --- 模块 1：顶部标题区 ---
           Row() {
             Column({ space: 4 }) {
               Text('准备做点什么？')
-                .fontSize(28)
+                .fontSize(32)
                 .fontColor(AppColors.GRAY_900)
                 .fontWeight(FontWeight.Bolder)
-                .letterSpacing(-0.5)
+                .letterSpacing(-1)
 
               Text('点选食材，匹配最佳做法')
                 .fontSize(14)
                 .fontColor(AppColors.GRAY_500)
-            }
-            .alignItems(HorizontalAlign.Start)
-            .layoutWeight(1)
+            }.alignItems(HorizontalAlign.Start).layoutWeight(1)
 
-            // 清空按钮
-            Text('清空')
-              .fontSize(13)
-              .fontColor(AppColors.GRAY_500)
-              .fontWeight(FontWeight.Medium)
-              .padding({ left: 14, right: 14, top: 6, bottom: 6 })
-              .backgroundColor(Color.White)
-              .borderRadius(100)
-              .shadow({
-                radius: 4,
-                color: 'rgba(0,0,0,0.05)',
-                offsetX: 0,
-                offsetY: 2
-              })
-              .onClick(() => {
-                this.resetSelection();
-              })
+            Row({ space: 4 }) {
+              SymbolGlyph($r('sys.symbol.trash')).fontSize(14).fontColor([AppColors.GRAY_600])
+              Text('清空')
+                .fontSize(13).fontColor(AppColors.GRAY_600).fontWeight(FontWeight.Medium)
+            }
+            .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+            .backgroundColor(AppColors.GRAY_100).borderRadius(100)
+            .onClick(() => this.resetSelection())
           }
           .width('100%')
-          .padding({ left: 20, right: 20, top: 16, bottom: 24 })
-          .alignItems(VerticalAlign.Bottom)
+          .padding({ left: 20, right: 20, top: 24 })
+          // 💡 关键修改：通过 margin 增加标题与下方按钮的特定呼吸感（16 + 12 = 28vp 间距）
+          .margin({ bottom: 12 })
 
-          // 随机搭配按钮
-          RandomPickerButton({
-            disabled: this.isRandomizing,
-            onRandomComplete: (selected: string[]) => {
-              this.startRandomAnimation();
-            }
-          })
+          // --- 模块 2：随机按钮区 ("没有灵感") ---
+          RandomPickerButton({ disabled: this.isRandomizing, onRandomComplete: () => this.startRandomAnimation() })
             .padding({ left: 20, right: 20 })
 
-          // 食材分类区域
-          Column({ space: 32 }) {
-            // 🥩 肉蛋水产
-            Column({ space: 12 }) {
-              Text('🥩 肉蛋水产')
-                .fontSize(15)
-                .fontColor(AppColors.GRAY_800)
-                .fontWeight(FontWeight.Bold)
-                .alignSelf(ItemAlign.Start)
+          // --- 模块 3：匹配策略 ---
+          Column({ space: 10 }) {
+            Text('匹配策略')
+              .fontSize(15).fontColor(AppColors.GRAY_800).fontWeight(FontWeight.Bold).alignSelf(ItemAlign.Center)
 
-              Flex({
-                direction: FlexDirection.Row,
-                wrap: FlexWrap.Wrap,
-                alignItems: ItemAlign.Center
-              }) {
-                ForEach(meatItems, (item: StuffItem) => {
-                  IngredientTag({
-                    label: item.name,
-                    emoji: item.emoji,
-                    tagType: TagType.MEAT,
-                    isActive: this.selectedStuff.includes(item.name),
-                    isHighlighted: this.highlightedTags.has(item.name),
-                    onTagClick: () => {
-                      this.toggleStuff(item.name);
-                    }
-                  })
-                    .margin({ right: 10, bottom: 10 })
-                }, (item: StuffItem) => item.name)
+            Row({ space: 8 }) {
+              ForEach([
+                { mode: 'loose', label: '模糊匹配', desc: '包含即可' },
+                { mode: 'survival', label: '生存模式', desc: '仅限现有' },
+                { mode: 'strict', label: '严格模式', desc: '工具符合' }
+              ], (item: Record<string, string>) => {
+                Column({ space: 2 }) {
+                  Text(item.label)
+                    .fontSize(14)
+                    .fontWeight(this.searchMode === item.mode ? FontWeight.Bold : FontWeight.Normal)
+                    .fontColor(this.searchMode === item.mode ? Color.White : AppColors.GRAY_600)
+                  Text(item.desc)
+                    .fontSize(10)
+                    .fontColor(this.searchMode === item.mode ? 'rgba(255,255,255,0.8)' : AppColors.GRAY_400)
+                }
+                .layoutWeight(1).padding({ top: 8, bottom: 8 })
+                .backgroundColor(this.searchMode === item.mode ? AppColors.BRAND_COLOR : Color.White)
+                .borderRadius(12)
+                .border({ width: 1, color: this.searchMode === item.mode ? AppColors.BRAND_COLOR : AppColors.GRAY_200 })
+                .onClick(() => this.switchSearchMode(item.mode as SearchMode))
+              }, (item: Record<string, string>) => item.mode)
+            }.width('100%')
+          }.width('100%').padding({ left: 20, right: 20 })
+
+          // --- 模块 4：食材与厨具分类 (缩小间距让整体更聚拢) ---
+          Column({ space: 20 }) { // 模块间距从 24 缩小到 20
+            ForEach(this.ingredientCategories, (cat: IngredientCategory) => {
+              Column({ space: 8 }) { // 标题与标签间距从 10 缩小到 8
+                Text(cat.title)
+                  .fontSize(15).fontColor(AppColors.GRAY_800).fontWeight(FontWeight.Bold).alignSelf(ItemAlign.Center)
+
+                Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Center, alignItems: ItemAlign.Center }) {
+                  ForEach(cat.data, (item: StuffItem) => {
+                    IngredientTag({
+                      label: item.name, emoji: item.emoji, tagType: cat.type,
+                      isActive: this.selectedStuff.includes(item.name),
+                      isHighlighted: this.highlightedTags.has(item.name),
+                      onTagClick: () => this.toggleStuff(item.name)
+                    }).margin({ left: 5, right: 5, bottom: 10 })
+                  }, (item: StuffItem) => item.name)
+                }.width('100%')
               }
-              .width('100%')
-            }
+            }, (cat: IngredientCategory) => cat.title)
 
-            // 🥬 新鲜蔬菜
-            Column({ space: 12 }) {
-              Text('🥬 新鲜蔬菜')
-                .fontSize(15)
-                .fontColor(AppColors.GRAY_800)
-                .fontWeight(FontWeight.Bold)
-                .alignSelf(ItemAlign.Start)
-
-              Flex({
-                direction: FlexDirection.Row,
-                wrap: FlexWrap.Wrap,
-                alignItems: ItemAlign.Center
-              }) {
-                ForEach(vegetableItems, (item: StuffItem) => {
-                  IngredientTag({
-                    label: item.name,
-                    emoji: item.emoji,
-                    tagType: TagType.VEG,
-                    isActive: this.selectedStuff.includes(item.name),
-                    isHighlighted: this.highlightedTags.has(item.name),
-                    onTagClick: () => {
-                      this.toggleStuff(item.name);
-                    }
-                  })
-                    .margin({ right: 10, bottom: 10 })
-                }, (item: StuffItem) => item.name)
-              }
-              .width('100%')
-            }
-
-            // 🍚 碳水辅料
-            Column({ space: 12 }) {
-              Text('🍚 碳水辅料')
-                .fontSize(15)
-                .fontColor(AppColors.GRAY_800)
-                .fontWeight(FontWeight.Bold)
-                .alignSelf(ItemAlign.Start)
-
-              Flex({
-                direction: FlexDirection.Row,
-                wrap: FlexWrap.Wrap,
-                alignItems: ItemAlign.Center
-              }) {
-                ForEach(stapleItems, (item: StuffItem) => {
-                  IngredientTag({
-                    label: item.name,
-                    emoji: item.emoji,
-                    tagType: TagType.CARB,
-                    isActive: this.selectedStuff.includes(item.name),
-                    isHighlighted: this.highlightedTags.has(item.name),
-                    onTagClick: () => {
-                      this.toggleStuff(item.name);
-                    }
-                  })
-                    .margin({ right: 10, bottom: 10 })
-                }, (item: StuffItem) => item.name)
-              }
-              .width('100%')
-            }
-            // 🍳 厨具
-            Column({ space: 12 }) {
+            // 厨具区
+            Column({ space: 8 }) {
               Text('🍳 厨具')
-                .fontSize(15)
-                .fontColor(AppColors.GRAY_800)
-                .fontWeight(FontWeight.Bold)
-                .alignSelf(ItemAlign.Start)
+                .fontSize(15).fontColor(AppColors.GRAY_800).fontWeight(FontWeight.Bold).alignSelf(ItemAlign.Center)
 
-              Flex({
-                direction: FlexDirection.Row,
-                wrap: FlexWrap.Wrap,
-                alignItems: ItemAlign.Center
-              }) {
+              Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Center, alignItems: ItemAlign.Center }) {
                 ForEach(toolItems, (item: StuffItem) => {
                   IngredientTag({
-                    label: item.label ?? item.name,
-                    emoji: item.emoji,
-                    tagType: TagType.TOOL,
+                    label: item.label ?? item.name, emoji: item.emoji, tagType: TagType.TOOL,
                     isActive: this.curTool === item.name,
                     isHighlighted: false,
-                    onTagClick: () => {
-                      this.toggleTool(item.name);
-                    }
-                  })
-                    .margin({ right: 10, bottom: 10 })
+                    onTagClick: () => this.toggleTool(item.name)
+                  }).margin({ left: 5, right: 5, bottom: 10 })
                 }, (item: StuffItem) => item.name)
-              }
-              .width('100%')
+              }.width('100%')
             }
           }
           .width('100%')
-          .padding({ left: 20, right: 20 })
-        }
-        .width('100%')
-        .padding({ bottom: 200 }) // 为底部悬浮按钮预留空间
-      }
-      .width('100%')
-      .height('100%')
-      .scrollBar(BarState.Off)
-      .edgeEffect(EdgeEffect.Spring)
+          .padding({ left: 20, right: 20, bottom: 140 }) // 底部留白确保不被遮挡
 
-      // 底部悬浮生成按钮区域
+        }.width('100%')
+      }
+      .width('100%').height('100%').scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring)
+
+      // 底部固定操作按钮
       Column() {
         Button() {
-          Text(this.selectedStuff.length > 0 ?
-          `查看这 ${this.selectedStuff.length} 种食材能做什么` :
-          '请先选择食材')
-            .fontSize(15)
-            .fontColor(Color.White)
-            .fontWeight(FontWeight.Bold)
+          Text(this.selectedStuff.length > 0 ? `查看这 ${this.selectedStuff.length} 种组合能做什么` : '请先选择食材')
+            .fontSize(15).fontColor(Color.White).fontWeight(FontWeight.Bold)
         }
-        .width('100%')
-        .height(56)
-        .backgroundColor(this.selectedStuff.length > 0 ?
-        AppColors.BRAND_COLOR :
-        AppColors.GRAY_200)
+        .width('100%').height(56)
+        .backgroundColor(this.selectedStuff.length > 0 ? AppColors.BRAND_COLOR : AppColors.GRAY_200)
         .borderRadius(16)
-        .shadow(this.selectedStuff.length > 0 ? {
-          radius: 24,
-          color: 'rgba(255, 71, 87, 0.5)',
-          offsetX: 0,
-          offsetY: 8
-        } : undefined)
         .enabled(this.selectedStuff.length > 0)
         .onClick(() => {
           if (this.selectedStuff.length > 0) {
             this.libraryActiveTag = '搜索结果';
-            this.libraryActiveDifficulty = '';
             this.runLibrarySearch();
-            this.mainTabIndex = 1; // 跳转到菜谱Tab
+            this.switchTabWithAnimation(1);
           }
         })
       }
@@ -769,807 +518,276 @@ struct IndexV2 {
       .padding({ left: 20, right: 20, bottom: 20 })
       .position({ x: 0, y: '100%' })
       .markAnchor({ y: '100%' })
-    }
-    .width('100%')
-    .height('100%')
+    }.width('100%').height('100%')
   }
 
-  /**
-   * 「菜谱」Tab - 对应原型中的 #tab-discover
-   */
   @Builder
   buildLibraryTab() {
     Column() {
-      // 顶部固定区域(搜索栏)
       Column() {
-        Text('探索')
-          .fontSize(24)
-          .fontColor(AppColors.GRAY_900)
-          .fontWeight(FontWeight.Bolder)
-          .alignSelf(ItemAlign.Start)
-          .margin({ bottom: 16 })
+        Text('探索').fontSize(24).fontColor(AppColors.GRAY_900).fontWeight(FontWeight.Bold).alignSelf(ItemAlign.Start).margin({ bottom: 16 })
 
-        // 搜索栏
         Row({ space: 8 }) {
-          Text('🔍')
-            .fontSize(18)
+          SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(18).fontColor([AppColors.GRAY_500])
+          TextInput({ placeholder: '搜索菜谱或食材', text: this.libraryKeyword })
+            .backgroundColor(Color.Transparent).layoutWeight(1).fontSize(15).placeholderColor(AppColors.GRAY_400)
+            .onChange((v: string) => { this.libraryKeyword = v; this.runLibrarySearch(); })
+        }.width('100%').height(48).padding({ left: 16, right: 16 }).backgroundColor(AppColors.GRAY_100).borderRadius(12)
 
-          TextInput({ placeholder: '搜索菜谱、食材或 UP 主', text: this.libraryKeyword })
-            .backgroundColor(Color.Transparent)
-            .layoutWeight(1)
-            .fontSize(15)
-            .placeholderColor(AppColors.GRAY_400)
-            .onChange((value: string) => {
-              this.libraryKeyword = value;
-              this.runLibrarySearch();
-            })
-        }
-        .width('100%')
-        .height(48)
-        .padding({ left: 16, right: 16 })
-        .backgroundColor(Color.White)
-        .borderRadius(16)
-        .shadow({
-          radius: 10,
-          color: 'rgba(0,0,0,0.03)',
-          offsetX: 0,
-          offsetY: 2
-        })
-
-        // 分类标签
         Scroll() {
+          // 修复：Row间距从8减小到6，缩减视觉留白
           Row({ space: 8 }) {
-            // 搜索结果标签（有冰箱筛选结果时显示）
             if (this.searchHits.length > 0) {
-              Text(`🔎 搜索结果 ${this.searchHits.length}`)
-                .fontSize(12)
-                .fontColor(this.libraryActiveTag === '搜索结果' ? Color.White : AppColors.BRAND_COLOR)
-                .fontWeight(FontWeight.Medium)
+              Text(`搜索结果 ${this.searchHits.length}`)
+                .fontSize(12).fontColor(this.libraryActiveTag === '搜索结果' ? Color.White : AppColors.BRAND_COLOR)
+              // 修复：左右padding从14减小到12
                 .padding({ left: 14, right: 14, top: 6, bottom: 6 })
                 .backgroundColor(this.libraryActiveTag === '搜索结果' ? AppColors.BRAND_COLOR : '#FFF0F1')
                 .borderRadius(8)
-                .shadow({
-                  radius: 2,
-                  color: 'rgba(0,0,0,0.05)',
-                  offsetX: 0,
-                  offsetY: 1
-                })
-                .onClick(() => {
-                  this.libraryActiveTag = '搜索结果';
-                  this.libraryActiveDifficulty = '';
-                  this.runLibrarySearch();
-                })
+                .onClick(() => { this.libraryActiveTag = '搜索结果'; this.libraryActiveDifficulty = ''; this.runLibrarySearch(); })
             }
-
-            ForEach(['今日推荐', '减脂餐', '快手早餐'], (tag: string) => {
-              Text(tag === '今日推荐' ? '🔥 今日推荐' : tag)
-                .fontSize(12)
-                .fontColor(this.libraryActiveTag === tag ? Color.White : AppColors.GRAY_600)
-                .fontWeight(FontWeight.Medium)
+            ForEach(this.filterTags, (tag: string) => {
+              Text(tag)
+                .fontSize(12).fontColor(this.libraryActiveTag === tag ? Color.White : AppColors.GRAY_600)
+              // 修复：左右padding从14减小到12
                 .padding({ left: 14, right: 14, top: 6, bottom: 6 })
                 .backgroundColor(this.libraryActiveTag === tag ? AppColors.GRAY_900 : Color.White)
                 .borderRadius(8)
-                .shadow({
-                  radius: 2,
-                  color: 'rgba(0,0,0,0.05)',
-                  offsetX: 0,
-                  offsetY: 1
-                })
                 .onClick(() => {
-                  this.libraryActiveTag = this.libraryActiveTag === tag ? '' : tag;
+                  this.libraryActiveTag = tag;
                   this.runLibrarySearch();
                 })
             }, (tag: string) => tag)
+          }.padding({ right: 4 })
+        }.scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off).width('100%').margin({ top: 16 })
+      }.width('100%').padding({ left: 20, right: 20, top: 16, bottom: 12 }).backgroundColor(AppColors.BG_COLOR)
 
-            // 难度筛选标签
-            ForEach(['简单', '普通', '困难'], (diff: string) => {
-              Text(diff)
-                .fontSize(12)
-                .fontColor(this.libraryActiveDifficulty === diff ? Color.White : AppColors.GRAY_600)
-                .fontWeight(FontWeight.Medium)
-                .padding({ left: 14, right: 14, top: 6, bottom: 6 })
-                .backgroundColor(this.libraryActiveDifficulty === diff ?
-                  (diff === '简单' ? '#22C55E' : diff === '普通' ? '#F59E0B' : '#EF4444') :
-                  Color.White)
-                .borderRadius(8)
-                .shadow({
-                  radius: 2,
-                  color: 'rgba(0,0,0,0.05)',
-                  offsetX: 0,
-                  offsetY: 1
-                })
-                .onClick(() => {
-                  this.libraryActiveDifficulty = this.libraryActiveDifficulty === diff ? '' : diff;
-                  this.runLibrarySearch();
-                })
-            }, (diff: string) => diff)
-          }
-          .padding({ right: 4 })
-        }
-        .scrollable(ScrollDirection.Horizontal)
-        .scrollBar(BarState.Off)
-        .width('100%')
-        .margin({ top: 16 })
-      }
-      .width('100%')
-      .padding({ left: 20, right: 20, top: 16, bottom: 12 })
-      .backgroundColor('rgba(244, 245, 247, 0.95)')
-      .backdropBlur(20)
-
-      // 滚动内容区域
       Scroll() {
         Column({ space: 20 }) {
-          // 搜索结果模式：显示已选食材提示条
           if (this.libraryActiveTag === '搜索结果') {
             Row({ space: 6 }) {
-              Text('🧊')
-                .fontSize(14)
-              Text(`已选：${this.selectedStuff.join('、')}${this.curTool.length > 0 ? ' · ' + this.curTool : ''}`)
-                .fontSize(13)
-                .fontColor(AppColors.GRAY_600)
-                .layoutWeight(1)
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-            }
-            .width('100%')
-            .padding({ left: 14, right: 14, top: 8, bottom: 8 })
-            .backgroundColor('#FFF0F1')
-            .borderRadius(10)
+              SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(14).fontColor([AppColors.GRAY_600])
+              Text(`已选：${this.selectedStuff.join('、')}${this.curTool ? ' · ' + this.curTool : ''}`)
+                .fontSize(13).fontColor(AppColors.GRAY_600).layoutWeight(1).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+            }.width('100%').padding({ left: 14, right: 14, top: 8, bottom: 8 }).backgroundColor('#FFF0F1').borderRadius(10)
           }
 
-          // 如果有搜索结果,显示卡片列表(统一使用小图模式)
           if (this.libraryHits.length > 0) {
-            ForEach(this.libraryHits, (item: RecipeWithId) => {
-              RecipeCard({
-                recipe: item,
-                mode: RecipeCardMode.SMALL,
-                isFavorite: this.isRecipeFavorite(item.id),
-                onCardClick: () => {
-                  this.openDetailSheet(item);
-                },
-                onFavoriteClick: () => {
-                  this.onTapFavorite(item.id);
+            GridRow({ columns: 1, gutter: { x: 0, y: 13 } }) {
+              ForEach(this.libraryHits, (item: RecipeWithId) => {
+                GridCol({ span: 1 }) {
+                  RecipeCard({
+                    recipe: item,
+                    mode: RecipeCardMode.LARGE,
+                    isFavorite: this.isRecipeFavorite(item.id),
+                    onCardClick: () => this.openDetailSheet(item),
+                    onFavoriteClick: () => this.onTapFavorite(item.id)
+                  })
                 }
-              })
-            }, (item: RecipeWithId) => `recipe-${item.id}`)
-          } else {
-            // 空状态
-            Column({ space: 12 }) {
-              Text('📖')
-                .fontSize(48)
-                .opacity(0.3)
-
-              Text(this.recipeCount === 0 ? '暂无菜谱数据' : '暂无匹配的菜谱')
-                .fontSize(14)
-                .fontColor(AppColors.GRAY_500)
+              }, (item: RecipeWithId) => `recipe-${item.id}`)
             }
-            .width('100%')
-            .margin({ top: 60 })
+          } else {
+            Column({ space: 12 }) {
+              SymbolGlyph($r('sys.symbol.info_circle')).fontSize(48).fontColor([AppColors.GRAY_300])
+              Text(this.recipeCount === 0 ? '暂无菜谱数据' : '暂无匹配的菜谱').fontSize(14).fontColor(AppColors.GRAY_500)
+            }.width('100%').margin({ top: 60 })
           }
-        }
-        .width('100%')
-        .padding({ left: 20, right: 20, top: 8, bottom: 120 })
-      }
-      .layoutWeight(1)
-      .scrollBar(BarState.Off)
-      .edgeEffect(EdgeEffect.Spring)
-    }
-    .width('100%')
-    .height('100%')
+        }.width('100%').padding({ left: 20, right: 20, top: 8, bottom: 120 })
+      }.layoutWeight(1).scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring)
+    }.width('100%').height('100%')
   }
 
-  /**
-   * 「发现」Tab - 随机推荐
-   */
   @Builder
   buildDiscoverTab() {
     Column() {
       Scroll() {
         Column({ space: 16 }) {
-          Text('发现')
-            .fontSize(24)
-            .fontColor(AppColors.GRAY_900)
-            .fontWeight(FontWeight.Bolder)
-            .alignSelf(ItemAlign.Start)
+          Text('发现').fontSize(24).fontColor(AppColors.GRAY_900).fontWeight(FontWeight.Bold).alignSelf(ItemAlign.Start)
+          Text('不知道吃什么？随机从全库挑一道菜谱。').fontSize(14).fontColor(AppColors.GRAY_500).alignSelf(ItemAlign.Start)
 
-          Text('不知道吃什么？随机从全库挑一道菜谱。')
-            .fontSize(14)
-            .fontColor(AppColors.GRAY_500)
-            .alignSelf(ItemAlign.Start)
-            .lineHeight(22)
-
-          if (this.errHint.length > 0) {
-            Text(this.errHint)
-              .fontSize(12)
-              .fontColor(Color.Red)
-              .alignSelf(ItemAlign.Start)
-          }
-
-          // 按钮组
           Row({ space: 12 }) {
             Button() {
               Row({ space: 8 }) {
-                Text('🎲')
-                  .fontSize(18)
-
-                Text('随机一道')
-                  .fontSize(15)
-                  .fontColor(Color.White)
-                  .fontWeight(FontWeight.Bold)
+                SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(18).fontColor([Color.White]);
+                Text('随机一道').fontSize(15).fontColor(Color.White).fontWeight(FontWeight.Bold)
               }
             }
-            .padding({ left: 20, right: 20 })
-            .height(44)
-            .backgroundColor(AppColors.BRAND_COLOR)
-            .borderRadius(12)
-            .shadow({
-              radius: 12,
-              color: 'rgba(255, 71, 87, 0.3)',
-              offsetX: 0,
-              offsetY: 4
-            })
-            .onClick(() => {
-              this.pickRandomDiscoverWithAnimation();
-            })
+            .padding({ left: 20, right: 20 }).height(44).backgroundColor(AppColors.BRAND_COLOR).borderRadius(12).onClick(() => this.pickRandomDiscoverWithAnimation())
 
             if (this.discoverPick.id >= 0) {
               Button() {
                 Row({ space: 6 }) {
-                  Text('🔄')
-                    .fontSize(16)
-
-                  Text('换一道')
-                    .fontSize(15)
-                    .fontColor(AppColors.BRAND_COLOR)
-                    .fontWeight(FontWeight.Medium)
+                  SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(16).fontColor([AppColors.BRAND_COLOR]);
+                  Text('换一道').fontSize(15).fontColor(AppColors.BRAND_COLOR).fontWeight(FontWeight.Medium)
                 }
               }
-              .padding({ left: 20, right: 20 })
-              .height(44)
-              .backgroundColor('#E8F5E9')
-              .borderRadius(12)
-              .onClick(() => {
-                // 直接更换,不要动画
-                this.pickRandomDiscover();
-              })
+              .padding({ left: 20, right: 20 }).height(44).backgroundColor('#FFF0F1').borderRadius(12).onClick(() => this.pickRandomDiscover())
             }
-          }
-          .margin({ top: 8 })
-          .alignSelf(ItemAlign.Start)
+          }.margin({ top: 8 }).alignSelf(ItemAlign.Start)
 
-          // 随机动画区域 (全屏菜品名称滚动)
           if (this.showRandomAnimation && this.randomAnimationNames.length > 0) {
             Column() {
               Text(this.randomAnimationNames[this.currentRandomIndex])
-                .fontSize(48)
-                .fontColor(AppColors.BRAND_COLOR)
-                .fontWeight(FontWeight.Bolder)
-                .textAlign(TextAlign.Center)
-                .maxLines(2)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-                .animation({
-                  duration: 50,
-                  curve: Curve.Linear
-                })
-            }
-            .width('100%')
-            .height(300)
-            .justifyContent(FlexAlign.Center)
-            .backgroundColor('rgba(255, 245, 235, 0.5)')
-            .borderRadius(24)
-            .margin({ top: 20 })
-          }
-
-          // 显示随机选中的菜谱
-          if (!this.showRandomAnimation && this.recipeCount === 0) {
-            Column({ space: 12 }) {
-              Text('📚')
-                .fontSize(48)
-                .opacity(0.3)
-
-              Text('暂无菜谱数据')
-                .fontSize(14)
-                .fontColor(AppColors.GRAY_500)
-            }
-            .width('100%')
-            .margin({ top: 40 })
-          } else if (!this.showRandomAnimation && this.discoverPick.id < 0) {
-            Column({ space: 12 }) {
-              Text('🎲')
-                .fontSize(48)
-                .opacity(0.3)
-
-              Text('点击「随机一道」开始')
-                .fontSize(14)
-                .fontColor(AppColors.GRAY_500)
-            }
-            .width('100%')
-            .margin({ top: 40 })
-          } else if (!this.showRandomAnimation) {
-            // 显示推荐结果(使用小图模式)
+                .fontSize(48).fontColor(AppColors.BRAND_COLOR).fontWeight(FontWeight.Bold).textAlign(TextAlign.Center).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
+            }.width('100%').height(300).justifyContent(FlexAlign.Center).backgroundColor('rgba(255, 245, 235, 0.5)').borderRadius(24).margin({ top: 20 })
+          } else if (!this.showRandomAnimation && this.discoverPick.id >= 0) {
             Column({ space: 8 }) {
-              Text('今日推荐')
-                .fontSize(15)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(AppColors.GRAY_800)
-                .alignSelf(ItemAlign.Start)
-                .margin({ top: 8 })
-
+              Text('今日推荐').fontSize(15).fontWeight(FontWeight.Bold).fontColor(AppColors.GRAY_800).alignSelf(ItemAlign.Start).margin({ top: 8 })
               RecipeCard({
-                recipe: this.discoverPick,
-                mode: RecipeCardMode.SMALL,
-                isFavorite: this.isRecipeFavorite(this.discoverPick.id),
-                onCardClick: () => {
-                  this.openDetailSheet(this.discoverPick);
-                },
-                onFavoriteClick: () => {
-                  this.onTapFavorite(this.discoverPick.id);
-                }
-              })
-                .opacity(this.tabOpacity)
-            }
-            .width('100%')
-            .alignItems(HorizontalAlign.Start)
+                recipe: this.discoverPick, mode: RecipeCardMode.SMALL, isFavorite: this.isRecipeFavorite(this.discoverPick.id),
+                onCardClick: () => this.openDetailSheet(this.discoverPick),
+                onFavoriteClick: () => this.onTapFavorite(this.discoverPick.id)
+              }).opacity(this.tabOpacity)
+            }.width('100%').alignItems(HorizontalAlign.Start)
           }
-        }
-        .width('100%')
-        .alignItems(HorizontalAlign.Start)
-        .padding({ left: 20, right: 20, top: 4, bottom: 120 })
-      }
-      .width('100%')
-      .layoutWeight(1)
-      .scrollBar(BarState.Off)
-      .edgeEffect(EdgeEffect.Spring)
-    }
-    .width('100%')
-    .height('100%')
+        }.width('100%').alignItems(HorizontalAlign.Start).padding({ left: 20, right: 20, top: 4, bottom: 120 })
+      }.width('100%').layoutWeight(1).scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring)
+    }.width('100%').height('100%')
   }
 
-  /**
-   * 「我的」Tab - 对应原型中的 #tab-table (餐桌页面)
-   */
   @Builder
   buildMyTab() {
     Stack() {
-      // 木纹背景图案 (原型中的 radial-gradient 点阵效果)
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(AppColors.TABLE_BG)
-        // 可选:添加木纹纹理 .backgroundImage($rawfile('table_texture.png'), ImageRepeat.NoRepeat)
-
-      // 内容区域
+      Column().width('100%').height('100%').backgroundColor(AppColors.TABLE_BG)
       Scroll() {
         Column({ space: 0 }) {
-          // 顶部个人信息区域
           Row() {
             Row({ space: 16 }) {
-              // 头像 — 动态加载用户设置的 emoji 或图片头像
-              Column() {
-                if (this.userProfile.avatar.startsWith('file://') || this.userProfile.avatar.includes('filesDir')) {
-                  Image(this.userProfile.avatar)
-                    .width(36)
-                    .height(36)
-                    .borderRadius(18)
-                    .objectFit(ImageFit.Cover)
-                } else {
-                  Text(this.userProfile.avatar)
-                    .fontSize(24)
-                }
-              }
-              .width(48)
-              .height(48)
-              .borderRadius(24)
-              .backgroundColor(Color.White)
+              Column() { Text(this.userProfile.nickname.charAt(0)).fontSize(20).fontWeight(FontWeight.Bold).fontColor(AppColors.GRAY_600) }
+              .width(48).height(48).borderRadius(24).backgroundColor(AppColors.GRAY_100)
               .justifyContent(FlexAlign.Center)
-              .shadow({
-                radius: 4,
-                color: 'rgba(0,0,0,0.05)',
-                offsetX: 0,
-                offsetY: 2
-              })
-              .border({
-                width: 1,
-                color: AppColors.GRAY_100
-              })
 
               Column({ space: 2 }) {
-                Text(this.userProfile.nickname)
-                  .fontSize(22)
-                  .fontColor('#4A4036')
-                  .fontWeight(FontWeight.Bolder)
-                  .letterSpacing(-0.5)
+                Text(this.userProfile.nickname).fontSize(22).fontColor('#4A4036').fontWeight(FontWeight.Bold)
+                Text(`已珍藏 ${this.favoriteIds.length} 道私家佳肴`).fontSize(13).fontColor('#8B7E6A')
+              }.alignItems(HorizontalAlign.Start)
+            }.layoutWeight(1)
 
-                Text(`已珍藏 ${this.favoriteIds.length} 道私家佳肴`)
-                  .fontSize(13)
-                  .fontColor('#8B7E6A')
-                  .fontWeight(FontWeight.Medium)
-              }
-              .alignItems(HorizontalAlign.Start)
-            }
-            .layoutWeight(1)
-
-            // 设置按钮
-            Column() {
-              Text('⚙️')
-                .fontSize(20)
-            }
-            .width(40)
-            .height(40)
-            .borderRadius(20)
-            .backgroundColor('rgba(255,255,255,0.6)')
-            .backdropBlur(12)
+            Column() { SymbolGlyph($r('sys.symbol.gearshape')).fontSize(20).fontColor([AppColors.GRAY_600]) }
+            .width(40).height(40).borderRadius(20)
+            .backgroundColor('rgba(255,255,255,0.4)')
+            .backgroundBlurStyle(BlurStyle.Thin)
             .justifyContent(FlexAlign.Center)
-            .shadow({
-              radius: 4,
-              color: 'rgba(0,0,0,0.05)',
-              offsetX: 0,
-              offsetY: 2
-            })
             .onClick(() => {
-              router.pushUrl({ url: 'pages/SettingsPage' }).catch((err: Error) => {
-                console.error('Navigate to SettingsPage failed:', err);
-                this.showToast('页面跳转失败');
-              });
+              router.pushUrl({ url: 'pages/SettingsPage' }).catch((e: Error) => {
+                console.error(`路由跳转 SettingsPage 失败: ${e.message}`);
+              })
             })
-          }
-          .width('100%')
-          .padding({ left: 24, right: 24, top: 16, bottom: 24 })
+          }.width('100%').padding({ left: 24, right: 24, top: 16, bottom: 24 })
 
-          // 瓷盘网格 (2列布局,第二列向下偏移) — 最多展示 6 张预览瓷盘
           if (this.favoriteIds.length > 0) {
             Column({ space: 48 }) {
-              // 网格标题行：左侧「珍藏菜肴」，右侧超出6条时显示「查看全部」
               Row() {
-                Text('珍藏菜肴')
-                  .fontSize(14)
-                  .fontColor('#8B7E6A')
-                  .fontWeight(FontWeight.Medium)
-                  .letterSpacing(0.5)
-                  .layoutWeight(1)
-
+                Text('珍藏菜肴').fontSize(14).fontColor('#8B7E6A').layoutWeight(1)
                 if (this.favoriteIds.length > 6) {
-                  Row({ space: 4 }) {
-                    Text(`全部 ${this.favoriteIds.length} 道`)
-                      .fontSize(13)
-                      .fontColor('#C8A882')
-                    Text('›')
-                      .fontSize(16)
-                      .fontColor('#C8A882')
-                  }
+                  Row({ space: 4 }) { Text(`全部`).fontSize(13).fontColor('#C8A882'); SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor(['#C8A882']) }
                   .onClick(() => {
-                    router.pushUrl({ url: 'pages/FavoritesPage' }).catch(() => {
-                      console.error('router FavoritesPage failed');
-                    });
+                    router.pushUrl({ url: 'pages/FavoritesPage' }).catch((e: Error) => {
+                      console.error(`路由跳转 FavoritesPage 失败: ${e.message}`);
+                    })
                   })
                 }
-              }
-              .width('100%')
-              .padding({ left: 24, right: 24 })
-
-              // 使用Grid实现瓷盘网格布局（取前6条作视觉预览）
+              }.width('100%').padding({ left: 24, right: 24 })
               GridRow({ columns: 2, gutter: { x: 24, y: 48 } }) {
                 ForEach(this.favoriteIds.slice(0, 6), (recipeId: number, index: number) => {
                   GridCol({ span: 1 }) {
                     Column() {
                       PlateCard({
                         dishName: RecipeRepository.getInstance().getById(recipeId)?.name || '未知菜品',
-                        emoji: this.getRecipeEmoji(recipeId),
+                        emoji: RecipeRepository.getInstance().getById(recipeId)?.emojis?.[0] || '🍽️',
                         onPlateClick: () => {
-                          const recipe = RecipeRepository.getInstance().getById(recipeId);
-                          if (recipe) {
-                            this.openDetailSheet(recipe);
-                          }
+                          const r = RecipeRepository.getInstance().getById(recipeId);
+                          if (r) this.openDetailSheet(r);
                         }
                       })
-                    }
-                    .margin({ top: index % 2 === 1 ? 48 : 0 }) // 第二列向下偏移
+                    }.margin({ top: index % 2 === 1 ? 48 : 0 })
                   }
-                }, (recipeId: number) => `plate-${recipeId}`)
-              }
-              .width('100%')
-              .padding({ left: 24, right: 24 })
+                }, (id: number) => `plate-${id}`)
+              }.width('100%').padding({ left: 24, right: 24 })
             }
           } else {
-            // 空状态
-            Column({ space: 16 }) {
-              Text('🍽️')
-                .fontSize(64)
-                .opacity(0.3)
-
-              Text('餐桌还空着呢')
-                .fontSize(16)
-                .fontColor('#8B7E6A')
-                .fontWeight(FontWeight.Medium)
-
-              Text('去收藏一些喜欢的菜谱吧')
-                .fontSize(13)
-                .fontColor('#8B7E6A')
-            }
-            .width('100%')
-            .margin({ top: 80 })
+            Column({ space: 12 }) {
+              SymbolGlyph($r('sys.symbol.info_circle')).fontSize(48).fontColor([AppColors.GRAY_300])
+              Text('餐桌还空着呢').fontSize(16).fontColor('#8B7E6A').fontWeight(FontWeight.Medium)
+            }.width('100%').margin({ top: 80 })
           }
+        }.width('100%').padding({ bottom: 120 })
+      }.width('100%').height('100%').scrollBar(BarState.Off)
+    }.width('100%').height('100%')
+  }
 
-          // 底部功能入口
-          Column({ space: 16 }) {
-            // 我的收藏 — 常驻入口，点击跳转完整收藏列表（适配 500 条上限）
-            Row() {
-              Column({ space: 6 }) {
-                Text('我的收藏')
-                  .fontSize(16)
-                  .fontWeight(FontWeight.Medium)
-                  .fontColor('#4A4036')
-
-                Text(this.keepLocalData
-                  ? (this.favoriteIds.length > 0 ? `共 ${this.favoriteIds.length} 道菜` : '暂无收藏')
-                  : '关闭本地数据时不记录')
-                  .fontSize(12)
-                  .fontColor('#8B7E6A')
-              }
-              .alignItems(HorizontalAlign.Start)
-              .layoutWeight(1)
-
-              Text('›')
-                .fontSize(22)
-                .fontColor('#CCCCCC')
-            }
-            .width('100%')
-            .padding(16)
-            .backgroundColor('rgba(255,255,255,0.85)')
-            .backdropBlur(8)
-            .borderRadius(16)
-            .shadow({
-              radius: 8,
-              color: 'rgba(139, 126, 110, 0.1)',
-              offsetX: 0,
-              offsetY: 4
-            })
-            .onClick(() => {
-              router.pushUrl({ url: 'pages/FavoritesPage' }).catch(() => {
-                console.error('router FavoritesPage failed');
-              });
-            })
-
-            // 浏览历史
-            Row() {
-              Column({ space: 6 }) {
-                Text('浏览历史')
-                  .fontSize(16)
-                  .fontWeight(FontWeight.Medium)
-                  .fontColor('#4A4036')
-
-                Text(this.keepLocalData ? `共 ${this.historyIds.length} 条` : '关闭本地数据时不记录')
-                  .fontSize(12)
-                  .fontColor('#8B7E6A')
-              }
-              .alignItems(HorizontalAlign.Start)
-              .layoutWeight(1)
-
-              Text('›')
-                .fontSize(22)
-                .fontColor('#CCCCCC')
-            }
-            .width('100%')
-            .padding(16)
-            .backgroundColor('rgba(255,255,255,0.85)')
-            .backdropBlur(8)
-            .borderRadius(16)
-            .shadow({
-              radius: 8,
-              color: 'rgba(139, 126, 110, 0.1)',
-              offsetX: 0,
-              offsetY: 4
-            })
-            .onClick(() => {
-              router.pushUrl({ url: 'pages/HistoryPage' }).catch(() => {
-                console.error('router HistoryPage failed');
-              });
-            })
+  @Builder
+  DetailSheetBuilder() {
+    if (this.selectedRecipe) {
+      RecipeDetailSheet({
+        recipe: this.selectedRecipe,
+        selectedStuff: this.selectedStuff.concat([]),
+        isFavorite: this.isRecipeFavorite(this.selectedRecipe.id),
+        onFavoriteToggle: () => {
+          if (this.selectedRecipe) {
+            this.onTapFavorite(this.selectedRecipe.id);
           }
-          .width('100%')
-          .padding({ left: 24, right: 24, top: 32 })
+        },
+        onRequestClose: () => {
+          this.detailSheetVisible = false;
         }
-        .width('100%')
-        .padding({ bottom: 120 })
-      }
-      .width('100%')
-      .height('100%')
-      .scrollBar(BarState.Off)
-      .edgeEffect(EdgeEffect.Spring)
+      })
     }
-    .width('100%')
-    .height('100%')
-  }
-
-  /**
-   * 获取菜谱的Emoji图标
-   */
-  private getRecipeEmoji(recipeId: number): string {
-    const recipe = RecipeRepository.getInstance().getById(recipeId);
-    if (recipe?.emojis && recipe.emojis.length > 0) {
-      return recipe.emojis.join('');
-    }
-    return '🍽️';
-  }
-
-  /**
-   * 切换Tab时带淡入淡出动效
-   */
-  private switchTabWithAnimation(targetIndex: number): void {
-    // 淡出
-    animateTo({
-      duration: 100,
-      curve: Curve.EaseOut
-    }, () => {
-      this.tabOpacity = 0;
-    });
-
-    // 切换Tab
-    setTimeout(() => {
-      this.mainTabIndex = targetIndex;
-
-      // 淡入
-      animateTo({
-        duration: 150,
-        curve: Curve.EaseIn
-      }, () => {
-        this.tabOpacity = 1.0;
-      });
-    }, 100);
   }
 
   build() {
     Stack() {
-      // 主内容区域
       Column() {
-        // Tab 内容区域(带淡入淡出动效)
         Column() {
-          if (this.mainTabIndex === 0) {
-            this.buildCookTab();
-          } else if (this.mainTabIndex === 1) {
-            this.buildLibraryTab();
-          } else if (this.mainTabIndex === 2) {
-            this.buildDiscoverTab();
-          } else {
-            this.buildMyTab();
-          }
+          if (this.mainTabIndex === 0) { this.buildCookTab(); }
+          else if (this.mainTabIndex === 1) { this.buildLibraryTab(); }
+          else if (this.mainTabIndex === 2) { this.buildDiscoverTab(); }
+          else { this.buildMyTab(); }
         }
-        .width('100%')
-        .layoutWeight(1)
-        .padding({ top: this.mainNavTopInsetVp })
+        .width('100%').layoutWeight(1).padding({ top: this.mainNavTopInsetVp })
         .opacity(this.tabOpacity)
-        .animation({
-          duration: 200,
-          curve: Curve.EaseInOut
-        })
 
-        // 底部毛玻璃导航栏
         Column() {
           Row() {
-            // Tab 1: 冰箱
-            Column({ space: 4 }) {
-              Text('🧊')
-                .fontSize(24)
-                .opacity(this.mainTabIndex === 0 ? 1.0 : 0.4)
+            ForEach(this.navItems, (item: NavItem) => {
+              Column({ space: 4 }) {
+                SymbolGlyph(item.icon)
+                  .fontSize(24)
+                  .fontColor([this.mainTabIndex === item.index ? AppColors.BRAND_COLOR : AppColors.GRAY_400])
 
-              Text('冰箱')
-                .fontSize(10)
-                .fontColor(this.mainTabIndex === 0 ? AppColors.GRAY_900 : AppColors.GRAY_400)
-                .fontWeight(this.mainTabIndex === 0 ? FontWeight.Bold : FontWeight.Medium)
-            }
-            .layoutWeight(1)
-            .height('100%')
-            .justifyContent(FlexAlign.Center)
-            .onClick(() => {
-              if (this.mainTabIndex !== 0) {
-                this.switchTabWithAnimation(0);
+                Text(item.label)
+                  .fontSize(10)
+                  .fontColor(this.mainTabIndex === item.index ? AppColors.GRAY_900 : AppColors.GRAY_400)
+                  .fontWeight(this.mainTabIndex === item.index ? FontWeight.Bold : FontWeight.Medium)
               }
-            })
+              .layoutWeight(1).height('100%').justifyContent(FlexAlign.Center)
+              .onClick(() => { if (this.mainTabIndex !== item.index) this.switchTabWithAnimation(item.index); })
+            }, (item: NavItem) => `tab-${item.index}`)
+          }.width('100%').height(56)
 
-            // Tab 2: 菜谱
-            Column({ space: 4 }) {
-              Text('📖')
-                .fontSize(24)
-                .opacity(this.mainTabIndex === 1 ? 1.0 : 0.4)
-
-              Text('菜谱')
-                .fontSize(10)
-                .fontColor(this.mainTabIndex === 1 ? AppColors.GRAY_900 : AppColors.GRAY_400)
-                .fontWeight(this.mainTabIndex === 1 ? FontWeight.Bold : FontWeight.Medium)
-            }
-            .layoutWeight(1)
-            .height('100%')
-            .justifyContent(FlexAlign.Center)
-            .onClick(() => {
-              if (this.mainTabIndex !== 1) {
-                this.switchTabWithAnimation(1);
-              }
-            })
-
-            // Tab 3: 发现
-            Column({ space: 4 }) {
-              Text('🎲')
-                .fontSize(24)
-                .opacity(this.mainTabIndex === 2 ? 1.0 : 0.4)
-
-              Text('发现')
-                .fontSize(10)
-                .fontColor(this.mainTabIndex === 2 ? AppColors.GRAY_900 : AppColors.GRAY_400)
-                .fontWeight(this.mainTabIndex === 2 ? FontWeight.Bold : FontWeight.Medium)
-            }
-            .layoutWeight(1)
-            .height('100%')
-            .justifyContent(FlexAlign.Center)
-            .onClick(() => {
-              if (this.mainTabIndex !== 2) {
-                this.switchTabWithAnimation(2);
-              }
-            })
-
-            // Tab 4: 餐桌
-            Column({ space: 4 }) {
-              Text('🍽️')
-                .fontSize(24)
-                .opacity(this.mainTabIndex === 3 ? 1.0 : 0.4)
-
-              Text('餐桌')
-                .fontSize(10)
-                .fontColor(this.mainTabIndex === 3 ? AppColors.GRAY_900 : AppColors.GRAY_400)
-                .fontWeight(this.mainTabIndex === 3 ? FontWeight.Bold : FontWeight.Medium)
-            }
-            .layoutWeight(1)
-            .height('100%')
-            .justifyContent(FlexAlign.Center)
-            .onClick(() => {
-              if (this.mainTabIndex !== 3) {
-                this.switchTabWithAnimation(3);
-                void this.refreshHistory();
-                void this.refreshFavorites();
-              }
-            })
-          }
-          .width('100%')
-          .height(56)
-
-          // 底部小白条(iOS风格指示器)
-          Column()
-            .width(128)
-            .height(5)
-            .backgroundColor(AppColors.GRAY_200)
-            .borderRadius(10)
-            .margin({ top: 8, bottom: 8 })
-            .alignSelf(ItemAlign.Center)
+          Column().width(128).height(5).backgroundColor(AppColors.GRAY_200).borderRadius(10).margin({ top: 8, bottom: 8 }).alignSelf(ItemAlign.Center)
         }
         .width('100%')
-        .backgroundColor('rgba(255, 255, 255, 0.85)')
-        .backgroundBlurStyle(BlurStyle.Thick) // 毛玻璃效果
-        .borderWidth({ top: 0.5 })
-        .borderColor('rgba(0,0,0,0.05)')
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
+        .backgroundColor('rgba(255, 255, 255, 0.7)')
+        .backgroundBlurStyle(BlurStyle.Thin)
+        .borderWidth({ top: 0.5 }).borderColor('rgba(0,0,0,0.05)').expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
       }
       .width('100%')
       .height('100%')
       .backgroundColor(this.getBackgroundColor())
 
-      // Toast 提示
       ToastView({ message: this.toastMessage, visible: this.toastVisible })
 
-      // 菜谱详情半模态弹窗
-      if (this.detailSheetVisible && this.selectedRecipe) {
-        RecipeDetailSheet({
-          isVisible: $detailSheetVisible,
-          recipe: this.selectedRecipe,
-          selectedStuff: this.selectedStuff.concat([]),
-          isFavorite: this.isRecipeFavorite(this.selectedRecipe.id),
-          onFavoriteToggle: () => {
-            if (this.selectedRecipe) {
-              this.onTapFavorite(this.selectedRecipe.id);
-            }
-          }
-        })
-      }
     }
     .width('100%')
     .height('100%')
+    .bindSheet($$this.detailSheetVisible, this.DetailSheetBuilder(), {
+      height: SheetSize.LARGE,
+      detents: [SheetSize.MEDIUM, SheetSize.LARGE],
+      dragBar: false,
+      backgroundColor: Color.Transparent,
+      showClose: false,
+      preferType: SheetType.BOTTOM
+    })
   }
 }

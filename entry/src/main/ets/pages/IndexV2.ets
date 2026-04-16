@@ -14,7 +14,7 @@ import { meatItems, stapleItems, toolItems, vegetableItems } from '../data/foodC
 import { RecipeRepository } from '../data/RecipeRepository';
 import type { RecipeWithId, SearchMode, StuffItem } from '../model/recipe';
 import { RecipeSearchService } from '../service/RecipeSearchService';
-import { CookPreferences } from '../store/CookPreferences';
+import { CookPreferences, type UserProfile } from '../store/CookPreferences';
 import { getSystemSafeTopVp } from '../util/StatusBarInset';
 import { AppColors } from '../constants/AppColors';
 import { IngredientTag, TagType } from '../components/IngredientTag';
@@ -47,6 +47,7 @@ struct IndexV2 {
   @State historyIds: number[] = []
   @State favoriteIds: number[] = []
   @State mainNavTopInsetVp: number = 48
+  @State userProfile: UserProfile = { nickname: '美食家', avatar: '🧑‍🍳' }
 
   // ===== 新增的 UI 状态 =====
   @State toastMessage: string = ''
@@ -76,6 +77,7 @@ struct IndexV2 {
   onPageShow(): void {
     void this.refreshHistory();
     void this.refreshFavorites();
+    void this.refreshUserProfile();
     const ctx2 = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
     if (ctx2 !== undefined) {
       void getSystemSafeTopVp(ctx2).then((vp: number) => {
@@ -127,6 +129,7 @@ struct IndexV2 {
     this.runLibrarySearch();
     await this.refreshHistory();
     await this.refreshFavorites();
+    await this.refreshUserProfile();
   }
 
   private isRecipeFavorite(recipeId: number): boolean {
@@ -201,6 +204,19 @@ struct IndexV2 {
       this.historyIds = next;
     } catch {
       console.error('refreshHistory failed');
+    }
+  }
+
+  private async refreshUserProfile(): Promise<void> {
+    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    if (host === undefined) {
+      return;
+    }
+    try {
+      const profile = await CookPreferences.getUserProfile(host);
+      this.userProfile = profile;
+    } catch {
+      console.error('refreshUserProfile failed');
     }
   }
 
@@ -1128,10 +1144,18 @@ struct IndexV2 {
           // 顶部个人信息区域
           Row() {
             Row({ space: 16 }) {
-              // 头像
+              // 头像 — 动态加载用户设置的 emoji 或图片头像
               Column() {
-                Text('🧑‍🍳')
-                  .fontSize(24)
+                if (this.userProfile.avatar.startsWith('file://') || this.userProfile.avatar.includes('filesDir')) {
+                  Image(this.userProfile.avatar)
+                    .width(36)
+                    .height(36)
+                    .borderRadius(18)
+                    .objectFit(ImageFit.Cover)
+                } else {
+                  Text(this.userProfile.avatar)
+                    .fontSize(24)
+                }
               }
               .width(48)
               .height(48)
@@ -1150,7 +1174,7 @@ struct IndexV2 {
               })
 
               Column({ space: 2 }) {
-                Text('我的餐桌')
+                Text(this.userProfile.nickname)
                   .fontSize(22)
                   .fontColor('#4A4036')
                   .fontWeight(FontWeight.Bolder)
@@ -1192,10 +1216,38 @@ struct IndexV2 {
           .width('100%')
           .padding({ left: 24, right: 24, top: 16, bottom: 24 })
 
-          // 瓷盘网格 (2列布局,第二列向下偏移)
+          // 瓷盘网格 (2列布局,第二列向下偏移) — 最多展示 6 张预览瓷盘
           if (this.favoriteIds.length > 0) {
             Column({ space: 48 }) {
-              // 使用Grid实现瓷盘网格布局
+              // 网格标题行：左侧「珍藏菜肴」，右侧超出6条时显示「查看全部」
+              Row() {
+                Text('珍藏菜肴')
+                  .fontSize(14)
+                  .fontColor('#8B7E6A')
+                  .fontWeight(FontWeight.Medium)
+                  .letterSpacing(0.5)
+                  .layoutWeight(1)
+
+                if (this.favoriteIds.length > 6) {
+                  Row({ space: 4 }) {
+                    Text(`全部 ${this.favoriteIds.length} 道`)
+                      .fontSize(13)
+                      .fontColor('#C8A882')
+                    Text('›')
+                      .fontSize(16)
+                      .fontColor('#C8A882')
+                  }
+                  .onClick(() => {
+                    router.pushUrl({ url: 'pages/FavoritesPage' }).catch(() => {
+                      console.error('router FavoritesPage failed');
+                    });
+                  })
+                }
+              }
+              .width('100%')
+              .padding({ left: 24, right: 24 })
+
+              // 使用Grid实现瓷盘网格布局（取前6条作视觉预览）
               GridRow({ columns: 2, gutter: { x: 24, y: 48 } }) {
                 ForEach(this.favoriteIds.slice(0, 6), (recipeId: number, index: number) => {
                   GridCol({ span: 1 }) {
@@ -1240,6 +1292,44 @@ struct IndexV2 {
 
           // 底部功能入口
           Column({ space: 16 }) {
+            // 我的收藏 — 常驻入口，点击跳转完整收藏列表（适配 500 条上限）
+            Row() {
+              Column({ space: 6 }) {
+                Text('我的收藏')
+                  .fontSize(16)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor('#4A4036')
+
+                Text(this.keepLocalData
+                  ? (this.favoriteIds.length > 0 ? `共 ${this.favoriteIds.length} 道菜` : '暂无收藏')
+                  : '关闭本地数据时不记录')
+                  .fontSize(12)
+                  .fontColor('#8B7E6A')
+              }
+              .alignItems(HorizontalAlign.Start)
+              .layoutWeight(1)
+
+              Text('›')
+                .fontSize(22)
+                .fontColor('#CCCCCC')
+            }
+            .width('100%')
+            .padding(16)
+            .backgroundColor('rgba(255,255,255,0.85)')
+            .backdropBlur(8)
+            .borderRadius(16)
+            .shadow({
+              radius: 8,
+              color: 'rgba(139, 126, 110, 0.1)',
+              offsetX: 0,
+              offsetY: 4
+            })
+            .onClick(() => {
+              router.pushUrl({ url: 'pages/FavoritesPage' }).catch(() => {
+                console.error('router FavoritesPage failed');
+              });
+            })
+
             // 浏览历史
             Row() {
               Column({ space: 6 }) {

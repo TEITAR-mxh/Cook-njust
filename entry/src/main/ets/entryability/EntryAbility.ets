@@ -1,4 +1,4 @@
-import { AbilityConstant, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
+import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 import { CookPreferences } from '../store/CookPreferences';
@@ -6,16 +6,46 @@ import { CookPreferences } from '../store/CookPreferences';
 const DOMAIN = 0x0000;
 
 export default class EntryAbility extends UIAbility {
+  /** 保存主窗口引用，用于主题切换时动态更新状态栏颜色 */
+  private mainWindow: window.Window | null = null;
+
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    // 让应用跟随系统深色/浅色模式（不强制覆盖）
     try {
       this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
     } catch (err) {
       hilog.error(DOMAIN, 'testTag', 'Failed to set colorMode. Cause: %{public}s', JSON.stringify(err));
     }
-    hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
+
+    // 将当前系统深色状态写入 AppStorage，作为全局单一数据源
+    // 所有页面通过 @StorageProp('isSystemDarkMode') 零延迟订阅
+    const currentConfig: Configuration = this.context.config;
+    const isDark: boolean =
+      currentConfig.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK;
+    AppStorage.setOrCreate<boolean>('isSystemDarkMode', isDark);
+    // 注意：不在此处初始化 'currentThemeMode'，让 loadData 阶段从 Preferences 读取并写入。
+    // 这样 AppStorage 在写入前为 undefined，loadData 可以正确判断"是 Preferences 值还是用户刚改的值"。
+
+    hilog.info(DOMAIN, 'testTag', 'Ability onCreate, isDark=%{public}s', String(isDark));
+
     void CookPreferences.warmUp(this.context).catch(() => {
       hilog.error(DOMAIN, 'testTag', 'CookPreferences warmUp failed');
     });
+  }
+
+  /**
+   * 系统配置变更回调（含深色/浅色切换、语言切换等）。
+   * AppStorage.setOrCreate 会同步通知所有 @StorageProp('isSystemDarkMode') 订阅者，
+   * 无需轮询，延迟约为 ArkUI 单次重绘时间（< 16ms）。
+   */
+  onConfigurationUpdate(newConfig: Configuration): void {
+    const isDark: boolean =
+      newConfig.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK;
+    AppStorage.setOrCreate<boolean>('isSystemDarkMode', isDark);
+    hilog.info(DOMAIN, 'testTag', 'onConfigurationUpdate: isDark=%{public}s', String(isDark));
+
+    // 同步更新状态栏与导航栏前景色
+    this.syncStatusBarToTheme(isDark);
   }
 
   onDestroy(): void {
@@ -23,50 +53,60 @@ export default class EntryAbility extends UIAbility {
   }
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
-    // Main window is created, set main page for this ability
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onWindowStageCreate');
 
     windowStage.loadContent('pages/StartupPage', (err) => {
       if (err.code) {
-        hilog.error(DOMAIN, 'testTag', 'Failed to load the content. Cause: %{public}s', JSON.stringify(err));
+        hilog.error(DOMAIN, 'testTag', 'Failed to load content. Cause: %{public}s', JSON.stringify(err));
         return;
       }
-      hilog.info(DOMAIN, 'testTag', 'Succeeded in loading the content.');
-      void EntryAbility.applyImmersiveBottomBar(windowStage);
+      hilog.info(DOMAIN, 'testTag', 'Succeeded in loading content.');
+
+      // 获取主窗口并应用沉浸式底栏 + 主题匹配状态栏
+      windowStage.getMainWindow().then((win: window.Window) => {
+        this.mainWindow = win;
+        try {
+          win.setWindowLayoutFullScreen(true);
+        } catch {
+          hilog.error(DOMAIN, 'testTag', 'setWindowLayoutFullScreen failed');
+        }
+        const isDark = AppStorage.get<boolean>('isSystemDarkMode') ?? false;
+        this.syncStatusBarToTheme(isDark);
+      }).catch(() => {
+        hilog.error(DOMAIN, 'testTag', 'getMainWindow failed');
+      });
     });
   }
 
-  /** 底部手势区与底栏一体：全屏布局 + 透明系统导航栏，避免底部被系统再「垫高」一截 */
-  private static applyImmersiveBottomBar(windowStage: window.WindowStage): void {
-    windowStage.getMainWindow().then((win) => {
-      try {
-        win.setWindowLayoutFullScreen(true);
-        win.setWindowSystemBarProperties({
-          statusBarColor: '#FFFFFFFF',
-          navigationBarColor: '#00000000',
-          statusBarContentColor: '#E5000000',
-          navigationBarContentColor: '#E5000000',
-        });
-      } catch {
-        hilog.error(DOMAIN, 'testTag', 'applyImmersiveBottomBar failed');
-      }
-    }).catch(() => {
-      hilog.error(DOMAIN, 'testTag', 'getMainWindow failed');
-    });
+  /**
+   * 根据当前深色模式状态更新状态栏与导航栏的前景色（图标/文字颜色）。
+   * 背景色设为透明，由页面背景透出，实现真正的沉浸式效果。
+   */
+  private syncStatusBarToTheme(isDark: boolean): void {
+    if (this.mainWindow === null) {
+      return;
+    }
+    try {
+      this.mainWindow.setWindowSystemBarProperties({
+        statusBarColor: '#00000000',
+        navigationBarColor: '#00000000',
+        statusBarContentColor: isDark ? '#FFFFFFFF' : '#E5000000',
+        navigationBarContentColor: isDark ? '#FFFFFFFF' : '#E5000000',
+      });
+    } catch {
+      hilog.error(DOMAIN, 'testTag', 'syncStatusBarToTheme failed');
+    }
   }
 
   onWindowStageDestroy(): void {
-    // Main window is destroyed, release UI related resources
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onWindowStageDestroy');
   }
 
   onForeground(): void {
-    // Ability has brought to foreground
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onForeground');
   }
 
   onBackground(): void {
-    // Ability has back to background
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onBackground');
   }
 }

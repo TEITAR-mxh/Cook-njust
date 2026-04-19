@@ -137,7 +137,7 @@ struct FavoritesPage {
           .justifyContent(FlexAlign.Center)
           .onClick(() => {
             try {
-              router.back();
+              this.getUIContext().getRouter().back();
             } catch {
               console.error('router.back failed');
             }

@@ -772,7 +772,7 @@ struct Index {
           .backgroundColor('#F9F9F9')
           .borderRadius(10)
           .onClick(() => {
-            router.pushUrl({ url: 'pages/HistoryPage' }).catch(() => {
+            this.getUIContext().getRouter().pushUrl({ url: 'pages/HistoryPage' }).catch(() => {
               console.error('router HistoryPage failed');
             });
           })
@@ -798,7 +798,7 @@ struct Index {
           .backgroundColor('#F9F9F9')
           .borderRadius(10)
           .onClick(() => {
-            router.pushUrl({ url: 'pages/FavoritesPage' }).catch(() => {
+            this.getUIContext().getRouter().pushUrl({ url: 'pages/FavoritesPage' }).catch(() => {
               console.error('router FavoritesPage failed');
             });
           })

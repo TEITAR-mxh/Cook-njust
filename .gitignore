@@ -12,3 +12,7 @@
 /.appanalyzer
 
 cook/
+debug_favorites.py
+fix_onlongpress.py
+.claude/
+tools/

@@ -15,8 +15,14 @@ export interface UserProfile {
   avatar: string // 头像emoji或图片URL
 }
 
+/** 主题设置 */
+export interface ThemeSettings {
+  themeMode: string // '系统默认' | '浅色模式' | '深色模式'
+}
+
 const DEFAULT_SETTINGS: UserSettings = { keepLocalData: true };
 const DEFAULT_PROFILE: UserProfile = { nickname: '美食家', avatar: '👨' };
+const DEFAULT_THEME: ThemeSettings = { themeMode: '系统默认' };
 
 export function sliceRecipeIds(ids: number[], offset: number, limit: number): number[] {
   if (limit <= 0 || offset < 0 || offset >= ids.length) {
@@ -37,6 +43,7 @@ export function sliceRecipeIds(ids: number[], offset: number, limit: number): nu
 export class CookPreferenceKeys {
   static readonly SETTINGS: string = 'settings'
   static readonly PROFILE: string = 'profile'
+  static readonly THEME: string = 'theme'
   /** 后续：食材多选，建议存 JSON 字符串 string[] */
   static readonly STUFF: string = 'stuff'
   static readonly TOOL: string = 'tool'
@@ -44,6 +51,7 @@ export class CookPreferenceKeys {
   static readonly FAVORITES: string = 'favorites'
   static readonly HISTORY: string = 'history'
   static readonly PRIVACY_ACCEPTED: string = 'privacy_accepted'
+  static readonly THEME_CHANGE_TIMESTAMP: string = 'theme_change_timestamp'
 }
 
 /**
@@ -145,6 +153,40 @@ export class CookPreferences {
     };
     await p.put(CookPreferenceKeys.PROFILE, JSON.stringify(toSave));
     await p.flush();
+  }
+
+  /** 获取主题设置 */
+  static async getThemeSettings(context: common.Context): Promise<ThemeSettings> {
+    const p = await CookPreferences.getStore(context);
+    const rawVal = await p.get(CookPreferenceKeys.THEME, '');
+    const raw = CookPreferences.getSettingsString(rawVal);
+    if (raw.length === 0) {
+      return { themeMode: DEFAULT_THEME.themeMode };
+    }
+    try {
+      const parsed: ThemeSettings = JSON.parse(raw) as ThemeSettings;
+      if (parsed.themeMode && ['系统默认', '浅色模式', '深色模式'].includes(parsed.themeMode)) {
+        return { themeMode: parsed.themeMode };
+      }
+      return { themeMode: DEFAULT_THEME.themeMode };
+    } catch {
+      return { themeMode: DEFAULT_THEME.themeMode };
+    }
+  }
+
+  /** 设置主题设置 */
+  static async setThemeSettings(context: common.Context, theme: ThemeSettings): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    const toSave: ThemeSettings = {
+      themeMode: theme.themeMode || DEFAULT_THEME.themeMode
+    };
+    await p.put(CookPreferenceKeys.THEME, JSON.stringify(toSave));
+    await p.flush();
+  }
+
+  /** 设置主题模式 */
+  static async setThemeMode(context: common.Context, themeMode: string): Promise<void> {
+    await CookPreferences.setThemeSettings(context, { themeMode });
   }
 
   /** 关闭「保留本地数据」时可清空已持久化的选料（与 Web 行伪接近） */
@@ -342,6 +384,23 @@ export class CookPreferences {
   static async setSearchMode(context: common.Context, mode: SearchMode): Promise<void> {
     const p = await CookPreferences.getStore(context);
     await p.put(CookPreferenceKeys.MODE, mode);
+    await p.flush();
+  }
+
+  /** 获取主题变更时间戳 */
+  static async getThemeChangeTimestamp(context: common.Context): Promise<number> {
+    const p = await CookPreferences.getStore(context);
+    const raw = await p.get(CookPreferenceKeys.THEME_CHANGE_TIMESTAMP, 0);
+    if (typeof raw === 'number') {
+      return raw;
+    }
+    return 0;
+  }
+
+  /** 设置主题变更时间戳 */
+  static async setThemeChangeTimestamp(context: common.Context, timestamp: number): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.THEME_CHANGE_TIMESTAMP, timestamp);
     await p.flush();
   }
 }

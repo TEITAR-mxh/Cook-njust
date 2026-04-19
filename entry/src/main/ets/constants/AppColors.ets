@@ -1,5 +1,6 @@
+
 /**
- * 品牌色定义 - 对应原型中的 CSS 变量
+ * 品牌色定义 - 支持明暗模式
  */
 export class AppColors {
   // 品牌色
@@ -46,4 +47,92 @@ export class AppColors {
 
   // 餐桌木纹底纹色
   static readonly TABLE_DOT: string = '#E5E0D8'
+
+  // ====== 深色主题颜色 ======
+  // 深色背景色
+  static readonly DARK_BG_COLOR: string = '#121212'
+  static readonly DARK_CARD_BG: string = '#1E1E1E'
+  static readonly DARK_TABLE_BG: string = '#1A1A1A'
+
+  // 深色灰度色系
+  static readonly DARK_GRAY_50: string = '#252525'
+  static readonly DARK_GRAY_100: string = '#2D2D2D'
+  static readonly DARK_GRAY_200: string = '#3D3D3D'
+  static readonly DARK_GRAY_300: string = '#4D4D4D'
+  static readonly DARK_GRAY_400: string = '#6D6D6D'
+  static readonly DARK_GRAY_500: string = '#8D8D8D'
+  static readonly DARK_GRAY_600: string = '#ADADAD'
+  static readonly DARK_GRAY_800: string = '#CDCDCD'
+  static readonly DARK_GRAY_900: string = '#EDEDED'
+
+  // 深色语义色
+  static readonly DARK_MEAT_BG: string = '#2A1A1A'
+  static readonly DARK_MEAT_BORDER: string = '#5A2A2A'
+  static readonly DARK_MEAT_TEXT: string = '#FF6B6B'
+
+  static readonly DARK_VEG_BG: string = '#1A2A1A'
+  static readonly DARK_VEG_BORDER: string = '#2A5A2A'
+  static readonly DARK_VEG_TEXT: string = '#4ADE80'  // 柔和绿，替代高饱和 #6BFF6B
+
+  static readonly DARK_CARB_BG: string = '#2A2A1A'
+  static readonly DARK_CARB_BORDER: string = '#5A5A2A'
+  static readonly DARK_CARB_TEXT: string = '#FBBF24'  // 琥珀色，替代纯黄 #FFFF6B
+
+  static readonly DARK_TOOL_BG: string = '#1A1A2A'
+  static readonly DARK_TOOL_BORDER: string = '#2A2A5A'
+  static readonly DARK_TOOL_TEXT: string = '#60A5FA'  // 柔和蓝，替代高饱和 #6B6BFF
+
+  static readonly DARK_TABLE_DOT: string = '#2A2A2A'
+}
+
+/**
+ * 主题管理器 - 提供明暗主题的颜色获取
+ *
+ * 数据流：
+ *   EntryAbility.onConfigurationUpdate → AppStorage('isSystemDarkMode')
+ *   SettingsPage.changeThemeMode      → AppStorage('currentThemeMode')
+ *   ThemeManager.getColor             → 读取 AppStorage 解析系统默认模式
+ */
+export class ThemeManager {
+  /**
+   * 根据主题模式返回对应颜色。
+   * '系统默认' 时从 AppStorage 读取 EntryAbility 写入的系统深色状态，
+   * 无需权限，零延迟，跟随系统实时切换。
+   */
+  static getColor(lightColor: string, darkColor: string, themeMode: string): string {
+    if (themeMode === '深色模式') {
+      return darkColor;
+    }
+    if (themeMode === '浅色模式') {
+      return lightColor;
+    }
+    // '系统默认'：读取 EntryAbility.onConfigurationUpdate 写入的系统深色状态
+    const isDark: boolean = AppStorage.get<boolean>('isSystemDarkMode') ?? false;
+    return isDark ? darkColor : lightColor;
+  }
+
+  // 获取背景色
+  static getBackgroundColor(themeMode: string): string {
+    return ThemeManager.getColor(AppColors.BG_COLOR, AppColors.DARK_BG_COLOR, themeMode)
+  }
+
+  // 获取卡片背景色
+  static getCardBackgroundColor(themeMode: string): string {
+    return ThemeManager.getColor(AppColors.CARD_BG, AppColors.DARK_CARD_BG, themeMode)
+  }
+
+  // 获取文本颜色
+  static getTextColor(themeMode: string): string {
+    return ThemeManager.getColor(AppColors.GRAY_900, AppColors.DARK_GRAY_900, themeMode)
+  }
+
+  // 获取次要文本颜色
+  static getSecondaryTextColor(themeMode: string): string {
+    return ThemeManager.getColor(AppColors.GRAY_500, AppColors.DARK_GRAY_500, themeMode)
+  }
+
+  // 获取边框颜色
+  static getBorderColor(themeMode: string): string {
+    return ThemeManager.getColor(AppColors.GRAY_100, AppColors.DARK_GRAY_100, themeMode)
+  }
 }

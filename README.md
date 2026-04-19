@@ -1,177 +1,205 @@
 # AUV 您吃了么
 
-基于 HarmonyOS NEXT (API 22) 的 ArkTS 菜谱应用。用户从冰箱已有食材出发，匹配可做菜谱，查看步骤并进入专注烹饪模式。
+> 基于 HarmonyOS NEXT (API 22) ArkTS 开发的本地菜谱助手应用。用户从冰箱已有食材出发，智能匹配可做菜谱，查看烹饪步骤并一键跳转视频教程。
 
 ---
 
-## 项目信息
+## 项目概览
 
-| 项目 | 值 |
+| 项 | 值 |
 |---|---|
-| 平台 | HarmonyOS NEXT — API 22 |
-| 语言 | ArkTS (严格模式) |
+| 平台 | HarmonyOS NEXT — API 22 (HarmonyOS 6.0.2) |
+| 语言 | ArkTS 严格模式（零 `any`，强类型规范） |
+| 包名 | `com.example.cook` |
+| 版本 | 1.0.0 |
 | 构建工具 | Hvigor |
 | 设备类型 | Phone |
-| 版本 | V1.0（开发中） |
+| 入口页面 | `StartupPage` → `IndexV2` |
 
 ---
 
-## 功能清单
+## 功能特性
 
-### 已交付
+### 冰箱 Tab — 智能匹配
+- 食材多选标签（肉蛋水产 / 新鲜蔬菜 / 碳水辅料三类颜色编码）
+- 厨具筛选（炒锅 / 蒸锅 / 烤箱等）
+- 三种搜索模式：**严格**（全部食材都有）/ **模糊**（任一食材匹配）/ **生存**（仅用所选食材）
+- 随机食材抽取动画
 
-| 模块 | 功能描述 | 状态 |
-|:---|:---|:---:|
-| **工程架构** | **ArkTS API 22 严格模式适配（强类型规范、消除 any、UI Builder 隔离）** | ✅ |
-| **视觉体系** | **全面升级 Linear/Vercel 现代风格（格式塔排版、去阴影化、呼吸感间距）** | ✅ |
-| 启动页 | 品牌动画（光晕 1200ms → Logo 弹入 880ms → 副标题 660ms → 状态行 500ms；最短停留 2400ms） | ✅ |
-| 启动页 | 首次启动隐私同意弹窗（拒绝退出 / 同意进入） | ✅ |
-| 启动页 | 离场淡出过渡 | ✅ |
-| 法律文档 | 隐私政策 / 用户协议独立页面 | ✅ |
-| 冰箱 Tab | 食材多选标签（三类颜色编码），UI 居中对称排版 | ✅ |
-| 冰箱 Tab | 随机食材抽取及滚动动画 | ✅ |
-| 冰箱 Tab | 严格 / 宽松 / 生存三种搜索模式 | ✅ |
-| 菜谱 Tab | 食谱列表（RecipeCard 大/小双模式），**高度自适应修复，间距紧凑** | ✅ |
-| 菜谱 Tab | 关键词全文搜索，**系统级原生搜索栏 UI** | ✅ |
-| 菜谱 Tab | 卡片点击进入详情弹窗，**带阻尼的系统级半模态 (bindSheet)** | ✅ |
-| 发现 Tab | 随机食谱抽取（淡入淡出动画） | ✅ |
-| 餐桌 Tab | 收藏网格 + 历史入口 + 设置入口 | ✅ |
-| 详情弹窗 | 标签行 / 食材 / 工具 / 步骤三态渲染（Loading / 空态 / 数据） | ✅ |
-| 详情弹窗 | selectedStuff 单向透传，新数组引用保障 ArkUI 响应性，**修复嵌套滑动冲突** | ✅ |
-| 专注烹饪 | 全屏覆盖 + Swiper 大字翻页 + 屏幕常亮锁 | ✅ |
-| 采购清单 | 缺料对比 / 缺料列表输出 / 剪贴板导出 / Toast 反馈 | ✅ |
-| 通知 | 毛玻璃 Toast 组件 | ✅ |
-| 沉浸式 UI | 透明导航栏 + 安全区适配，**系统原生 BlurStyle 导航栏** | ✅ |
-| 持久化 | CookPreferences（收藏 / 历史 / 搜索模式 / 隐私确认状态） | ✅ |
-| 数据层 | RecipeRepository 单例（JSON 索引化加载） | ✅ |
-| 数据层 | RecipeDBManager（SQLite，含 steps 字段，SHA256 增量导入） | ✅ |
-| 设置 | SettingsPage（数据统计 / keepLocalData 开关 / 关于） | ✅ |
+### 菜谱 Tab — 浏览探索
+- 全量菜谱列表，RecipeCard 大/小双模式
+- 关键词全文搜索
+- 标签筛选（今日推荐 / 减脂餐 / 快手早餐 / 广式 / 川香 / 烘焙 / 汤羹）
+- 点击卡片打开系统原生半模态详情弹窗（`bindSheet`）
 
-### 组件库
+### 发现 Tab — 随机推荐
+- 随机抽取含视频教程的菜谱
+- 淡入淡出切换动画
 
-| 组件 | 描述 | 状态 |
-|:---|:---|:---:|
-| `RecipeCard.ets` | 大/小双模式，修复 `.height('100%')` 溢出问题，高度自适应 | ✅ |
-| `RecipeDetailSheet.ets` | 底部弹窗，采用原生 `bindSheet` + `nestedScroll`，支持弹簧阻尼动画 | ✅ |
-| `CookingFocusView.ets` | 全屏专注覆盖层（Swiper + 屏幕常亮） | ✅ |
-| `IngredientTag.ets` | 颜色编码食材标签，对称式布局 | ✅ |
-| `ToastView.ets` | 毛玻璃通知 | ✅ |
-| `PlateCard.ets` | 3D 盘子效果卡片 | ✅ |
-| `RandomPickerButton.ets` | 随机食材抽取触发器 | ✅ |
+### 餐桌 Tab — 个人中心
+- 收藏网格（最多 500 条，按收藏时间排序）
+- 浏览历史（最近 50 条）
+- 用户资料（昵称 / 头像 Emoji / 相册图片）
+- 主题切换（浅色 / 深色 / 跟随系统）
+- 数据管理（保留本地数据开关 / 缓存清理）
+
+### 详情弹窗
+- 食材列表 / 厨具说明 / 分步骤烹饪指引
+- 收藏切换（即时同步）
+- 跳转 Bilibili 视频教程
+
+### 合规
+- 首次启动隐私同意弹窗（拒绝退出 / 同意进入）
+- 独立隐私政策页面（符合《个人信息保护法》）
+- 独立用户协议页面（具备合同效力条款）
 
 ---
 
-## 已知问题
+## 技术架构
 
-### P1 — 交互
+### 分层设计
 
-| # | 问题 | 状态 |
-|:---:|:---|:---:|
-| 1 | 设置页用户名 / ID / 版本号硬编码 | ❌ 待修复 |
-| 2 | ~~搜索后强制切换 Tab，缺少就地视觉反馈~~ | ✅ 已修复 (平滑过渡动画) |
-
-### 合规上架
-
-| 审核项 | 状态 | 风险 |
-|:---|:---:|:---:|
-| 首次启动隐私同意弹窗 | ✅ | — |
-| 隐私政策 / 用户协议页面 | ✅ | — |
-| `app.json5` 描述 / 图标 / 标签完整性 | ⚠️ 待核查 | 可能阻塞 |
-| AGC 后台数据安全说明 | ❌ 缺失 | 可能阻塞 |
-
----
-
-## 团队分工
-
-| 编号 | 职责域 | 负责任务 | 协作关系 | 交付物 |
-|:---:|:---|:---|:---:|:---|
-| 1 | 技术架构 — RDB 与数据稳定性 | 1. ~~methods 类型扩展为 string[]~~ ✅<br>2. 数据迁移 SHA256 哈希校验维护<br>3. 与成员 2 协同处理 DB 层 Bug 修复 | 与 2 协作 | 稳定运行的 RDB 模块；增量导入无异常 |
-| 2 | 技术架构 — 前端 Bug 治理 | 1. 修复收藏列表 `.slice(0,6)` 截断，适配 500 条上限（P1）<br>2. 设置页用户信息 / 版本号动态化（P2）<br>3. 与成员 1 协同处理数据层联调 | 与 1 协作 | 收藏列表无截断；设置页无硬编码 |
-| 3 | 交互体验与视觉精进 | 1. ~~全局文本重写：去除冗长话术，统一为工业化表述~~ ✅<br>2. ~~Emoji 减负：全局使用系统原生 SymbolGlyph 替代~~ ✅<br>3. ~~参照 Linear 风格重审动效与阴影层级，重构卡片间距体系~~ ✅<br>4. ~~修复搜索后 Tab 跳转，补足就地视觉反馈（P2）~~ ✅ | 独立 | UI 视觉降噪产出物；极致流畅的交互体验 |
-| 4 | 内容治理 | 1. 人工 review 全部 steps 内容：校验逻辑正确性，修剪冗余，统一粒度（目标 3–5 步/菜）<br>2. 补齐 foodCatalog emoji 字典，清理 Todo 占位符<br>3. 持续维护 recipe.json 与 RDB 增量数据包 | 独立 | steps 质量审核报告；完整 emoji 字典 |
-| 5 | 合规上架（专职） | 1. AGC 后台数据安全说明填报（P1 阻塞项）<br>2. `app.json5` 描述 / 图标 / 标签完整性核查<br>3. 汇总审核材料（截图 / 隐私清单 / 功能说明）<br>4. 提审提交与审核进度跟进 | 独立 | AGC 合规材料完整；审核包通过率 |
-
----
-
-## Sprint 计划
-
-```text
-[Week 1] ✅ 归档
-  A  RecipeDBManager 实现 / 表结构 / SHA256 增量导入
-  B  RecipeCard 升级 / difficulty·methods 字段渲染
-  C  steps 批量生成 / 数据入库验证
-
-[Week 2] ✅ 归档
-  A  开机动画时序精调 / 采购清单数据透传修复
-  B  专注烹饪全屏覆盖 + 屏幕常亮 / 采购清单 UI 闭环
-  C  隐私弹窗验收 / 合规缺口识别
-
-[Week 3] ← 当前阶段  P1 数据封堵 / UI 降噪 / AGC 合规闭环
-  1+2  收藏列表截断修复（P1）/ 设置页动态化（P2）/ DB 层联调
-  3    ✅ 全局文本去 AI 化 / Emoji 减负 / UI 极简风格重构 / ArkTS 严格模式适配
-  4    steps 全量人工 review / emoji 字典补全
-  5    AGC 数据安全说明填报 / app.json5 核查 / 审核材料汇总
+```
+┌─────────────────────────────────────────┐
+│               Pages / UI                │  ArkUI 声明式 UI
+├─────────────────────────────────────────┤
+│             Components                  │  可复用 UI 组件
+├────────────────────┬────────────────────┤
+│      Service       │      Store         │  业务逻辑 / 持久化
+├────────────────────┼────────────────────┤
+│        Data        │      Model         │  数据加载 / 类型定义
+└─────────────────────────────────────────┘
 ```
 
----
+### 核心设计决策
 
-## V1.0 交付标准
-
-- **数据层** — RDB 初始化稳定；所有食谱含有效 steps；methods 兼容全部 24 种烹饪方式 ✅
-- **架构层** — 符合 HarmonyOS API 22 规范，零 `any`，严格 UI Builder 作用域 ✅
-- **列表** — 收藏上限 500 条，无 .slice 截断；RecipeCard 正确渲染 difficulty / methods
-- **详情** — 步骤有序可读；采购清单剪贴板导出正常；半模态嵌套滚动丝滑无冲突 ✅
-- **设置** — 用户信息与版本号从系统 / Preferences 动态读取
-- **合规** — 隐私弹窗 ✅；法律文档页 ✅；AGC 数据安全说明完整；app.json5 通过核查
-- **质量** — 全链路回归（选材 → 搜索 → 详情 → 步骤 → 采购清单 → 专注烹饪 → 收藏 → 历史）
+| 问题 | 方案 |
+|------|------|
+| 菜谱 ID 稳定性 | 数组下标作为稳定 ID（与 Web 端 Dexie 对齐） |
+| 跨页面主题同步 | `AppStorage` + `@StorageProp` / `@Watch`，零轮询 |
+| 系统主题监听 | `EntryAbility.onConfigurationUpdate` 写入 `AppStorage('isSystemDarkMode')` |
+| UTF-8 解码 | 自定义 `utf8BytesToString()`，规避 SDK 跨版本 `TextDecoder` 差异 |
+| 沉浸式底栏 | `setWindowLayoutFullScreen(true)` + 透明导航栏 + 安全区适配 |
+| 收藏/历史并发安全 | `CookPreferences` Promise 链式单例，防止竞态写入 |
+| ArkUI 响应性 | `@State` 赋值使用深拷贝，避免引用未变导致 UI 不刷新 |
 
 ---
 
 ## 项目结构
 
-```text
+```
 entry/src/main/ets/
 ├── components/
-│   ├── RecipeCard.ets           # 大/小双模式卡片（已修复自适应高度）
-│   ├── RecipeDetailSheet.ets    # 底部弹窗（原生 bindSheet 适配）
-│   ├── CookingFocusView.ets     # 全屏专注覆盖层
-│   ├── IngredientTag.ets
-│   ├── ToastView.ets
-│   ├── PlateCard.ets
-│   └── RandomPickerButton.ets
+│   ├── RecipeCard.ets           # 菜谱卡片（大/小双模式，收藏按钮，视频播放数角标）
+│   ├── RecipeDetailSheet.ets    # 底部详情弹窗（原生 bindSheet + nestedScroll）
+│   ├── CookingFocusView.ets     # 全屏专注烹饪覆盖层（Swiper 翻页 + 屏幕常亮锁）
+│   ├── IngredientTag.ets        # 颜色编码食材标签
+│   ├── ToastView.ets            # 毛玻璃 Toast 通知
+│   ├── PlateCard.ets            # 3D 盘子效果卡片
+│   └── RandomPickerButton.ets  # 随机食材抽取触发器
+│
 ├── constants/
-│   ├── AppColors.ets
-│   └── DesignSystem.ets         # 全局视觉 Token 控制中心
+│   └── AppColors.ets            # 品牌色 + 深色适配色 + ThemeManager 工具类
+│
 ├── data/
-│   ├── RecipeRepository.ets     # JSON 索引化加载
-│   ├── RecipeDBManager.ets      # SQLite（steps / SHA256 增量）
-│   └── foodCatalog.ets          # 食材厨具目录（emoji 字典，Todo 待清理）
+│   ├── RecipeRepository.ets     # 菜谱数据单例（rawfile JSON 索引化加载）
+│   └── foodCatalog.ets          # 食材 / 厨具目录（含 emoji 映射）
+│
 ├── model/
-│   └── recipe.ets               # RecipeItem / RecipeWithId / SearchMode
+│   └── recipe.ets               # RecipeItem / RecipeWithId / SearchMode 类型定义
+│
 ├── pages/
-│   ├── StartupPage.ets          # 启动动画 + 隐私弹窗
-│   ├── LegalDocPage.ets
-│   ├── IndexV2.ets              # 主入口 (API 22 严格模式重构版)
-│   ├── SettingsPage.ets         # 设置（用户信息待动态化）
-│   ├── FavoritesPage.ets        # 收藏列表（截断问题待修复）
-│   └── HistoryPage.ets
+│   ├── StartupPage.ets          # 启动页（品牌动画 + 隐私同意对话框）
+│   ├── IndexV2.ets              # 主入口（四 Tab 导航）
+│   ├── LegalDocPage.ets         # 隐私政策 & 用户协议阅读页
+│   ├── SettingsPage.ets         # 设置与管理
+│   ├── FavoritesPage.ets        # 收藏列表
+│   └── HistoryPage.ets          # 浏览历史
+│
 ├── service/
-│   ├── RecipeSearchService.ets  # 严格 / 宽松 / 生存搜索
-│   └── ShoppingListService.ets  # 缺料对比 + 剪贴板导出
+│   ├── RecipeSearchService.ets  # 纯函数搜索（严格 / 模糊 / 生存三算法）
+│   ├── ShoppingListService.ets  # 缺料对比 + 剪贴板导出
+│   └── RecipeVideoLauncher.ets  # Bilibili BV 跳转 / 剪贴板回退
+│
 ├── store/
-│   └── CookPreferences.ets
-├── utils/
-│   └── IngredientTypeMapper.ets
+│   └── CookPreferences.ets      # HarmonyOS Preferences 持久化封装
+│
+├── util/
+│   ├── StatusBarInset.ets       # 系统安全区顶部高度计算
+│   └── ThemeManager.ets         # 主题状态读取工具
+│
 └── entryability/
-    └── EntryAbility.ets         # 沉浸式 UI 初始化
+    └── EntryAbility.ets         # 沉浸式 UI 初始化 + 系统主题监听
 ```
 
 ---
 
-## 开发环境
+## 数据说明
 
-| 项 | 值 |
-|---|---|
-| IDE | DevEco Studio |
-| SDK | HarmonyOS 6.0.2 (API 22) |
-| 构建命令 | `node ./hvigor/hvigor-wrapper.js --mode module -p module=entry@default assembleHap` |
+菜谱数据存储于 `entry/src/main/resources/rawfile/recipe.json`，格式与 Web 端共享：
+
+```typescript
+interface RecipeItem {
+  name: string
+  stuff: string[]       // 所需食材
+  tools: string[]       // 所需厨具
+  steps?: string[]      // 烹饪步骤
+  emojis?: string[]     // 菜品 Emoji
+  difficulty?: '简单' | '普通' | '困难'
+  tags?: string[]
+  methods?: string[]    // 烹饪方式（炒/蒸/烤等）
+  imageUri?: string
+}
+```
+
+数组下标为稳定 ID，收藏与历史均以 `number[]` 形式存储于 Preferences。
+
+---
+
+## 快速开始
+
+### 环境要求
+
+- DevEco Studio 5.0+
+- HarmonyOS SDK API 22（HarmonyOS 6.0.2）
+
+### 构建运行
+
+```bash
+# 方式一：DevEco Studio 直接运行（推荐）
+# 打开项目 → 选择设备/模拟器 → Run
+
+# 方式二：命令行构建 HAP
+node ./hvigor/hvigor-wrapper.js --mode module \
+  -p module=entry@default \
+  -p product=default \
+  assembleHap
+```
+
+### 模拟器注意事项
+
+- 首次安装前需**卸载旧版本**，避免应用名称缓存为旧值
+- 运行后如应用名称显示异常，执行 **Run → Clean Project** 后重新安装
+
+---
+
+## 合规说明
+
+| 合规项 | 状态 |
+|--------|------|
+| 首次启动隐私同意弹窗 | ✅ |
+| 隐私政策页面（独立页） | ✅ |
+| 用户协议页面（独立页） | ✅ |
+| 权限声明（相册读写 / 屏幕常亮） | ✅ |
+| 应用图标与名称配置 | ✅ |
+| AGC 后台数据安全说明 | ⚠️ 上架前需填报 |
+
+---
+
+## 开源协议
+
+本项目代码以学习交流为目的开源，菜谱内容整理自公开烹饪知识。
+
+仓库地址：[https://github.com/Ruheluobixieqing/Cook.git](https://github.com/Ruheluobixieqing/Cook.git)
+
+© 2026 AUV 项目组 · 南京理工大学

@@ -14,6 +14,8 @@ export interface RecipeItem {
   /** 保留 recipe.json 中的完整烹饪方式枚举，避免入库时被硬编码过滤 */
   methods?: string[]
   tools: string[]
+  /** 菜谱图片 URI */
+  imageUri?: string
 }
 
 export type Recipes = RecipeItem[]

@@ -10,7 +10,7 @@ import type { RecipeWithId, SearchMode, StuffItem } from '../model/recipe';
 import { RecipeSearchService } from '../service/RecipeSearchService';
 import { CookPreferences, type UserProfile } from '../store/CookPreferences';
 import { getSystemSafeTopVp } from '../util/StatusBarInset';
-import { AppColors } from '../constants/AppColors';
+import { AppColors, ThemeManager } from '../constants/AppColors';
 import { IngredientTag, TagType } from '../components/IngredientTag';
 import { ToastView } from '../components/ToastView';
 import { RandomPickerButton } from '../components/RandomPickerButton';
@@ -71,6 +71,30 @@ struct IndexV2 {
   @State currentRandomIndex: number = 0
   @State showRandomAnimation: boolean = false
 
+  // 主题颜色状态
+  @State currentBgColor: string = AppColors.BG_COLOR
+  @State currentCardBgColor: string = AppColors.CARD_BG
+  @State currentTextColor: string = AppColors.GRAY_900
+  @State currentSecondaryTextColor: string = AppColors.GRAY_500
+  @State currentBorderColor: string = AppColors.GRAY_100
+  @State lastThemeMode: string = '系统默认' // 当前生效的主题模式（含系统默认解析结果）
+
+  /**
+   * 系统深色状态：EntryAbility.onConfigurationUpdate 写入 AppStorage → 此处零延迟更新。
+   * @Watch 触发时：若当前为系统默认模式则重算颜色。
+   */
+  @StorageProp('isSystemDarkMode')
+  @Watch('onSystemThemeChange')
+  isSystemDark: boolean = false;
+
+  /**
+   * 用户选择的主题模式：SettingsPage.changeThemeMode 写入 AppStorage → 此处零延迟更新。
+   * @Watch 触发时：更新 lastThemeMode 并重算颜色，替代原有 1s 轮询定时器。
+   */
+  @StorageProp('currentThemeMode')
+  @Watch('onStoredThemeModeChange')
+  storedThemeMode: string = '系统默认';
+
   // 利用外部 foodCatalog.ets 的数据进行装配
   private readonly ingredientCategories: IngredientCategory[] = [
     { title: '🥩 肉蛋水产', data: meatItems, type: TagType.MEAT },
@@ -87,7 +111,7 @@ struct IndexV2 {
 
   private readonly filterTags: string[] = ['全部', '今日推荐', '减脂餐', '快手早餐', '广式', '川香', '烘焙', '汤羹'];
 
-  aboutToAppear(): void {
+  async aboutToAppear(): Promise<void> {
     void this.bootstrapData();
     const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
     if (ctx !== undefined) {
@@ -95,18 +119,30 @@ struct IndexV2 {
         this.mainNavTopInsetVp = vp;
       });
     }
+    
+    // 初始化主题颜色（从 Preferences 读取初始值，后续由 @StorageProp 驱动）
+    await this.updateThemeColors();
   }
 
   onPageShow(): void {
     void this.refreshHistory();
     void this.refreshFavorites();
     void this.refreshUserProfile();
+
+    // 页面从后台恢复时立即重算颜色：
+    // 解决"从 SettingsPage 返回后主题未更新"的问题。
+    // 即使 @StorageProp @Watch 已在后台触发过，也需在页面可见时做一次同步确认。
+    this.applyThemeColors(this.storedThemeMode);
+
     const ctx2 = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
     if (ctx2 !== undefined) {
       void getSystemSafeTopVp(ctx2).then((vp: number) => {
         this.mainNavTopInsetVp = vp;
       });
     }
+  }
+
+  aboutToDisappear(): void {
   }
 
   private async bootstrapData(): Promise<void> {
@@ -156,23 +192,61 @@ struct IndexV2 {
   private async refreshFavorites(): Promise<void> {
     const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
     if (!host || !this.keepLocalData) {
-      if (!this.keepLocalData) this.favoriteIds = [];
+      if (!this.keepLocalData) {
+        console.log('[收藏] 本地数据存储已关闭，清空收藏列表');
+        this.favoriteIds = [];
+      }
       return;
     }
+    
     try {
+      console.log('[收藏] 开始刷新收藏列表');
       const raw = await CookPreferences.getFavoriteIds(host);
       const n = RecipeRepository.getInstance().getCount();
-      this.favoriteIds = raw.filter(id => id >= 0 && id < n);
-    } catch { }
+      const filteredIds = raw.filter(id => id >= 0 && id < n);
+      
+      console.log(`[收藏] 从存储获取: ${raw.length} 条，过滤后: ${filteredIds.length} 条`);
+      
+      // 检查是否有变化，避免不必要的状态更新
+      if (JSON.stringify(this.favoriteIds) !== JSON.stringify(filteredIds)) {
+        this.favoriteIds = filteredIds;
+        console.log('[收藏] 收藏列表已更新');
+      } else {
+        console.log('[收藏] 收藏列表无变化');
+      }
+    } catch (error) {
+      console.error('[收藏] 刷新收藏列表失败', error);
+      this.favoriteIds = [];
+    }
   }
 
   private onTapFavorite(recipeId: number): void {
-    if (!this.keepLocalData) return;
+    console.log(`[收藏] onTapFavorite 被调用，菜谱ID: ${recipeId}`);
+    
+    if (!this.keepLocalData) {
+      console.log('[收藏] 本地数据存储已关闭，无法收藏');
+      this.showToast('请开启本地数据存储以使用收藏功能');
+      return;
+    }
+    
     const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
-    if (!host) return;
+    if (!host) {
+      console.error('[收藏] 无法获取UIAbility上下文');
+      this.showToast('系统错误：无法获取应用上下文');
+      return;
+    }
+    
+    console.log(`[收藏] 开始切换收藏状态，菜谱ID: ${recipeId}`);
+    
     void CookPreferences.toggleFavoriteId(host, recipeId).then(async () => {
+      console.log(`[收藏] 数据存储成功，菜谱ID: ${recipeId}`);
       await this.refreshFavorites();
-      this.showToast(this.isRecipeFavorite(recipeId) ? '已添加至收藏' : '已取消收藏');
+      const isNowFavorite = this.isRecipeFavorite(recipeId);
+      console.log(`[收藏] 刷新后状态: ${isNowFavorite ? '已收藏' : '未收藏'}`);
+      this.showToast(isNowFavorite ? '已添加至收藏' : '已取消收藏');
+    }).catch((error: Error) => {
+      console.error(`[收藏] 数据存储失败，菜谱ID: ${recipeId}`, error);
+      this.showToast('收藏操作失败，请重试');
     });
   }
 
@@ -195,6 +269,49 @@ struct IndexV2 {
     try {
       this.userProfile = await CookPreferences.getUserProfile(host);
     } catch { }
+  }
+
+  /**
+   * 冷启动初始化：从 Preferences 读取用户选择的主题模式，并同步到 AppStorage。
+   * 后续所有实时变化由 @StorageProp @Watch 驱动，无需再次读 Preferences。
+   */
+  private async updateThemeColors(): Promise<void> {
+    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    if (!host) return;
+    try {
+      const themeSettings = await CookPreferences.getThemeSettings(host);
+      // AppStorage 优先（当次会话实时值）；冷启动时 AppStorage 无值则用 Preferences
+      const liveMode = AppStorage.get<string>('currentThemeMode')
+      const effectiveTheme: string = (liveMode !== undefined && liveMode.length > 0)
+        ? liveMode
+        : themeSettings.themeMode
+      AppStorage.setOrCreate<string>('currentThemeMode', effectiveTheme);
+      this.applyThemeColors(effectiveTheme);
+    } catch (error) {
+      console.error('updateThemeColors failed:', error);
+    }
+  }
+
+  /** @Watch 回调：系统深色状态变化（EntryAbility.onConfigurationUpdate 写入） */
+  private onSystemThemeChange(): void {
+    if (this.lastThemeMode === '系统默认') {
+      this.applyThemeColors('系统默认');
+    }
+  }
+
+  /** @Watch 回调：用户在 SettingsPage 选择了新主题（AppStorage 广播） */
+  private onStoredThemeModeChange(): void {
+    this.applyThemeColors(this.storedThemeMode);
+  }
+
+  /** 同步计算并写入所有主题颜色 @State，保证同帧完成无闪烁 */
+  private applyThemeColors(mode: string): void {
+    this.currentBgColor = ThemeManager.getBackgroundColor(mode);
+    this.currentCardBgColor = ThemeManager.getCardBackgroundColor(mode);
+    this.currentTextColor = ThemeManager.getTextColor(mode);
+    this.currentSecondaryTextColor = ThemeManager.getSecondaryTextColor(mode);
+    this.currentBorderColor = ThemeManager.getBorderColor(mode);
+    this.lastThemeMode = mode;
   }
 
   private runSearch(): void {
@@ -337,7 +454,37 @@ struct IndexV2 {
   }
 
   private getBackgroundColor(): string {
-    return this.mainTabIndex === 3 ? AppColors.TABLE_BG : AppColors.BG_COLOR;
+    return this.mainTabIndex === 3 ? this.currentCardBgColor : this.currentBgColor;
+  }
+
+  /**
+   * 当前是否处于深色渲染状态。
+   * 正确处理"系统默认"模式：此时跟随 @StorageProp isSystemDark。
+   */
+  private isEffectivelyDark(): boolean {
+    if (this.lastThemeMode === '深色模式') return true;
+    if (this.lastThemeMode === '浅色模式') return false;
+    return this.isSystemDark; // 系统默认
+  }
+
+  private getNavButtonBgColor(): string {
+    return this.isEffectivelyDark() ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.4)';
+  }
+
+  private getNavBarBgColor(): string {
+    return this.isEffectivelyDark() ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.7)';
+  }
+
+  private getSearchModeActiveTextColor(): string {
+    return this.isEffectivelyDark() ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.8)';
+  }
+
+  private getRandomAnimationBgColor(): string {
+    return this.isEffectivelyDark() ? 'rgba(30, 30, 30, 0.5)' : 'rgba(255, 245, 235, 0.5)';
+  }
+
+  private getNavBarBorderColor(): string {
+    return this.isEffectivelyDark() ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
   }
 
   private startRandomAnimation(): void {
@@ -384,6 +531,36 @@ struct IndexV2 {
     }, 100);
   }
 
+  /**
+   * 测试收藏功能是否正常工作
+   */
+  private testFavoriteFunction(): void {
+    if (!this.keepLocalData) {
+      this.showToast('请先开启本地数据存储');
+      return;
+    }
+    
+    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    if (!host) {
+      this.showToast('无法获取应用上下文');
+      return;
+    }
+    
+    // 测试第一个菜谱的收藏功能
+    const testRecipeId = 0;
+    console.log(`[测试] 开始测试收藏功能，菜谱ID: ${testRecipeId}`);
+    
+    void CookPreferences.toggleFavoriteId(host, testRecipeId).then(async () => {
+      await this.refreshFavorites();
+      const isFavorite = this.isRecipeFavorite(testRecipeId);
+      this.showToast(`收藏功能测试${isFavorite ? '成功' : '失败'}`);
+      console.log(`[测试] 收藏功能测试${isFavorite ? '成功' : '失败'}`);
+    }).catch((error: Error) => {
+      console.error('[测试] 收藏功能测试失败', error);
+      this.showToast('收藏功能测试失败');
+    });
+  }
+
   @Builder
   buildCookTab() {
     Stack() {
@@ -396,22 +573,22 @@ struct IndexV2 {
             Column({ space: 4 }) {
               Text('准备做点什么？')
                 .fontSize(32)
-                .fontColor(AppColors.GRAY_900)
+                .fontColor(this.currentTextColor)
                 .fontWeight(FontWeight.Bolder)
                 .letterSpacing(-1)
 
               Text('点选食材，匹配最佳做法')
                 .fontSize(14)
-                .fontColor(AppColors.GRAY_500)
+                .fontColor(this.currentSecondaryTextColor)
             }.alignItems(HorizontalAlign.Start).layoutWeight(1)
 
             Row({ space: 4 }) {
-              SymbolGlyph($r('sys.symbol.trash')).fontSize(14).fontColor([AppColors.GRAY_600])
+              SymbolGlyph($r('sys.symbol.trash')).fontSize(14).fontColor([this.currentSecondaryTextColor])
               Text('清空')
-                .fontSize(13).fontColor(AppColors.GRAY_600).fontWeight(FontWeight.Medium)
+                .fontSize(13).fontColor(this.currentSecondaryTextColor).fontWeight(FontWeight.Medium)
             }
             .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-            .backgroundColor(AppColors.GRAY_100).borderRadius(100)
+            .backgroundColor(this.currentBorderColor).borderRadius(100)
             .onClick(() => this.resetSelection())
           }
           .width('100%')
@@ -426,7 +603,7 @@ struct IndexV2 {
           // --- 模块 3：匹配策略 ---
           Column({ space: 10 }) {
             Text('匹配策略')
-              .fontSize(15).fontColor(AppColors.GRAY_800).fontWeight(FontWeight.Bold).alignSelf(ItemAlign.Center)
+              .fontSize(15).fontColor(this.currentTextColor).fontWeight(FontWeight.Bold).alignSelf(ItemAlign.Center)
 
             Row({ space: 8 }) {
               ForEach([
@@ -438,15 +615,15 @@ struct IndexV2 {
                   Text(item.label)
                     .fontSize(14)
                     .fontWeight(this.searchMode === item.mode ? FontWeight.Bold : FontWeight.Normal)
-                    .fontColor(this.searchMode === item.mode ? Color.White : AppColors.GRAY_600)
+                    .fontColor(this.searchMode === item.mode ? Color.White : this.currentTextColor)
                   Text(item.desc)
                     .fontSize(10)
-                    .fontColor(this.searchMode === item.mode ? 'rgba(255,255,255,0.8)' : AppColors.GRAY_400)
+                    .fontColor(this.searchMode === item.mode ? this.getSearchModeActiveTextColor() : this.currentSecondaryTextColor)
                 }
                 .layoutWeight(1).padding({ top: 8, bottom: 8 })
-                .backgroundColor(this.searchMode === item.mode ? AppColors.BRAND_COLOR : Color.White)
+                .backgroundColor(this.searchMode === item.mode ? AppColors.BRAND_COLOR : this.currentCardBgColor)
                 .borderRadius(12)
-                .border({ width: 1, color: this.searchMode === item.mode ? AppColors.BRAND_COLOR : AppColors.GRAY_200 })
+                .border({ width: 1, color: this.searchMode === item.mode ? AppColors.BRAND_COLOR : this.currentBorderColor })
                 .onClick(() => this.switchSearchMode(item.mode as SearchMode))
               }, (item: Record<string, string>) => item.mode)
             }.width('100%')
@@ -457,7 +634,7 @@ struct IndexV2 {
             ForEach(this.ingredientCategories, (cat: IngredientCategory) => {
               Column({ space: 8 }) { // 标题与标签间距从 10 缩小到 8
                 Text(cat.title)
-                  .fontSize(15).fontColor(AppColors.GRAY_800).fontWeight(FontWeight.Bold).alignSelf(ItemAlign.Center)
+                  .fontSize(15).fontColor(this.currentTextColor).fontWeight(FontWeight.Bold).alignSelf(ItemAlign.Center)
 
                 Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Center, alignItems: ItemAlign.Center }) {
                   ForEach(cat.data, (item: StuffItem) => {
@@ -475,7 +652,7 @@ struct IndexV2 {
             // 厨具区
             Column({ space: 8 }) {
               Text('🍳 厨具')
-                .fontSize(15).fontColor(AppColors.GRAY_800).fontWeight(FontWeight.Bold).alignSelf(ItemAlign.Center)
+                .fontSize(15).fontColor(this.currentTextColor).fontWeight(FontWeight.Bold).alignSelf(ItemAlign.Center)
 
               Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Center, alignItems: ItemAlign.Center }) {
                 ForEach(toolItems, (item: StuffItem) => {
@@ -503,7 +680,7 @@ struct IndexV2 {
             .fontSize(15).fontColor(Color.White).fontWeight(FontWeight.Bold)
         }
         .width('100%').height(56)
-        .backgroundColor(this.selectedStuff.length > 0 ? AppColors.BRAND_COLOR : AppColors.GRAY_200)
+        .backgroundColor(this.selectedStuff.length > 0 ? AppColors.BRAND_COLOR : this.currentBorderColor)
         .borderRadius(16)
         .enabled(this.selectedStuff.length > 0)
         .onClick(() => {
@@ -525,14 +702,14 @@ struct IndexV2 {
   buildLibraryTab() {
     Column() {
       Column() {
-        Text('探索').fontSize(24).fontColor(AppColors.GRAY_900).fontWeight(FontWeight.Bold).alignSelf(ItemAlign.Start).margin({ bottom: 16 })
+        Text('探索').fontSize(24).fontColor(this.currentTextColor).fontWeight(FontWeight.Bold).alignSelf(ItemAlign.Start).margin({ bottom: 16 })
 
         Row({ space: 8 }) {
-          SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(18).fontColor([AppColors.GRAY_500])
+          SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(18).fontColor([this.currentSecondaryTextColor])
           TextInput({ placeholder: '搜索菜谱或食材', text: this.libraryKeyword })
-            .backgroundColor(Color.Transparent).layoutWeight(1).fontSize(15).placeholderColor(AppColors.GRAY_400)
+            .backgroundColor(Color.Transparent).layoutWeight(1).fontSize(15).placeholderColor(this.currentSecondaryTextColor)
             .onChange((v: string) => { this.libraryKeyword = v; this.runLibrarySearch(); })
-        }.width('100%').height(48).padding({ left: 16, right: 16 }).backgroundColor(AppColors.GRAY_100).borderRadius(12)
+        }.width('100%').height(48).padding({ left: 16, right: 16 }).backgroundColor(this.currentBorderColor).borderRadius(12)
 
         Scroll() {
           // 修复：Row间距从8减小到6，缩减视觉留白
@@ -542,16 +719,16 @@ struct IndexV2 {
                 .fontSize(12).fontColor(this.libraryActiveTag === '搜索结果' ? Color.White : AppColors.BRAND_COLOR)
               // 修复：左右padding从14减小到12
                 .padding({ left: 14, right: 14, top: 6, bottom: 6 })
-                .backgroundColor(this.libraryActiveTag === '搜索结果' ? AppColors.BRAND_COLOR : '#FFF0F1')
+                .backgroundColor(this.libraryActiveTag === '搜索结果' ? AppColors.BRAND_COLOR : this.currentCardBgColor)
                 .borderRadius(8)
                 .onClick(() => { this.libraryActiveTag = '搜索结果'; this.libraryActiveDifficulty = ''; this.runLibrarySearch(); })
             }
             ForEach(this.filterTags, (tag: string) => {
               Text(tag)
-                .fontSize(12).fontColor(this.libraryActiveTag === tag ? Color.White : AppColors.GRAY_600)
+                .fontSize(12).fontColor(this.libraryActiveTag === tag ? Color.White : this.currentSecondaryTextColor)
               // 修复：左右padding从14减小到12
                 .padding({ left: 14, right: 14, top: 6, bottom: 6 })
-                .backgroundColor(this.libraryActiveTag === tag ? AppColors.GRAY_900 : Color.White)
+                .backgroundColor(this.libraryActiveTag === tag ? AppColors.BRAND_COLOR : this.currentCardBgColor)
                 .borderRadius(8)
                 .onClick(() => {
                   this.libraryActiveTag = tag;
@@ -560,16 +737,16 @@ struct IndexV2 {
             }, (tag: string) => tag)
           }.padding({ right: 4 })
         }.scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off).width('100%').margin({ top: 16 })
-      }.width('100%').padding({ left: 20, right: 20, top: 16, bottom: 12 }).backgroundColor(AppColors.BG_COLOR)
+      }.width('100%').padding({ left: 20, right: 20, top: 16, bottom: 12 }).backgroundColor(this.currentBgColor)
 
       Scroll() {
         Column({ space: 20 }) {
           if (this.libraryActiveTag === '搜索结果') {
             Row({ space: 6 }) {
-              SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(14).fontColor([AppColors.GRAY_600])
+              SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(14).fontColor([this.currentSecondaryTextColor])
               Text(`已选：${this.selectedStuff.join('、')}${this.curTool ? ' · ' + this.curTool : ''}`)
-                .fontSize(13).fontColor(AppColors.GRAY_600).layoutWeight(1).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-            }.width('100%').padding({ left: 14, right: 14, top: 8, bottom: 8 }).backgroundColor('#FFF0F1').borderRadius(10)
+                .fontSize(13).fontColor(this.currentSecondaryTextColor).layoutWeight(1).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+            }.width('100%').padding({ left: 14, right: 14, top: 8, bottom: 8 }).backgroundColor(this.currentCardBgColor).borderRadius(10)
           }
 
           if (this.libraryHits.length > 0) {
@@ -588,8 +765,8 @@ struct IndexV2 {
             }
           } else {
             Column({ space: 12 }) {
-              SymbolGlyph($r('sys.symbol.info_circle')).fontSize(48).fontColor([AppColors.GRAY_300])
-              Text(this.recipeCount === 0 ? '暂无菜谱数据' : '暂无匹配的菜谱').fontSize(14).fontColor(AppColors.GRAY_500)
+              SymbolGlyph($r('sys.symbol.info_circle')).fontSize(48).fontColor([this.currentBorderColor])
+              Text(this.recipeCount === 0 ? '暂无菜谱数据' : '暂无匹配的菜谱').fontSize(14).fontColor(this.currentSecondaryTextColor)
             }.width('100%').margin({ top: 60 })
           }
         }.width('100%').padding({ left: 20, right: 20, top: 8, bottom: 120 })
@@ -602,8 +779,8 @@ struct IndexV2 {
     Column() {
       Scroll() {
         Column({ space: 16 }) {
-          Text('发现').fontSize(24).fontColor(AppColors.GRAY_900).fontWeight(FontWeight.Bold).alignSelf(ItemAlign.Start)
-          Text('不知道吃什么？随机从全库挑一道菜谱。').fontSize(14).fontColor(AppColors.GRAY_500).alignSelf(ItemAlign.Start)
+          Text('发现').fontSize(24).fontColor(this.currentTextColor).fontWeight(FontWeight.Bold).alignSelf(ItemAlign.Start)
+          Text('不知道吃什么？随机从全库挑一道菜谱。').fontSize(14).fontColor(this.currentSecondaryTextColor).alignSelf(ItemAlign.Start)
 
           Row({ space: 12 }) {
             Button() {
@@ -621,7 +798,7 @@ struct IndexV2 {
                   Text('换一道').fontSize(15).fontColor(AppColors.BRAND_COLOR).fontWeight(FontWeight.Medium)
                 }
               }
-              .padding({ left: 20, right: 20 }).height(44).backgroundColor('#FFF0F1').borderRadius(12).onClick(() => this.pickRandomDiscover())
+              .padding({ left: 20, right: 20 }).height(44).backgroundColor(this.currentCardBgColor).borderRadius(12).onClick(() => this.pickRandomDiscover())
             }
           }.margin({ top: 8 }).alignSelf(ItemAlign.Start)
 
@@ -629,10 +806,10 @@ struct IndexV2 {
             Column() {
               Text(this.randomAnimationNames[this.currentRandomIndex])
                 .fontSize(48).fontColor(AppColors.BRAND_COLOR).fontWeight(FontWeight.Bold).textAlign(TextAlign.Center).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
-            }.width('100%').height(300).justifyContent(FlexAlign.Center).backgroundColor('rgba(255, 245, 235, 0.5)').borderRadius(24).margin({ top: 20 })
+            }.width('100%').height(300).justifyContent(FlexAlign.Center).backgroundColor(this.getRandomAnimationBgColor()).borderRadius(24).margin({ top: 20 })
           } else if (!this.showRandomAnimation && this.discoverPick.id >= 0) {
             Column({ space: 8 }) {
-              Text('今日推荐').fontSize(15).fontWeight(FontWeight.Bold).fontColor(AppColors.GRAY_800).alignSelf(ItemAlign.Start).margin({ top: 8 })
+              Text('今日推荐').fontSize(15).fontWeight(FontWeight.Bold).fontColor(this.currentTextColor).alignSelf(ItemAlign.Start).margin({ top: 8 })
               RecipeCard({
                 recipe: this.discoverPick, mode: RecipeCardMode.SMALL, isFavorite: this.isRecipeFavorite(this.discoverPick.id),
                 onCardClick: () => this.openDetailSheet(this.discoverPick),
@@ -648,24 +825,24 @@ struct IndexV2 {
   @Builder
   buildMyTab() {
     Stack() {
-      Column().width('100%').height('100%').backgroundColor(AppColors.TABLE_BG)
+      Column().width('100%').height('100%').backgroundColor(this.getBackgroundColor())
       Scroll() {
         Column({ space: 0 }) {
           Row() {
             Row({ space: 16 }) {
-              Column() { Text(this.userProfile.nickname.charAt(0)).fontSize(20).fontWeight(FontWeight.Bold).fontColor(AppColors.GRAY_600) }
-              .width(48).height(48).borderRadius(24).backgroundColor(AppColors.GRAY_100)
+              Column() { Text(this.userProfile.nickname.charAt(0)).fontSize(20).fontWeight(FontWeight.Bold).fontColor(this.currentSecondaryTextColor) }
+              .width(48).height(48).borderRadius(24).backgroundColor(this.currentBorderColor)
               .justifyContent(FlexAlign.Center)
 
               Column({ space: 2 }) {
-                Text(this.userProfile.nickname).fontSize(22).fontColor('#4A4036').fontWeight(FontWeight.Bold)
-                Text(`已珍藏 ${this.favoriteIds.length} 道私家佳肴`).fontSize(13).fontColor('#8B7E6A')
+                Text(this.userProfile.nickname).fontSize(22).fontColor(this.currentTextColor).fontWeight(FontWeight.Bold)
+                Text(`已珍藏 ${this.favoriteIds.length} 道私家佳肴`).fontSize(13).fontColor(this.currentSecondaryTextColor)
               }.alignItems(HorizontalAlign.Start)
             }.layoutWeight(1)
 
-            Column() { SymbolGlyph($r('sys.symbol.gearshape')).fontSize(20).fontColor([AppColors.GRAY_600]) }
+            Column() { SymbolGlyph($r('sys.symbol.gearshape')).fontSize(20).fontColor([this.currentSecondaryTextColor]) }
             .width(40).height(40).borderRadius(20)
-            .backgroundColor('rgba(255,255,255,0.4)')
+            .backgroundColor(this.getNavButtonBgColor())
             .backgroundBlurStyle(BlurStyle.Thin)
             .justifyContent(FlexAlign.Center)
             .onClick(() => {
@@ -678,9 +855,9 @@ struct IndexV2 {
           if (this.favoriteIds.length > 0) {
             Column({ space: 48 }) {
               Row() {
-                Text('珍藏菜肴').fontSize(14).fontColor('#8B7E6A').layoutWeight(1)
+                Text('珍藏菜肴').fontSize(14).fontColor(this.currentSecondaryTextColor).layoutWeight(1)
                 if (this.favoriteIds.length > 6) {
-                  Row({ space: 4 }) { Text(`全部`).fontSize(13).fontColor('#C8A882'); SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor(['#C8A882']) }
+                  Row({ space: 4 }) { Text(`全部`).fontSize(13).fontColor(AppColors.BRAND_COLOR); SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor([AppColors.BRAND_COLOR]) }
                   .onClick(() => {
                     router.pushUrl({ url: 'pages/FavoritesPage' }).catch((e: Error) => {
                       console.error(`路由跳转 FavoritesPage 失败: ${e.message}`);
@@ -707,8 +884,8 @@ struct IndexV2 {
             }
           } else {
             Column({ space: 12 }) {
-              SymbolGlyph($r('sys.symbol.info_circle')).fontSize(48).fontColor([AppColors.GRAY_300])
-              Text('餐桌还空着呢').fontSize(16).fontColor('#8B7E6A').fontWeight(FontWeight.Medium)
+              SymbolGlyph($r('sys.symbol.info_circle')).fontSize(48).fontColor([this.currentBorderColor])
+              Text('餐桌还空着呢').fontSize(16).fontColor(this.currentSecondaryTextColor).fontWeight(FontWeight.Medium)
             }.width('100%').margin({ top: 80 })
           }
         }.width('100%').padding({ bottom: 120 })
@@ -738,6 +915,7 @@ struct IndexV2 {
   build() {
     Stack() {
       Column() {
+        // 隐藏的测试区域（长按触发收藏功能测试）
         Column() {
           if (this.mainTabIndex === 0) { this.buildCookTab(); }
           else if (this.mainTabIndex === 1) { this.buildLibraryTab(); }
@@ -745,6 +923,7 @@ struct IndexV2 {
           else { this.buildMyTab(); }
         }
         .width('100%').layoutWeight(1).padding({ top: this.mainNavTopInsetVp })
+        
         .opacity(this.tabOpacity)
 
         Column() {
@@ -753,11 +932,11 @@ struct IndexV2 {
               Column({ space: 4 }) {
                 SymbolGlyph(item.icon)
                   .fontSize(24)
-                  .fontColor([this.mainTabIndex === item.index ? AppColors.BRAND_COLOR : AppColors.GRAY_400])
+                  .fontColor([this.mainTabIndex === item.index ? AppColors.BRAND_COLOR : this.currentSecondaryTextColor])
 
                 Text(item.label)
                   .fontSize(10)
-                  .fontColor(this.mainTabIndex === item.index ? AppColors.GRAY_900 : AppColors.GRAY_400)
+                  .fontColor(this.mainTabIndex === item.index ? this.currentTextColor : this.currentSecondaryTextColor)
                   .fontWeight(this.mainTabIndex === item.index ? FontWeight.Bold : FontWeight.Medium)
               }
               .layoutWeight(1).height('100%').justifyContent(FlexAlign.Center)
@@ -765,12 +944,12 @@ struct IndexV2 {
             }, (item: NavItem) => `tab-${item.index}`)
           }.width('100%').height(56)
 
-          Column().width(128).height(5).backgroundColor(AppColors.GRAY_200).borderRadius(10).margin({ top: 8, bottom: 8 }).alignSelf(ItemAlign.Center)
+          Column().width(128).height(5).backgroundColor(this.currentBorderColor).borderRadius(10).margin({ top: 8, bottom: 8 }).alignSelf(ItemAlign.Center)
         }
         .width('100%')
-        .backgroundColor('rgba(255, 255, 255, 0.7)')
+        .backgroundColor(this.getNavBarBgColor())
         .backgroundBlurStyle(BlurStyle.Thin)
-        .borderWidth({ top: 0.5 }).borderColor('rgba(0,0,0,0.05)').expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
+        .borderWidth({ top: 0.5 }).borderColor(this.getNavBarBorderColor()).expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
       }
       .width('100%')
       .height('100%')

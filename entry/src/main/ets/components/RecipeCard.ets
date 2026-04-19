@@ -55,13 +55,22 @@ export struct RecipeCard {
     Column() {
       // 顶部大图区域
       Stack() {
-        Column() {
-          Text(this.getEmoji())
-            .fontSize(60)
+        // 图片显示区域（如果有图片）
+        if (this.recipe.imageUri) {
+          Image(this.recipe.imageUri)
+            .width('100%')
+            .height('100%')
+            .objectFit(ImageFit.Cover)
+        } else {
+          // 无图片时显示 Emoji
+          Column() {
+            Text(this.getEmoji())
+              .fontSize(60)
+          }
+          .width('100%')
+          .height('100%')
+          .justifyContent(FlexAlign.Center)
         }
-        .width('100%')
-        .height('100%')
-        .justifyContent(FlexAlign.Center)
 
         // 收藏按钮 (右上角)
         Column() {
@@ -69,9 +78,9 @@ export struct RecipeCard {
             .fontSize(24)
             .fontColor(this.isFavorite ? '#FFB020' : AppColors.GRAY_400)
         }
-        .width(36)
-        .height(36)
-        .borderRadius(18)
+        .width(44)
+        .height(44)
+        .borderRadius(22)
         .backgroundColor('rgba(255, 255, 255, 0.95)')
         .backdropBlur(8)
         .justifyContent(FlexAlign.Center)
@@ -83,8 +92,9 @@ export struct RecipeCard {
         })
         .position({ x: '100%', y: 0 })
         .markAnchor({ x: '100%', y: 0 })
-        .translate({ x: -8, y: 8 })
+        .translate({ x: -12, y: 12 })
         .hitTestBehavior(HitTestMode.Block)
+        .zIndex(100)
         .onClick(() => {
           if (this.onFavoriteClick) {
             this.onFavoriteClick()
@@ -93,7 +103,7 @@ export struct RecipeCard {
       }
       .width('100%')
       .height(160)
-      .backgroundColor('#FFF5EB') // bg-orange-50
+      .backgroundColor(this.recipe.imageUri ? Color.Transparent : '#FFF5EB') // 有图片时透明，无图片时背景色
       .borderRadius({ topLeft: 24, topRight: 24 })
 
       // 底部信息区域
@@ -161,16 +171,25 @@ export struct RecipeCard {
   buildSmallCard() {
     Stack() {
       Row({ space: 16 }) {
-        // 左侧图标
-        Column() {
-          Text(this.getEmoji())
-            .fontSize(40)
+        // 左侧图标/图片
+        if (this.recipe.imageUri) {
+          Image(this.recipe.imageUri)
+            .width(96)
+            .height(96)
+            .objectFit(ImageFit.Cover)
+            .borderRadius(14)
+        } else {
+          // 无图片时显示 Emoji
+          Column() {
+            Text(this.getEmoji())
+              .fontSize(40)
+          }
+          .width(96)
+          .height(96)
+          .borderRadius(14)
+          .backgroundColor('#F0FDF4') // bg-green-50
+          .justifyContent(FlexAlign.Center)
         }
-        .width(96)
-        .height(96)
-        .borderRadius(14)
-        .backgroundColor('#F0FDF4') // bg-green-50
-        .justifyContent(FlexAlign.Center)
 
         // 右侧信息
         Column({ space: 6 }) {
@@ -232,9 +251,9 @@ export struct RecipeCard {
           .fontSize(20)
           .fontColor(this.isFavorite ? '#FFB020' : AppColors.GRAY_400)
       }
-      .width(32)
-      .height(32)
-      .borderRadius(16)
+      .width(40)
+      .height(40)
+      .borderRadius(20)
       .backgroundColor('rgba(255, 255, 255, 0.95)')
       .backdropBlur(8)
       .justifyContent(FlexAlign.Center)
@@ -246,11 +265,16 @@ export struct RecipeCard {
       })
       .position({ x: '100%', y: 0 })
       .markAnchor({ x: '100%', y: 0 })
-      .translate({ x: -8, y: 8 })
+      .translate({ x: -12, y: 12 })
       .hitTestBehavior(HitTestMode.Block)
+      .zIndex(100)
       .onClick(() => {
+        console.log('[RecipeCard] 收藏按钮被点击')
         if (this.onFavoriteClick) {
+          console.log('[RecipeCard] 调用 onFavoriteClick 回调')
           this.onFavoriteClick()
+        } else {
+          console.log('[RecipeCard] onFavoriteClick 回调未定义')
         }
       })
     }

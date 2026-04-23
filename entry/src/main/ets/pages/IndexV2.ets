@@ -779,30 +779,7 @@ struct IndexV2 {
     Column() {
       Scroll() {
         Column({ space: 16 }) {
-          Row() {
-            Text('发现')
-              .fontSize(24)
-              .fontColor(this.currentTextColor)
-              .fontWeight(FontWeight.Bold)
-            Blank()
-            Text('?')
-              .fontSize(15)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(this.currentSecondaryTextColor)
-              .width(32)
-              .height(32)
-              .textAlign(TextAlign.Center)
-              .lineHeight(32)
-              .backgroundColor(this.currentCardBgColor)
-              .borderRadius(16)
-              .onClick(() => {
-                router.pushUrl({ url: 'pages/DietaryStructurePage' }).catch((e: Error) => {
-                  console.error(`路由跳转 DietaryStructurePage 失败: ${e.message}`)
-                })
-              })
-          }
-          .width('100%')
-          .alignItems(VerticalAlign.Center)
+          Text('发现').fontSize(24).fontColor(this.currentTextColor).fontWeight(FontWeight.Bold).alignSelf(ItemAlign.Start)
           Text('不知道吃什么？随机从全库挑一道菜谱。').fontSize(14).fontColor(this.currentSecondaryTextColor).alignSelf(ItemAlign.Start)
 
           Row({ space: 12 }) {

@@ -6,6 +6,7 @@
     "pages/HistoryPage",
     "pages/FavoritesPage",
     "pages/SettingsPage",
-    "pages/LegalDocPage"
+    "pages/LegalDocPage",
+    "pages/DietaryStructurePage"
   ]
 }

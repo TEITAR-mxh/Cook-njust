@@ -25,6 +25,7 @@ interface LegalDocConfig {
 }
 
 // ─── 隐私政策 ─────────────────────────────────────────────────────────────────
+// 内容已与线上 HTML 版本 (https://fanbo0419.github.io/-/) 同步
 
 const PRIVACY_DOC: LegalDocConfig = {
   type: 'privacy',
@@ -33,6 +34,10 @@ const PRIVACY_DOC: LegalDocConfig = {
   subtitle: '《AUV 您吃了么》由南京理工大学学生团队开发。我们依据《个人信息保护法》《网络安全法》制定本政策，请在使用前仔细阅读。',
   effectiveDate: '版本 1.0.0　·　生效日期：2026 年 4 月 19 日',
   sections: [
+    {
+      heading: '📌 开发者信息',
+      body: '“AUV 您吃了么”开发团队 (个人开发者: 孟晓菡)'
+    },
     {
       heading: '一、我们收集的信息',
       body: '本应用仅在设备本地处理数据，不向任何服务器上传个人身份信息。\n\n【本地自动生成的数据】\n• 您选择的食材与厨具偏好\n• 浏览过的菜谱历史记录（最近 50 条）\n• 您收藏的菜谱 ID 列表（最多 500 条）\n• 昵称、头像等个人资料（存储于设备沙箱）\n\n【相册权限】仅在您主动选择头像图片时读取，读取后立即复制至沙箱，不保留原始路径。'
@@ -63,11 +68,11 @@ const PRIVACY_DOC: LegalDocConfig = {
     },
     {
       heading: '八、政策变更',
-      body: '如本政策发生实质性变更，我们将在应用内通过弹窗或更新日志形式提前告知。您继续使用本应用视为接受更新后的政策。'
+      body: '如本政策发生实质性变更，我们将在应用内通过弹窗等显著方式重新获得您的明确同意。对于不影响用户重大权益的非实质性变更（如文本优化），我们会在应用更新时同步。您继续使用本应用视为接受更新后的政策。'
     },
     {
       heading: '九、联系我们',
-      body: '如您对本隐私政策有任何疑问、意见或投诉：\n\n• GitHub Issues：https://github.com/Ruheluobixieqing/Cook.git\n• 开发团队：南京理工大学 AUV 项目组\n\n我们承诺在收到请求后 15 个工作日内回复。'
+      body: '开发与运营方：“AUV 您吃了么”开发团队 (个人开发者: 孟晓菡)\n\n• GitHub Issues：https://github.com/Ruheluobixieqing/Cook.git\n• 开发团队：南京理工大学 AUV 项目组\n\n我们承诺在收到请求后 15 个工作日内回复。'
     }
   ],
   footer: '© 2026 AUV 项目组 · 南京理工大学　保留所有权利'

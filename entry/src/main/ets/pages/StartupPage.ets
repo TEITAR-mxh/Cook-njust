@@ -132,6 +132,8 @@ struct PrivacyConsentDialog {
 struct StartupPage {
   @State private statusText: string = '正在准备数据...'
   @State private hasRouted: boolean = false
+  /** 标记用户曾从对话框跳转去查看协议，返回后才需要重新弹窗 */
+  private navigatedToLegal: boolean = false
 
   // 入场动画状态
   @State private logoScale: number = 0.68
@@ -157,16 +159,16 @@ struct StartupPage {
         this.rejectPrivacy()
       },
       onOpenPrivacy: () => {
-        // 先关闭对话框，等关闭动画（约 120ms）完成后再导航，避免动画叠加产生遮挡
+        this.navigatedToLegal = true   // 标记：返回后需要重新弹窗
         this.privacyDialogController.close()
         setTimeout(() => {
-          // 与 LegalDocPage.getParams() 使用同一路由栈，确保参数能正常传递
           this.getUIContext().getRouter()
             .pushUrl({ url: 'pages/LegalDocPage', params: { docType: 'privacy' } })
             .catch((e: Error) => { console.error('nav to privacy failed', e) })
         }, 150)
       },
       onOpenAgreement: () => {
+        this.navigatedToLegal = true   // 标记：返回后需要重新弹窗
         this.privacyDialogController.close()
         setTimeout(() => {
           this.getUIContext().getRouter()
@@ -187,10 +189,12 @@ struct StartupPage {
 
   /**
    * 用户从《隐私政策》/《用户协议》页面返回时触发。
-   * 若仍未同意，重新弹出对话框，避免用户卡在加载状态文字。
+   * 只有 navigatedToLegal = true（即确实跳出去看过协议）才重新弹出，
+   * 避免首次加载时与 bootstrap() 双重触发。
    */
   onPageShow(): void {
-    if (!this.hasRouted) {
+    if (!this.hasRouted && this.navigatedToLegal) {
+      this.navigatedToLegal = false
       void this.recheckAndShowDialog()
     }
   }

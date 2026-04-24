@@ -9,12 +9,12 @@ import { getSystemSafeTopVp } from '../util/StatusBarInset'
 
 // ─── 数据结构 ─────────────────────────────────────────────────────────────────
 
-interface LegalSection {
+export interface LegalSection {
   heading: string
   body: string
 }
 
-interface LegalDocConfig {
+export interface LegalDocConfig {
   type: 'privacy' | 'agreement'
   icon: string
   title: string
@@ -27,7 +27,7 @@ interface LegalDocConfig {
 // ─── 隐私政策 ─────────────────────────────────────────────────────────────────
 // 内容已与线上 HTML 版本 (https://fanbo0419.github.io/-/) 同步
 
-const PRIVACY_DOC: LegalDocConfig = {
+export const PRIVACY_DOC: LegalDocConfig = {
   type: 'privacy',
   icon: '🛡️',
   title: '隐私政策',
@@ -80,7 +80,7 @@ const PRIVACY_DOC: LegalDocConfig = {
 
 // ─── 用户协议 ─────────────────────────────────────────────────────────────────
 
-const AGREEMENT_DOC: LegalDocConfig = {
+export const AGREEMENT_DOC: LegalDocConfig = {
   type: 'agreement',
   icon: '📋',
   title: '用户协议',
@@ -154,7 +154,6 @@ struct LegalDocPage {
   aboutToAppear(): void {
     const params = this.getUIContext().getRouter()
       .getParams() as Record<string, string> | undefined
-    // 与 StartupPage.getUIContext().getRouter().pushUrl() 同一路由栈，参数可正常读取
     this.docConfig = params?.docType === 'agreement' ? AGREEMENT_DOC : PRIVACY_DOC
 
     this.isDark = this.calcIsDark()
@@ -235,7 +234,7 @@ struct LegalDocPage {
       .onClick(() => { this.getUIContext().getRouter().back() })
 
       Text(this.docConfig.title)
-        .fontSize(16)
+        .fontSize(15)
         .fontWeight(FontWeight.Medium)
         .fontColor(this.textPrimary)
         .layoutWeight(1)
@@ -244,69 +243,66 @@ struct LegalDocPage {
       Blank().width(44)
     }
     .width('100%')
-    .height(this.safeTopVp + 48)
+    .height(this.safeTopVp + 44)
     .padding({ top: this.safeTopVp, left: 4, right: 4 })
     .backgroundColor(this.navBg)
     .border({ width: { bottom: 0.5 }, color: this.dividerColor })
   }
 
-  // ── 头部（类型区分设计）────────────────────────────────────────────────────
+  // ── 文档 Banner ───────────────────────────────────────────────────────────
 
   @Builder
-  private DocHeader() {
+  private DocBanner() {
     Column({ space: 0 }) {
-      // 类型标识区：大图标 + 类型色标签 + 标题
-      Column({ space: 12 }) {
-        // emoji 图标
-        Text(this.docConfig.icon)
-          .fontSize(48)
-
-        // 类型色标签
-        Text(this.docConfig.type === 'agreement' ? '用 户 协 议' : '隐 私 政 策')
-          .fontSize(11)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(this.docAccent)
-          .letterSpacing(2)
+      Column({ space: 14 }) {
+        // 图标 + 标题 + 日期，同行不换行
+        Row({ space: 14 }) {
+          // 图标：圆角方块 + accent 浅底
+          Column() {
+            Text(this.docConfig.icon)
+              .fontSize(28)
+          }
+          .width(54).height(54)
+          .borderRadius(14)
           .backgroundColor(this.docAccentLight)
-          .padding({ left: 12, right: 12, top: 5, bottom: 5 })
-          .borderRadius(20)
+          .justifyContent(FlexAlign.Center)
+          .flexShrink(0)
 
-        // 主标题
-        Text(this.docConfig.title)
-          .fontSize(28)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(this.textPrimary)
-      }
-      .width('100%')
-      .alignItems(HorizontalAlign.Center)
-      .padding({ top: 28, bottom: 20, left: 24, right: 24 })
+          // 标题 + 日期
+          Column({ space: 5 }) {
+            Text(this.docConfig.title)
+              .fontSize(26)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.textPrimary)
+              .maxLines(1)
 
-      // 副标题说明
-      Text(this.docConfig.subtitle)
-        .fontSize(14)
-        .fontColor(this.textBody)
-        .lineHeight(22)
-        .textAlign(TextAlign.Center)
+            Text(this.docConfig.effectiveDate)
+              .fontSize(12)
+              .fontColor(this.textCaption)
+          }
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1)
+        }
         .width('100%')
-        .padding({ left: 24, right: 24, bottom: 16 })
+        .alignItems(VerticalAlign.Center)
 
-      // 生效日期行
-      Row() {
-        Text(this.docConfig.effectiveDate)
-          .fontSize(12)
-          .fontColor(this.docAccent)
-          .backgroundColor(this.docAccentLight)
-          .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-          .borderRadius(6)
+        // 简介，最多 3 行
+        Text(this.docConfig.subtitle)
+          .fontSize(13)
+          .fontColor(this.textCaption)
+          .lineHeight(21)
+          .maxLines(3)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .width('100%')
       }
       .width('100%')
-      .justifyContent(FlexAlign.Center)
-      .padding({ bottom: 24 })
+      .alignItems(HorizontalAlign.Start)
+      .padding({ left: 24, right: 24, top: 24, bottom: 22 })
+      .backgroundColor(this.surface)
 
       Divider().color(this.dividerColor)
     }
     .width('100%')
-    .backgroundColor(this.surface)
   }
 
   // ── 条款条目 ──────────────────────────────────────────────────────────────
@@ -314,11 +310,11 @@ struct LegalDocPage {
   @Builder
   private SectionItem(section: LegalSection, isLast: boolean) {
     Column({ space: 0 }) {
-      Column({ space: 10 }) {
-        // 标题行：类型色竖线 + 文字
+      Column({ space: 12 }) {
+        // 标题行：accent 色竖线 + 文字
         Row({ space: 10 }) {
           Column()
-            .width(3).height(16)
+            .width(3).height(17)
             .backgroundColor(this.docAccent)
             .borderRadius(2)
             .flexShrink(0)
@@ -336,11 +332,11 @@ struct LegalDocPage {
         Text(section.body)
           .fontSize(14)
           .fontColor(this.textBody)
-          .lineHeight(24)
+          .lineHeight(26)
           .width('100%')
       }
       .width('100%')
-      .padding({ left: 24, right: 24, top: 20, bottom: 20 })
+      .padding({ left: 24, right: 24, top: 20, bottom: 22 })
       .backgroundColor(this.surface)
 
       if (!isLast) {
@@ -356,25 +352,19 @@ struct LegalDocPage {
 
   @Builder
   private DocFooter() {
-    Column({ space: 6 }) {
-      // 文档类型色装饰线
-      Column()
-        .width(32).height(3)
-        .backgroundColor(this.docAccent)
-        .borderRadius(2)
-        .opacity(0.4)
-
+    Column({ space: 8 }) {
+      Divider().color(this.dividerColor)
       Text(this.docConfig.footer)
         .fontSize(12)
         .fontColor(this.textCaption)
         .textAlign(TextAlign.Center)
         .width('100%')
-        .padding({ top: 8 })
+        .padding({ top: 4 })
     }
     .width('100%')
-    .backgroundColor(this.surface)
+    .backgroundColor(this.bg)
     .alignItems(HorizontalAlign.Center)
-    .padding({ top: 20, bottom: 48, left: 24, right: 24 })
+    .padding({ top: 16, bottom: 48, left: 24, right: 24 })
   }
 
   // ── 构建入口 ──────────────────────────────────────────────────────────────
@@ -385,7 +375,7 @@ struct LegalDocPage {
 
       Scroll() {
         Column({ space: 0 }) {
-          this.DocHeader()
+          this.DocBanner()
 
           // 条款列表（整体白卡）
           Column({ space: 0 }) {
@@ -398,7 +388,7 @@ struct LegalDocPage {
             )
           }
           .width('100%')
-          .margin({ top: 10, bottom: 10 })
+          .margin({ top: 8, bottom: 8 })
 
           this.DocFooter()
         }
@@ -411,5 +401,18 @@ struct LegalDocPage {
     .width('100%')
     .height('100%')
     .backgroundColor(this.bg)
+  }
+
+  // ── 页面转场动画 ──────────────────────────────────────────────────────────
+  // RouteType.Push：前进（pushUrl）时触发
+  // RouteType.Pop ：后退（back）时触发
+  // 两者方向相反，避免"进退都从右飞"的视觉重叠
+  // LegalDocPage 独立负责动画：从右侧滑入覆盖 Settings，返回时滑出
+  // Settings 不定义转场保持静止，视觉上只有一层在移动
+  pageTransition() {
+    PageTransitionEnter({ duration: 300, curve: Curve.EaseOut, type: RouteType.Push })
+      .slide(SlideEffect.Right)
+    PageTransitionExit({ duration: 250, curve: Curve.EaseIn, type: RouteType.Pop })
+      .slide(SlideEffect.Right)
   }
 }

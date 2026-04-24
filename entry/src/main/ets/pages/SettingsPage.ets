@@ -11,7 +11,8 @@ import { AppColors, ThemeManager } from '../constants/AppColors'
 import { RecipeRepository } from '../data/RecipeRepository'
 import { CookPreferences, type UserProfile, type ThemeSettings } from '../store/CookPreferences'
 import { getSystemSafeTopVp } from '../util/StatusBarInset'
-import { ToastView } from '../components/ToastView' // 引入 Toast
+import { ToastView } from '../components/ToastView'
+import { PRIVACY_DOC, AGREEMENT_DOC, type LegalDocConfig, type LegalSection } from '../pages/LegalDocPage'
 
 const AVATAR_OPTIONS: string[] = ['👨', '👩', '🧑', '👦', '👧', '🍳', '🥘', '🍲', '🥗', '🍕', '🍔', '🍟', '🥐', '🥪', '🥙', '🍣']
 
@@ -35,6 +36,9 @@ struct SettingsPage {
   @State isEditingAvatar: boolean = false
   @State avatarMode: 'emoji' | 'upload' = 'emoji'
   @State customAvatarUri: string = ''
+  /** 页内协议覆盖层 */
+  @State private showLegalOverlay: boolean = false
+  @State private legalOverlayDoc: LegalDocConfig = PRIVACY_DOC
 
   // ====== 主题响应式订阅（由 EntryAbility 写入 AppStorage，零延迟广播） ======
   /**
@@ -75,6 +79,23 @@ struct SettingsPage {
 
   onPageShow(): void {
     void this.loadData()
+  }
+
+  /**
+   * 拦截系统返回键：
+   * 有页内覆盖层时先关闭覆盖层，返回 true 消费事件，不触发路由 back。
+   * 无覆盖层时返回 false，交由路由正常 pop SettingsPage。
+   */
+  onBackPress(): boolean {
+    if (this.showLegalOverlay) {
+      this.showLegalOverlay = false
+      return true
+    }
+    if (this.showThemeSheet) {
+      this.showThemeSheet = false
+      return true
+    }
+    return false
   }
 
   private showToast(msg: string) {
@@ -277,12 +298,8 @@ struct SettingsPage {
   }
 
   private openLegalDoc(docType: string): void {
-    try {
-      const routerInstance = this.getUIContext().getRouter()
-      routerInstance.pushUrl({ url: 'pages/LegalDocPage', params: { docType: docType } })
-    } catch (error) {
-      console.error('跳转法律文档页面失败:', error)
-    }
+    this.legalOverlayDoc = docType === 'agreement' ? AGREEMENT_DOC : PRIVACY_DOC
+    this.showLegalOverlay = true
   }
 
   // ==== 构建器区块 ====
@@ -366,14 +383,25 @@ struct SettingsPage {
     Text(title).fontSize(14).fontWeight(FontWeight.Bold).fontColor(this.currentSecondaryTextColor).width('100%').padding({ left: 24, right: 24, top: 16, bottom: 8 })
   }
 
-  // 颜色模式选择的底部半模态面板
+  // 颜色模式选择面板内容（页面内渲染，不使用 bindSheet 避免 window overlay 污染）
   @Builder
-  ThemeSheetBuilder() {
+  ThemeSheetContent() {
     Column() {
-      Text('颜色模式').fontSize(18).fontWeight(FontWeight.Bold).fontColor(this.currentTextColor).margin({ bottom: 20, top: 12 })
+      // 拖拽指示条
+      Column()
+        .width(36).height(4)
+        .backgroundColor(this.currentBorderColor)
+        .borderRadius(2)
+        .margin({ top: 10, bottom: 16 })
+
+      Text('颜色模式').fontSize(18).fontWeight(FontWeight.Bold).fontColor(this.currentTextColor).margin({ bottom: 4 })
+
       ForEach(['系统默认', '浅色模式', '深色模式'], (theme: string) => {
         Row() {
-          Text(theme).fontSize(16).fontColor(this.currentTextColor).fontWeight(this.themeMode === theme ? FontWeight.Bold : FontWeight.Normal)
+          Text(theme)
+            .fontSize(16)
+            .fontColor(this.currentTextColor)
+            .fontWeight(this.themeMode === theme ? FontWeight.Bold : FontWeight.Normal)
           if (this.themeMode === theme) {
             SymbolGlyph($r('sys.symbol.checkmark')).fontSize(18).fontColor([AppColors.BRAND_COLOR])
           }
@@ -389,9 +417,135 @@ struct SettingsPage {
         })
       })
     }
-    .padding(24)
+    .width('100%')
+    .padding({ left: 24, right: 24, bottom: 32 })
     .backgroundColor(this.currentCardBgColor)
     .borderRadius({ topLeft: 24, topRight: 24 })
+  }
+
+  // ── 页内全屏协议覆盖层 ────────────────────────────────────────────────────
+  @Builder
+  LegalOverlay() {
+    Column() {
+      // 导航栏
+      Row() {
+        Row() {
+          SymbolGlyph($r('sys.symbol.chevron_left'))
+            .fontSize(22).fontColor([this.currentTextColor])
+        }
+        .width(48).height(48).justifyContent(FlexAlign.Center)
+        .onClick(() => { this.showLegalOverlay = false })
+
+        Text(this.legalOverlayDoc.title)
+          .fontSize(16).fontWeight(FontWeight.Medium)
+          .fontColor(this.currentTextColor)
+          .layoutWeight(1).textAlign(TextAlign.Center)
+
+        Blank().width(48)
+      }
+      .width('100%')
+      .height(this.safeTopVp + 44)
+      .padding({ top: this.safeTopVp, left: 4, right: 4 })
+      .backgroundColor(this.currentCardBgColor)
+      .border({ width: { bottom: 0.5 }, color: this.currentBorderColor })
+
+      Scroll() {
+        Column({ space: 0 }) {
+          // Banner：图标 + 标题 + 日期 + 摘要
+          Column({ space: 14 }) {
+            Row({ space: 14 }) {
+              Column() {
+                Text(this.legalOverlayDoc.icon).fontSize(28)
+              }
+              .width(54).height(54).borderRadius(14)
+              .backgroundColor(
+                this.legalOverlayDoc.type === 'agreement'
+                  ? (this.currentBgColor === AppColors.DARK_BG_COLOR ? '#1A2A4A' : '#EFF6FF')
+                  : (this.currentBgColor === AppColors.DARK_BG_COLOR ? '#2A1215' : '#FFF0F1')
+              )
+              .justifyContent(FlexAlign.Center).flexShrink(0)
+
+              Column({ space: 5 }) {
+                Text(this.legalOverlayDoc.title)
+                  .fontSize(26).fontWeight(FontWeight.Bold)
+                  .fontColor(this.currentTextColor)
+                Text(this.legalOverlayDoc.effectiveDate)
+                  .fontSize(12).fontColor(this.currentSecondaryTextColor)
+              }
+              .alignItems(HorizontalAlign.Start).layoutWeight(1)
+            }
+            .width('100%').alignItems(VerticalAlign.Center)
+
+            Text(this.legalOverlayDoc.subtitle)
+              .fontSize(13).fontColor(this.currentSecondaryTextColor)
+              .lineHeight(21).maxLines(3)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .width('100%')
+          }
+          .width('100%').alignItems(HorizontalAlign.Start)
+          .padding({ left: 24, right: 24, top: 24, bottom: 22 })
+          .backgroundColor(this.currentCardBgColor)
+
+          Divider().color(this.currentBorderColor)
+
+          // 条款列表
+          Column({ space: 0 }) {
+            ForEach(
+              this.legalOverlayDoc.sections,
+              (section: LegalSection, index: number) => {
+                Column({ space: 0 }) {
+                  Column({ space: 12 }) {
+                    Row({ space: 10 }) {
+                      Column()
+                        .width(3).height(17)
+                        .backgroundColor(
+                          this.legalOverlayDoc.type === 'agreement' ? '#2563EB' : AppColors.BRAND_COLOR
+                        )
+                        .borderRadius(2).flexShrink(0)
+                      Text(section.heading)
+                        .fontSize(15).fontWeight(FontWeight.Medium)
+                        .fontColor(this.currentTextColor).layoutWeight(1)
+                    }
+                    .width('100%').alignItems(VerticalAlign.Center)
+
+                    Text(section.body)
+                      .fontSize(14).fontColor(this.currentSecondaryTextColor)
+                      .lineHeight(26).width('100%')
+                  }
+                  .width('100%')
+                  .padding({ left: 24, right: 24, top: 20, bottom: 22 })
+                  .backgroundColor(this.currentCardBgColor)
+
+                  if (index < this.legalOverlayDoc.sections.length - 1) {
+                    Divider().color(this.currentBorderColor).padding({ left: 24 })
+                  }
+                }
+              },
+              (section: LegalSection) => section.heading
+            )
+          }
+          .width('100%').margin({ top: 8, bottom: 8 })
+
+          // 页脚
+          Column({ space: 8 }) {
+            Divider().color(this.currentBorderColor)
+            Text(this.legalOverlayDoc.footer)
+              .fontSize(12).fontColor(this.currentSecondaryTextColor)
+              .textAlign(TextAlign.Center).width('100%').padding({ top: 4 })
+          }
+          .width('100%')
+          .padding({ top: 16, bottom: 48, left: 24, right: 24 })
+        }
+        .width('100%')
+      }
+      .layoutWeight(1).scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring)
+    }
+    .width('100%').height('100%')
+    .backgroundColor(this.currentBgColor)
+    .transition(
+      TransitionEffect.translate({ x: '100%' })
+        .animation({ duration: 300, curve: Curve.EaseOut })
+    )
   }
 
   build() {
@@ -483,17 +637,35 @@ struct SettingsPage {
         }.layoutWeight(1).scrollBar(BarState.Off)
       }.width('100%').height('100%').backgroundColor(this.currentBgColor)
 
-      // 绑定 Toast 提示组件
+      // 颜色模式选择面板（页面内覆盖层，不使用 bindSheet）
+      if (this.showThemeSheet) {
+        // 半透明蒙层，点击关闭
+        Column()
+          .width('100%').height('100%')
+          .backgroundColor('rgba(0,0,0,0.45)')
+          .onClick(() => { this.showThemeSheet = false })
+
+        // 面板内容，固定在底部
+        Column() {
+          this.ThemeSheetContent()
+        }
+        .width('100%')
+        .alignSelf(ItemAlign.End)
+      }
+
+      // 协议全屏覆盖层（在 Stack 内渲染，不产生新路由层）
+      if (this.showLegalOverlay) {
+        this.LegalOverlay()
+      }
+
+      // Toast 始终在最上层
       ToastView({ message: this.toastMessage, visible: this.toastVisible })
     }
     .width('100%')
     .height('100%')
-    // 绑定原生颜色模式选择半模态弹窗
-    .bindSheet($$this.showThemeSheet, this.ThemeSheetBuilder(), {
-      height: SheetSize.FIT_CONTENT,
-      dragBar: false,
-      backgroundColor: Color.Transparent,
-      showClose: false
-    })
+    .alignContent(Alignment.Bottom)
   }
+
+  // SettingsPage 不定义 pageTransition，保持静止作为背景层
+  // LegalDocPage 负责独立滑入滑出，避免两层同时动造成"双页"视觉
 }

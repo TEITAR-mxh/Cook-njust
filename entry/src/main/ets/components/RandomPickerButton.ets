@@ -28,7 +28,7 @@ export struct RandomPickerButton {
       // 模拟盲盒动画(0.75s * 10轮 = 7.5秒)
       setTimeout(() => {
         // 这里应该由父组件提供随机逻辑
-        // 原型中是:1个肉类 + 2个蔬菜
+        // 父组件 IndexV2：一荤一素随机搭配
         this.isAnimating = false
         this.onRandomComplete!([])
       }, 750) // 简化版:直接完成

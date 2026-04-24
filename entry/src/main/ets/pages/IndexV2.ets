@@ -499,7 +499,7 @@ struct IndexV2 {
 
     const animationInterval = setInterval(() => {
       this.highlightedTags = new Set();
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 2; i++) {
         this.highlightedTags.add(allIngredients[Math.floor(Math.random() * allIngredients.length)]);
       }
       if (++round >= 10) {
@@ -511,10 +511,8 @@ struct IndexV2 {
 
         const m = meats[Math.floor(Math.random() * meats.length)];
         const v1 = vegs[Math.floor(Math.random() * vegs.length)];
-        let v2 = vegs[Math.floor(Math.random() * vegs.length)];
-        while (v2 === v1 && vegs.length > 1) v2 = vegs[Math.floor(Math.random() * vegs.length)];
 
-        this.selectedStuff = [m, v1, v2];
+        this.selectedStuff = [m, v1];
         this.isRandomizing = false;
         this.runSearch();
         void this.persistCookIfNeeded();

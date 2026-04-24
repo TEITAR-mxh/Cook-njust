@@ -27,7 +27,7 @@ function difficultyBg(d: Difficulty | '' | undefined): string {
 }
 
 /** 按下后移动超过该距离（vp）则视为滑动，松手不再打开详情 */
-const RECIPE_CARD_TAP_SLOP_VP: number = 5
+const RECIPE_CARD_TAP_SLOP_VP: number = 12
 
 @Component
 export struct RecipeCard {

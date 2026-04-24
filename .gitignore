@@ -16,3 +16,6 @@ debug_favorites.py
 fix_onlongpress.py
 .claude/
 tools/
+
+# 证书文件相关
+/build-profile.json5

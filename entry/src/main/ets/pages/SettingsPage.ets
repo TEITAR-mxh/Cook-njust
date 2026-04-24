@@ -146,7 +146,7 @@ struct SettingsPage {
   }
 
   private isImageUri(uri: string): boolean {
-    return uri.startsWith('file://') || uri.includes('filesDir')
+    return uri.startsWith('file://') || uri.startsWith('/')
   }
 
   /** @Watch 回调：系统深色状态变化（仅在系统默认模式下重算颜色） */
@@ -194,20 +194,17 @@ struct SettingsPage {
   private async copyImageToSandbox(sourceUri: string): Promise<string> {
     const host = this.getHostContext()
     if (!host) throw new Error('No host context')
-    const timestamp = new Date().getTime()
-    const targetPath = `${host.filesDir}/avatar_${timestamp}.jpg`
-    
+    const targetPath = `${host.filesDir}/avatar_${Date.now()}.jpg`
+
+    // HarmonyOS NEXT API 12+: fileIo.open 支持直接打开 datashare:// URI
+    const srcFile = await fileIo.open(sourceUri, fileIo.OpenMode.READ_ONLY)
     try {
-      let sourceFile = fileIo.openSync(sourceUri, fileIo.OpenMode.READ_ONLY)
-      let targetFile = fileIo.openSync(targetPath, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE)
-      fileIo.copyFileSync(sourceFile.fd, targetFile.fd)
-      fileIo.closeSync(sourceFile)
-      fileIo.closeSync(targetFile)
-      return targetPath
-    } catch (error) {
-      console.error('复制图片到沙箱失败:', error)
-      throw new Error(`复制图片到沙箱失败: ${error}`)
+      await fileIo.copyFile(srcFile.fd, targetPath)
+    } finally {
+      await fileIo.close(srcFile.fd)
     }
+    // Image() 加载本地沙箱文件必须使用 file:// 前缀，裸绝对路径不支持
+    return `file://${targetPath}`
   }
 
   private async onKeepLocalChange(isOn: boolean): Promise<void> {
@@ -240,7 +237,7 @@ struct SettingsPage {
 
   private confirmEditNickname(): void {
     if (this.tempNickname.trim().length > 0) {
-      this.userProfile.nickname = this.tempNickname.trim()
+      this.userProfile = { nickname: this.tempNickname.trim(), avatar: this.userProfile.avatar }
       void this.saveUserProfile()
     }
     this.isEditingNickname = false
@@ -253,7 +250,7 @@ struct SettingsPage {
   }
 
   private selectAvatar(avatar: string): void {
-    this.userProfile.avatar = avatar
+    this.userProfile = { nickname: this.userProfile.nickname, avatar: avatar }
     this.customAvatarUri = ''
     this.isEditingAvatar = false
     void this.saveUserProfile()
@@ -269,7 +266,7 @@ struct SettingsPage {
       if (result && result.photoUris.length > 0) {
         const sandboxUri = await this.copyImageToSandbox(result.photoUris[0])
         this.customAvatarUri = sandboxUri
-        this.userProfile.avatar = sandboxUri
+        this.userProfile = { nickname: this.userProfile.nickname, avatar: sandboxUri }
         this.isEditingAvatar = false
         void this.saveUserProfile()
       }
@@ -293,7 +290,9 @@ struct SettingsPage {
   @Builder
   buildAvatarDisplay() {
     if (this.customAvatarUri) {
-      Image(this.customAvatarUri).width(64).height(64).borderRadius(32)
+      Image(this.customAvatarUri)
+        .width(64).height(64).borderRadius(32)
+        .onError(() => { console.error(`头像加载失败: ${this.customAvatarUri}`) })
     } else {
       Text(this.userProfile.avatar).fontSize(32)
     }

@@ -36,7 +36,7 @@ const PRIVACY_DOC: LegalDocConfig = {
   sections: [
     {
       heading: '📌 开发者信息',
-      body: '“AUV 您吃了么”开发团队 (个人开发者: 孟晓菡)'
+      body: '“AUV 您吃了么”开发团队'
     },
     {
       heading: '一、我们收集的信息',
@@ -72,7 +72,7 @@ const PRIVACY_DOC: LegalDocConfig = {
     },
     {
       heading: '九、联系我们',
-      body: '开发与运营方：“AUV 您吃了么”开发团队 (个人开发者: 孟晓菡)\n\n• GitHub Issues：https://github.com/Ruheluobixieqing/Cook.git\n• 开发团队：南京理工大学 AUV 项目组\n\n我们承诺在收到请求后 15 个工作日内回复。'
+      body: '开发与运营方：“AUV 您吃了么”开发团队 \n\n• GitHub Issues：https://github.com/Ruheluobixieqing/Cook.git\n• 开发团队：南京理工大学 AUV 项目组\n\n我们承诺在收到请求后 15 个工作日内回复。'
     }
   ],
   footer: '© 2026 AUV 项目组 · 南京理工大学　保留所有权利'

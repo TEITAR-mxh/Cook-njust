@@ -26,6 +26,9 @@ function difficultyBg(d: Difficulty | '' | undefined): string {
   return AppColors.GRAY_100
 }
 
+/** 按下后移动超过该距离（vp）则视为滑动，松手不再打开详情 */
+const RECIPE_CARD_TAP_SLOP_VP: number = 5
+
 @Component
 export struct RecipeCard {
   @Prop recipe: RecipeWithId
@@ -36,6 +39,18 @@ export struct RecipeCard {
   onFavoriteClick?: () => void
 
   @State scaleValue: number = 1.0
+
+  private cardPointerDownX: number = 0
+  private cardPointerDownY: number = 0
+  private cardPointerDownValid: boolean = false
+  private cardPointerSlopExceeded: boolean = false
+
+  private cardTouchExceedsSlop(localX: number, localY: number): boolean {
+    const dx = localX - this.cardPointerDownX
+    const dy = localY - this.cardPointerDownY
+    const slop = RECIPE_CARD_TAP_SLOP_VP
+    return dx * dx + dy * dy > slop * slop
+  }
 
   /**
    * 获取菜品 Emoji(如果有)
@@ -306,12 +321,34 @@ export struct RecipeCard {
     // .height('100%')
     .onTouch((event) => {
       if (event.type === TouchType.Down) {
+        this.cardPointerDownValid = event.touches.length > 0
+        if (this.cardPointerDownValid) {
+          this.cardPointerDownX = event.touches[0].x
+          this.cardPointerDownY = event.touches[0].y
+        }
+        this.cardPointerSlopExceeded = false
         this.scaleValue = 0.98
+      } else if (event.type === TouchType.Move) {
+        if (this.cardPointerDownValid && event.touches.length > 0 &&
+          this.cardTouchExceedsSlop(event.touches[0].x, event.touches[0].y)) {
+          this.cardPointerSlopExceeded = true
+        }
       } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
         this.scaleValue = 1.0
-        if (event.type === TouchType.Up && this.onCardClick) {
-          this.onCardClick()
+        if (event.type === TouchType.Up && this.onCardClick && this.cardPointerDownValid) {
+          let treatAsTap = !this.cardPointerSlopExceeded
+          if (treatAsTap && event.changedTouches.length > 0) {
+            const t = event.changedTouches[0]
+            if (this.cardTouchExceedsSlop(t.x, t.y)) {
+              treatAsTap = false
+            }
+          }
+          if (treatAsTap) {
+            this.onCardClick()
+          }
         }
+        this.cardPointerDownValid = false
+        this.cardPointerSlopExceeded = false
       }
     })
     .hitTestBehavior(HitTestMode.Default) // 确保整个卡片区域都可点击

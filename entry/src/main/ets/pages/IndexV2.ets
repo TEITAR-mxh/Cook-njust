@@ -8,7 +8,7 @@ import { router } from '@kit.ArkUI';
 import { RecipeRepository } from '../data/RecipeRepository';
 import type { RecipeWithId, SearchMode, StuffItem } from '../model/recipe';
 import { RecipeSearchService } from '../service/RecipeSearchService';
-import { CookPreferences, type UserProfile } from '../store/CookPreferences';
+import { CookPreferences, UserProfile, FolderItem } from '../store/CookPreferences';
 import { getSystemSafeTopVp } from '../util/StatusBarInset';
 import { AppColors, ThemeManager } from '../constants/AppColors';
 import { IngredientTag, TagType } from '../components/IngredientTag';
@@ -16,7 +16,9 @@ import { ToastView } from '../components/ToastView';
 import { RandomPickerButton } from '../components/RandomPickerButton';
 import { RecipeDetailSheet } from '../components/RecipeDetailSheet';
 import { PlateCard } from '../components/PlateCard';
-import { RecipeCard, RecipeCardMode } from '../components/RecipeCard';
+import { RecipeCard, RecipeCardMode } from '../components/RecipeCard'
+import { FavoriteToast } from '../components/FavoriteToast'
+import { FolderPickerSheet } from '../components/FolderPickerSheet';
 
 // 引入统一管理的食材与厨具全库
 import { meatItems, stapleItems, toolItems, vegetableItems } from '../data/foodCatalog';
@@ -66,6 +68,17 @@ struct IndexV2 {
   @State isRandomizing: boolean = false
   @State highlightedTags: Set<string> = new Set()
   @State tabOpacity: number = 1.0
+
+  // 收藏夹相关状态
+  @State mySubTab: number = 0
+  @State folders: FolderItem[] = []
+  private myTabScroller: Scroller = new Scroller()
+  @State favoriteToastVisible: boolean = false
+  @State pendingFolderRecipeId: number = -1
+  @State folderPickerVisible: boolean = false
+  @State deleteFolderConfirmVisible: boolean = false
+  @State pendingDeleteFolderId: string = ''
+  @State pendingDeleteFolderName: string = ''
 
   @State randomAnimationNames: string[] = []
   @State currentRandomIndex: number = 0
@@ -127,6 +140,7 @@ struct IndexV2 {
   onPageShow(): void {
     void this.refreshHistory();
     void this.refreshFavorites();
+    void this.refreshFolders();
     void this.refreshUserProfile();
 
     // 页面从后台恢复时立即重算颜色：
@@ -222,32 +236,79 @@ struct IndexV2 {
 
   private onTapFavorite(recipeId: number): void {
     console.log(`[收藏] onTapFavorite 被调用，菜谱ID: ${recipeId}`);
-    
+
     if (!this.keepLocalData) {
       console.log('[收藏] 本地数据存储已关闭，无法收藏');
       this.showToast('请开启本地数据存储以使用收藏功能');
       return;
     }
-    
+
     const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
     if (!host) {
       console.error('[收藏] 无法获取UIAbility上下文');
       this.showToast('系统错误：无法获取应用上下文');
       return;
     }
-    
-    console.log(`[收藏] 开始切换收藏状态，菜谱ID: ${recipeId}`);
-    
+
+    const wasFavorite = this.isRecipeFavorite(recipeId);
+    console.log(`[收藏] 开始切换收藏状态，菜谱ID: ${recipeId}，当前状态: ${wasFavorite ? '已收藏' : '未收藏'}`);
+
     void CookPreferences.toggleFavoriteId(host, recipeId).then(async () => {
       console.log(`[收藏] 数据存储成功，菜谱ID: ${recipeId}`);
       await this.refreshFavorites();
-      const isNowFavorite = this.isRecipeFavorite(recipeId);
-      console.log(`[收藏] 刷新后状态: ${isNowFavorite ? '已收藏' : '未收藏'}`);
-      this.showToast(isNowFavorite ? '已添加至收藏' : '已取消收藏');
+      if (wasFavorite) {
+        // toggleFavoriteId 已内联处理收藏夹移除，这里只需刷新 UI
+        await this.refreshFolders();
+        this.showToast('已取消收藏');
+      } else {
+        // 新增收藏：弹出收藏夹选择器
+        this.pendingFolderRecipeId = recipeId;
+        this.favoriteToastVisible = false;
+        setTimeout(() => { this.favoriteToastVisible = true; }, 50);
+      }
     }).catch((error: Error) => {
       console.error(`[收藏] 数据存储失败，菜谱ID: ${recipeId}`, error);
       this.showToast('收藏操作失败，请重试');
     });
+  }
+
+  private async refreshFolders(): Promise<void> {
+    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    if (!host) return;
+    try {
+      this.folders = await CookPreferences.getFolders(host);
+    } catch { }
+  }
+
+  private async onAddToFolder(folderId: string): Promise<void> {
+    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    if (!host || this.pendingFolderRecipeId < 0) return;
+    await CookPreferences.addRecipeToFolder(host, folderId, this.pendingFolderRecipeId);
+    await this.refreshFolders();
+    this.folderPickerVisible = false;
+    this.showToast('已加入收藏夹');
+  }
+
+  private async onCreateAndAddToFolder(name: string): Promise<void> {
+    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    if (!host || this.pendingFolderRecipeId < 0) return;
+    const folder = await CookPreferences.createFolder(host, name);
+    await CookPreferences.addRecipeToFolder(host, folder.id, this.pendingFolderRecipeId);
+    await this.refreshFolders();
+    this.folderPickerVisible = false;
+    this.showToast('已创建收藏夹并加入');
+  }
+
+  private async onConfirmDeleteFolder(): Promise<void> {
+    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    if (!host || !this.pendingDeleteFolderId) return;
+    await CookPreferences.deleteFolder(host, this.pendingDeleteFolderId);
+    await this.refreshFolders();
+    await this.refreshFavorites();
+    this.deleteFolderConfirmVisible = false;
+    this.pendingDeleteFolderId = '';
+    this.pendingDeleteFolderName = '';
+    this.showToast('收藏夹已删除');
   }
 
   private async refreshHistory(): Promise<void> {
@@ -847,8 +908,9 @@ struct IndexV2 {
   buildMyTab() {
     Stack() {
       Column().width('100%').height('100%').backgroundColor(this.getBackgroundColor())
-      Scroll() {
+      Scroll(this.myTabScroller) {
         Column({ space: 0 }) {
+          // 用户信息头部
           Row() {
             Row({ space: 16 }) {
               Column() { Text(this.userProfile.nickname.charAt(0)).fontSize(20).fontWeight(FontWeight.Bold).fontColor(this.currentSecondaryTextColor) }
@@ -871,43 +933,157 @@ struct IndexV2 {
                 console.error(`路由跳转 SettingsPage 失败: ${e.message}`);
               })
             })
-          }.width('100%').padding({ left: 24, right: 24, top: 16, bottom: 24 })
+          }.width('100%').padding({ left: 24, right: 24, top: 16, bottom: 16 })
 
-          if (this.favoriteIds.length > 0) {
-            Column({ space: 48 }) {
-              Row() {
-                Text('珍藏菜肴').fontSize(14).fontColor(this.currentSecondaryTextColor).layoutWeight(1)
-                if (this.favoriteIds.length > 6) {
-                  Row({ space: 4 }) { Text(`全部`).fontSize(13).fontColor(AppColors.BRAND_COLOR); SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor([AppColors.BRAND_COLOR]) }
-                  .onClick(() => {
-                    router.pushUrl({ url: 'pages/FavoritesPage' }).catch((e: Error) => {
-                      console.error(`路由跳转 FavoritesPage 失败: ${e.message}`);
-                    })
-                  })
-                }
-              }.width('100%').padding({ left: 24, right: 24 })
-              GridRow({ columns: 2, gutter: { x: 24, y: 48 } }) {
-                ForEach(this.favoriteIds.slice(0, 6), (recipeId: number, index: number) => {
-                  GridCol({ span: 1 }) {
-                    Column() {
-                      PlateCard({
-                        dishName: RecipeRepository.getInstance().getById(recipeId)?.name || '未知菜品',
-                        emoji: RecipeRepository.getInstance().getById(recipeId)?.emojis?.[0] || '🍽️',
-                        onPlateClick: () => {
-                          const r = RecipeRepository.getInstance().getById(recipeId);
-                          if (r) this.openDetailSheet(r);
-                        }
-                      })
-                    }.margin({ top: index % 2 === 1 ? 48 : 0 })
-                  }
-                }, (id: number) => `plate-${id}`)
-              }.width('100%').padding({ left: 24, right: 24 })
+          // 子 Tab 切换：珍藏菜肴 / 我的收藏夹
+          Row({ space: 0 }) {
+            Column({ space: 4 }) {
+              Text('珍藏菜肴')
+                .fontSize(15)
+                .fontWeight(this.mySubTab === 0 ? FontWeight.Bold : FontWeight.Medium)
+                .fontColor(this.mySubTab === 0 ? this.currentTextColor : this.currentSecondaryTextColor)
+              Column()
+                .width(this.mySubTab === 0 ? 24 : 0)
+                .height(3)
+                .backgroundColor(AppColors.BRAND_COLOR)
+                .borderRadius(2)
+                .animation({ duration: 200, curve: Curve.EaseOut })
             }
-          } else {
-            Column({ space: 12 }) {
-              SymbolGlyph($r('sys.symbol.info_circle')).fontSize(48).fontColor([this.currentBorderColor])
-              Text('餐桌还空着呢').fontSize(16).fontColor(this.currentSecondaryTextColor).fontWeight(FontWeight.Medium)
-            }.width('100%').margin({ top: 80 })
+            .layoutWeight(1)
+            .alignItems(HorizontalAlign.Center)
+            .padding({ top: 4, bottom: 12 })
+            .onClick(() => { this.mySubTab = 0; this.myTabScroller.scrollTo({ xOffset: 0, yOffset: 0 }) })
+
+            Column({ space: 4 }) {
+              Text('我的收藏夹')
+                .fontSize(15)
+                .fontWeight(this.mySubTab === 1 ? FontWeight.Bold : FontWeight.Medium)
+                .fontColor(this.mySubTab === 1 ? this.currentTextColor : this.currentSecondaryTextColor)
+              Column()
+                .width(this.mySubTab === 1 ? 24 : 0)
+                .height(3)
+                .backgroundColor(AppColors.BRAND_COLOR)
+                .borderRadius(2)
+                .animation({ duration: 200, curve: Curve.EaseOut })
+            }
+            .layoutWeight(1)
+            .alignItems(HorizontalAlign.Center)
+            .padding({ top: 4, bottom: 12 })
+            .onClick(() => { this.mySubTab = 1; this.myTabScroller.scrollTo({ xOffset: 0, yOffset: 0 }) })
+          }
+          .width('100%')
+          .padding({ left: 24, right: 24 })
+          .borderWidth({ bottom: 0.5 })
+          .borderColor(this.currentBorderColor)
+
+          // 珍藏菜肴内容
+          if (this.mySubTab === 0) {
+            if (this.favoriteIds.length > 0) {
+              Column({ space: 48 }) {
+                Row() {
+                  Text('珍藏菜肴').fontSize(14).fontColor(this.currentSecondaryTextColor).layoutWeight(1)
+                  if (this.favoriteIds.length > 6) {
+                    Row({ space: 4 }) { Text(`全部`).fontSize(13).fontColor(AppColors.BRAND_COLOR); SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor([AppColors.BRAND_COLOR]) }
+                    .onClick(() => {
+                      router.pushUrl({ url: 'pages/FavoritesPage' }).catch((e: Error) => {
+                        console.error(`路由跳转 FavoritesPage 失败: ${e.message}`);
+                      })
+                    })
+                  }
+                }.width('100%').padding({ left: 24, right: 24 })
+                GridRow({ columns: 2, gutter: { x: 24, y: 48 } }) {
+                  ForEach(this.favoriteIds.slice(0, 6), (recipeId: number, index: number) => {
+                    GridCol({ span: 1 }) {
+                      Column() {
+                        PlateCard({
+                          dishName: RecipeRepository.getInstance().getById(recipeId)?.name || '未知菜品',
+                          emoji: RecipeRepository.getInstance().getById(recipeId)?.emojis?.[0] || '🍽️',
+                          onPlateClick: () => {
+                            const r = RecipeRepository.getInstance().getById(recipeId);
+                            if (r) this.openDetailSheet(r);
+                          }
+                        })
+                      }.margin({ top: index % 2 === 1 ? 48 : 0 })
+                    }
+                  }, (id: number) => `plate-${id}`)
+                }.width('100%').padding({ left: 24, right: 24 })
+              }.margin({ top: 20 })
+            } else {
+              Column({ space: 12 }) {
+                SymbolGlyph($r('sys.symbol.info_circle')).fontSize(48).fontColor([this.currentBorderColor])
+                Text('餐桌还空着呢').fontSize(16).fontColor(this.currentSecondaryTextColor).fontWeight(FontWeight.Medium)
+              }.width('100%').margin({ top: 80 })
+            }
+          }
+
+          // 我的收藏夹内容
+          if (this.mySubTab === 1) {
+            Column({ space: 0 }) {
+              // 创建新收藏夹按钮
+              Row({ space: 10 }) {
+                Text('+').fontSize(20).fontColor(AppColors.BRAND_COLOR).fontWeight(FontWeight.Bold)
+                Text('创建新收藏夹').fontSize(15).fontColor(AppColors.BRAND_COLOR).fontWeight(FontWeight.Medium)
+              }
+              .width('100%')
+              .padding({ left: 20, right: 20, top: 14, bottom: 14 })
+              .backgroundColor(this.currentCardBgColor)
+              .borderRadius(14)
+              .margin({ top: 16, left: 16, right: 16 })
+              .onClick(() => {
+                router.pushUrl({ url: 'pages/CreateFolderPage' }).catch((e: Error) => {
+                  console.error(`路由跳转 CreateFolderPage 失败: ${e.message}`);
+                })
+              })
+
+              if (this.folders.length === 0) {
+                Column({ space: 10 }) {
+                  Text('📂').fontSize(48)
+                  Text('还没有收藏夹').fontSize(15).fontColor(this.currentSecondaryTextColor)
+                  Text('创建收藏夹来整理你的菜谱吧').fontSize(13).fontColor(this.currentBorderColor)
+                }.width('100%').margin({ top: 60 }).alignItems(HorizontalAlign.Center)
+              } else {
+                Column({ space: 12 }) {
+                  ForEach(this.folders, (folder: FolderItem) => {
+                    Row({ space: 14 }) {
+                      Text('📁').fontSize(32)
+                      Column({ space: 3 }) {
+                        Text(folder.name)
+                          .fontSize(16)
+                          .fontColor(this.currentTextColor)
+                          .fontWeight(FontWeight.Medium)
+                          .maxLines(1)
+                          .textOverflow({ overflow: TextOverflow.Ellipsis })
+                        Text(`${folder.recipeIds.length} 道菜`)
+                          .fontSize(13)
+                          .fontColor(this.currentSecondaryTextColor)
+                      }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+
+                      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([this.currentBorderColor])
+
+                      // 删除按钮
+                      Text('🗑️')
+                        .fontSize(18)
+                        .padding({ left: 8, right: 4, top: 4, bottom: 4 })
+                        .hitTestBehavior(HitTestMode.Block)
+                        .onClick(() => {
+                          this.pendingDeleteFolderId = folder.id;
+                          this.pendingDeleteFolderName = folder.name;
+                          this.deleteFolderConfirmVisible = true;
+                        })
+                    }
+                    .width('100%')
+                    .padding({ left: 20, right: 20, top: 16, bottom: 16 })
+                    .backgroundColor(this.currentCardBgColor)
+                    .borderRadius(14)
+                    .onClick(() => {
+                      router.pushUrl({ url: 'pages/FolderDetailPage', params: { folderId: folder.id } }).catch((e: Error) => {
+                        console.error(`路由跳转 FolderDetailPage 失败: ${e.message}`);
+                      })
+                    })
+                  }, (f: FolderItem) => `folder-${f.id}`)
+                }.width('100%').padding({ left: 16, right: 16, top: 12 })
+              }
+            }
           }
         }.width('100%').padding({ bottom: 120 })
       }.width('100%').height('100%').scrollBar(BarState.Off)
@@ -977,6 +1153,112 @@ struct IndexV2 {
       .backgroundColor(this.getBackgroundColor())
 
       ToastView({ message: this.toastMessage, visible: this.toastVisible })
+
+      // 收藏成功底部弹窗（固定在导航栏上方）
+      Column() {
+        FavoriteToast({
+          visible: this.favoriteToastVisible,
+          onAddToFolder: () => {
+            this.favoriteToastVisible = false;
+            this.folderPickerVisible = true;
+          }
+        })
+      }
+      .width('100%')
+      .padding({ left: 16, right: 16, bottom: 80 })
+      .position({ x: 0, y: '100%' })
+      .markAnchor({ x: 0, y: '100%' })
+      .zIndex(9997)
+      .hitTestBehavior(this.favoriteToastVisible ? HitTestMode.Default : HitTestMode.Transparent)
+
+      // 收藏夹选择覆盖层
+      if (this.folderPickerVisible) {
+        Stack() {
+          // 半透明遮罩
+          Column()
+            .width('100%')
+            .height('100%')
+            .backgroundColor('rgba(0,0,0,0.4)')
+            .onClick(() => { this.folderPickerVisible = false })
+
+          // 底部弹出面板
+          Column() {
+            FolderPickerSheet({
+              folders: this.folders,
+              onAddToFolder: (folderId: string) => { void this.onAddToFolder(folderId) },
+              onCreateAndAdd: (name: string) => { void this.onCreateAndAddToFolder(name) },
+              onClose: () => { this.folderPickerVisible = false }
+            })
+          }
+          .width('100%')
+          .height(420)
+          .position({ x: 0, y: '100%' })
+          .markAnchor({ x: 0, y: '100%' })
+        }
+        .width('100%')
+        .height('100%')
+        .zIndex(9999)
+      }
+
+      // 删除收藏夹确认弹窗
+      if (this.deleteFolderConfirmVisible) {
+        Stack() {
+          Column()
+            .width('100%')
+            .height('100%')
+            .backgroundColor('rgba(0,0,0,0.5)')
+            .onClick(() => {
+              this.deleteFolderConfirmVisible = false;
+            })
+
+          Column({ space: 0 }) {
+            Text('删除收藏夹')
+              .fontSize(17)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#1F2937')
+              .padding({ top: 24, bottom: 8 })
+
+            Text(`确定删除「${this.pendingDeleteFolderName}」？\n收藏夹内的菜谱将全部取消收藏。`)
+              .fontSize(14)
+              .fontColor('#6B7280')
+              .textAlign(TextAlign.Center)
+              .padding({ left: 24, right: 24, bottom: 24 })
+
+            Divider().color('#F3F4F6').strokeWidth(1)
+
+            Row() {
+              Text('取消')
+                .fontSize(16)
+                .fontColor('#6B7280')
+                .layoutWeight(1)
+                .textAlign(TextAlign.Center)
+                .padding({ top: 16, bottom: 16 })
+                .onClick(() => {
+                  this.deleteFolderConfirmVisible = false;
+                })
+
+              Divider().vertical(true).height(48).color('#F3F4F6').strokeWidth(1)
+
+              Text('删除')
+                .fontSize(16)
+                .fontColor('#EF4444')
+                .fontWeight(FontWeight.Medium)
+                .layoutWeight(1)
+                .textAlign(TextAlign.Center)
+                .padding({ top: 16, bottom: 16 })
+                .onClick(() => {
+                  void this.onConfirmDeleteFolder();
+                })
+            }.width('100%')
+          }
+          .width('80%')
+          .backgroundColor(Color.White)
+          .borderRadius(16)
+        }
+        .width('100%')
+        .height('100%')
+        .zIndex(10000)
+      }
 
     }
     .width('100%')

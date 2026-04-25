@@ -20,6 +20,14 @@ export interface ThemeSettings {
   themeMode: string // '系统默认' | '浅色模式' | '深色模式'
 }
 
+/** 收藏夹 */
+export interface FolderItem {
+  id: string
+  name: string
+  recipeIds: number[]
+  createdAt: number
+}
+
 const DEFAULT_SETTINGS: UserSettings = { keepLocalData: true };
 const DEFAULT_PROFILE: UserProfile = { nickname: '美食家', avatar: '👨' };
 const DEFAULT_THEME: ThemeSettings = { themeMode: '系统默认' };
@@ -52,6 +60,7 @@ export class CookPreferenceKeys {
   static readonly HISTORY: string = 'history'
   static readonly PRIVACY_ACCEPTED: string = 'privacy_accepted'
   static readonly THEME_CHANGE_TIMESTAMP: string = 'theme_change_timestamp'
+  static readonly FOLDERS: string = 'folders'
 }
 
 /**
@@ -264,6 +273,23 @@ export class CookPreferences {
     let next: number[];
     if (had) {
       next = rest;
+      // 取消收藏时，同步从所有收藏夹移除
+      const folders = await CookPreferences.getFolders(context);
+      let changed = false;
+      for (let i = 0; i < folders.length; i++) {
+        const kept: number[] = [];
+        for (let j = 0; j < folders[i].recipeIds.length; j++) {
+          if (folders[i].recipeIds[j] !== recipeId) {
+            kept.push(folders[i].recipeIds[j]);
+          } else {
+            changed = true;
+          }
+        }
+        folders[i].recipeIds = kept;
+      }
+      if (changed) {
+        await CookPreferences.setFolders(context, folders);
+      }
     } else {
       const withNew: number[] = [recipeId];
       for (let j = 0; j < rest.length; j++) {
@@ -282,6 +308,18 @@ export class CookPreferences {
   static async clearFavorites(context: common.Context): Promise<void> {
     const p = await CookPreferences.getStore(context);
     await p.put(CookPreferenceKeys.FAVORITES, '[]');
+    // 同步清空所有收藏夹内的菜谱
+    const folders = await CookPreferences.getFolders(context);
+    let changed = false;
+    for (let i = 0; i < folders.length; i++) {
+      if (folders[i].recipeIds.length > 0) {
+        folders[i].recipeIds = [];
+        changed = true;
+      }
+    }
+    if (changed) {
+      await p.put(CookPreferenceKeys.FOLDERS, JSON.stringify(folders));
+    }
     await p.flush();
   }
 
@@ -402,5 +440,123 @@ export class CookPreferences {
     const p = await CookPreferences.getStore(context);
     await p.put(CookPreferenceKeys.THEME_CHANGE_TIMESTAMP, timestamp);
     await p.flush();
+  }
+
+  // ─── 收藏夹 ───────────────────────────────────────────────
+
+  static async getFolders(context: common.Context): Promise<FolderItem[]> {
+    const p = await CookPreferences.getStore(context);
+    const raw = CookPreferences.getSettingsString(await p.get(CookPreferenceKeys.FOLDERS, ''));
+    if (raw.length === 0) return [];
+    try {
+      const v = JSON.parse(raw) as FolderItem[];
+      return Array.isArray(v) ? v : [];
+    } catch {
+      return [];
+    }
+  }
+
+  static async setFolders(context: common.Context, folders: FolderItem[]): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.FOLDERS, JSON.stringify(folders));
+    await p.flush();
+  }
+
+  static async createFolder(context: common.Context, name: string): Promise<FolderItem> {
+    const folders = await CookPreferences.getFolders(context);
+    const folder: FolderItem = {
+      id: Date.now().toString(),
+      name: name.trim() || '新收藏夹',
+      recipeIds: [],
+      createdAt: Date.now()
+    };
+    folders.push(folder);
+    await CookPreferences.setFolders(context, folders);
+    return folder;
+  }
+
+  static async addRecipeToFolder(context: common.Context, folderId: string, recipeId: number): Promise<void> {
+    const folders = await CookPreferences.getFolders(context);
+    for (let i = 0; i < folders.length; i++) {
+      if (folders[i].id === folderId) {
+        if (!folders[i].recipeIds.includes(recipeId)) {
+          const newIds: number[] = [recipeId];
+          for (let j = 0; j < folders[i].recipeIds.length; j++) {
+            newIds.push(folders[i].recipeIds[j]);
+          }
+          folders[i].recipeIds = newIds;
+        }
+        break;
+      }
+    }
+    await CookPreferences.setFolders(context, folders);
+  }
+
+  static async removeRecipeFromFolder(context: common.Context, folderId: string, recipeId: number): Promise<void> {
+    const folders = await CookPreferences.getFolders(context);
+    for (let i = 0; i < folders.length; i++) {
+      if (folders[i].id === folderId) {
+        const kept: number[] = [];
+        for (let j = 0; j < folders[i].recipeIds.length; j++) {
+          if (folders[i].recipeIds[j] !== recipeId) {
+            kept.push(folders[i].recipeIds[j]);
+          }
+        }
+        folders[i].recipeIds = kept;
+        break;
+      }
+    }
+    await CookPreferences.setFolders(context, folders);
+  }
+
+  static async removeRecipeFromAllFolders(context: common.Context, recipeId: number): Promise<void> {
+    const folders = await CookPreferences.getFolders(context);
+    let changed = false;
+    for (let i = 0; i < folders.length; i++) {
+      const kept: number[] = [];
+      for (let j = 0; j < folders[i].recipeIds.length; j++) {
+        if (folders[i].recipeIds[j] !== recipeId) {
+          kept.push(folders[i].recipeIds[j]);
+        } else {
+          changed = true;
+        }
+      }
+      folders[i].recipeIds = kept;
+    }
+    if (changed) {
+      await CookPreferences.setFolders(context, folders);
+    }
+  }
+
+  static async deleteFolder(context: common.Context, folderId: string): Promise<void> {
+    const folders = await CookPreferences.getFolders(context);
+    // 找到要删除的收藏夹，取消其中所有菜的收藏
+    let recipeIdsToUnfavorite: number[] = [];
+    const remaining: FolderItem[] = [];
+    for (let i = 0; i < folders.length; i++) {
+      if (folders[i].id === folderId) {
+        recipeIdsToUnfavorite = folders[i].recipeIds;
+      } else {
+        remaining.push(folders[i]);
+      }
+    }
+    await CookPreferences.setFolders(context, remaining);
+    if (recipeIdsToUnfavorite.length > 0) {
+      const prev = await CookPreferences.getFavoriteIds(context);
+      const next: number[] = [];
+      for (let i = 0; i < prev.length; i++) {
+        let inFolder = false;
+        for (let j = 0; j < recipeIdsToUnfavorite.length; j++) {
+          if (prev[i] === recipeIdsToUnfavorite[j]) {
+            inFolder = true;
+            break;
+          }
+        }
+        if (!inFolder) {
+          next.push(prev[i]);
+        }
+      }
+      await CookPreferences.setFavoriteIds(context, next);
+    }
   }
 }

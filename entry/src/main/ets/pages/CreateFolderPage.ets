@@ -25,7 +25,7 @@ struct CreateFolderPage {
     const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined
     if (!host) { this.saving = false; return }
     await CookPreferences.createFolder(host, name)
-    router.back()
+    this.getUIContext().getRouter().back()
   }
 
   build() {
@@ -36,7 +36,7 @@ struct CreateFolderPage {
           .fontSize(16)
           .fontColor(AppColors.GRAY_600)
           .padding({ left: 20, right: 16, top: 10, bottom: 10 })
-          .onClick(() => router.back())
+          .onClick(() => this.getUIContext().getRouter().back())
 
         Text('新建收藏夹')
           .fontSize(18)

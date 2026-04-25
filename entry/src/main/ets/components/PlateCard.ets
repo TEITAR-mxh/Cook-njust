@@ -9,82 +9,69 @@ import { AppColors } from '../constants/AppColors'
 export struct PlateCard {
   @Prop dishName: string = ''
   @Prop emoji: string = '🍽️'
+  @Prop isFavorite: boolean = true
   onPlateClick?: () => void
+  onFavoriteClick?: () => void
 
   @State scaleValue: number = 1.0
   @State translateY: number = 0
 
   build() {
-    Column({ space: 12 }) {
-      // 外层盘子(plate-ui) - 添加默认占位图片
+    Column({ space: 10 }) {
+      // 盘子主体
       Stack({ alignContent: Alignment.Center }) {
-        // 内层盘沿(plate-inner)
+        // 内层盘沿
         Column()
-          .width('85%')
-          .height('85%')
+          .width('82%')
+          .height('82%')
           .borderRadius(1000)
           .backgroundColor(Color.White)
           .borderWidth(1)
-          .borderColor('rgba(240, 235, 230, 0.5)')
-          .shadow({
-            radius: 15,
-            color: 'rgba(0,0,0,0.04)',
-            offsetX: 0,
-            offsetY: 6
-          })
+          .borderColor('rgba(240, 235, 230, 0.6)')
+          .shadow({ radius: 12, color: 'rgba(0,0,0,0.05)', offsetX: 0, offsetY: 4 })
 
-        // 默认占位图片区域
-        Text('🍽️')
-          .fontSize(36)
-          .fontColor(AppColors.GRAY_400)
-          .opacity(0.3)
+        // 菜品 emoji
+        Text(this.emoji)
+          .fontSize(48)
+
+        // 收藏星标（右上角）
+        Text(this.isFavorite ? '★' : '☆')
+          .fontSize(14)
+          .fontColor(this.isFavorite ? '#F59E0B' : AppColors.GRAY_300)
+          .backgroundColor('rgba(255,255,255,0.9)')
+          .borderRadius(100)
+          .padding(4)
+          .position({ x: '62%', y: '4%' })
+          .hitTestBehavior(HitTestMode.Block)
+          .onClick(() => {
+            if (this.onFavoriteClick) this.onFavoriteClick()
+          })
       }
-      .width(140)
-      .height(140)
+      .width(130)
+      .height(130)
       .borderRadius(1000)
       .backgroundColor(Color.White)
-      .shadow({
-        radius: 35,
-        color: 'rgba(139, 126, 110, 0.2)',
-        offsetX: 0,
-        offsetY: 15
-      })
+      .shadow({ radius: 30, color: 'rgba(139, 126, 110, 0.18)', offsetX: 0, offsetY: 12 })
       .scale({ x: this.scaleValue, y: this.scaleValue })
       .translate({ y: this.translateY })
-      .animation({
-        duration: 300,
-        curve: Curve.Sharp
-      })
+      .animation({ duration: 280, curve: Curve.Sharp })
 
-      // 菜品标签(plate-label) - 文字居中
+      // 菜名标签
       Text(this.dishName)
-        .fontSize(13)
+        .fontSize(12)
         .fontColor('#5C5042')
-        .fontWeight(FontWeight.Bold)
+        .fontWeight(FontWeight.Medium)
         .textAlign(TextAlign.Center)
         .maxLines(2)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .width('100%')
-        .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-        .backgroundColor('rgba(255,255,255,0.85)')
-        .borderRadius(100)
-        .borderWidth(0.5)
-        .borderColor('rgba(255,255,255,0.5)')
-        .shadow({
-          radius: 12,
-          color: 'rgba(139, 126, 110, 0.1)',
-          offsetX: 0,
-          offsetY: 4
-        })
-        .backgroundBlurStyle(BlurStyle.Thin)
+        .width(120)
     }
-    .width(140)
+    .width(130)
     .alignItems(HorizontalAlign.Center)
     .onTouch((event) => {
       if (event.type === TouchType.Down) {
-        // 原型中的 :active 效果
-        this.scaleValue = 0.92
-        this.translateY = 4
+        this.scaleValue = 0.93
+        this.translateY = 3
       } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
         this.scaleValue = 1.0
         this.translateY = 0

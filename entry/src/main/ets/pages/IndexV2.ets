@@ -15,8 +15,8 @@ import { IngredientTag, TagType } from '../components/IngredientTag';
 import { ToastView } from '../components/ToastView';
 import { RandomPickerButton } from '../components/RandomPickerButton';
 import { RecipeDetailSheet } from '../components/RecipeDetailSheet';
-import { PlateCard } from '../components/PlateCard';
 import { RecipeCard, RecipeCardMode } from '../components/RecipeCard'
+import { PlateCard } from '../components/PlateCard'
 import { FavoriteToast } from '../components/FavoriteToast'
 import { FolderPickerSheet } from '../components/FolderPickerSheet';
 
@@ -58,6 +58,7 @@ struct IndexV2 {
   @State discoverPick: RecipeWithId = { id: -1, name: '', stuff: [], tools: [], steps: [] }
   @State historyIds: number[] = []
   @State favoriteIds: number[] = []
+  @State myFavoriteRecipes: RecipeWithId[] = []
   @State mainNavTopInsetVp: number = 48
   @State userProfile: UserProfile = { nickname: '美食家', avatar: '🧑‍🍳' }
 
@@ -207,8 +208,8 @@ struct IndexV2 {
     const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
     if (!host || !this.keepLocalData) {
       if (!this.keepLocalData) {
-        console.log('[收藏] 本地数据存储已关闭，清空收藏列表');
         this.favoriteIds = [];
+        this.myFavoriteRecipes = [];
       }
       return;
     }
@@ -221,13 +222,14 @@ struct IndexV2 {
       
       console.log(`[收藏] 从存储获取: ${raw.length} 条，过滤后: ${filteredIds.length} 条`);
       
-      // 检查是否有变化，避免不必要的状态更新
-      if (JSON.stringify(this.favoriteIds) !== JSON.stringify(filteredIds)) {
-        this.favoriteIds = filteredIds;
-        console.log('[收藏] 收藏列表已更新');
-      } else {
-        console.log('[收藏] 收藏列表无变化');
+      this.favoriteIds = filteredIds;
+      const repo = RecipeRepository.getInstance();
+      const recipeList: RecipeWithId[] = [];
+      for (let i = 0; i < filteredIds.length; i++) {
+        const r = repo.getById(filteredIds[i]);
+        if (r !== null) recipeList.push(r);
       }
+      this.myFavoriteRecipes = recipeList;
     } catch (error) {
       console.error('[收藏] 刷新收藏列表失败', error);
       this.favoriteIds = [];
@@ -263,8 +265,14 @@ struct IndexV2 {
       } else {
         // 新增收藏：弹出收藏夹选择器
         this.pendingFolderRecipeId = recipeId;
-        this.favoriteToastVisible = false;
-        setTimeout(() => { this.favoriteToastVisible = true; }, 50);
+        if (this.detailSheetVisible) {
+          // 详情页内触发：直接在详情页内部显示收藏夹选择器（跳过 Toast，Toast 在系统弹层后看不到）
+          this.folderPickerVisible = true;
+        } else {
+          // 卡片星标触发：先显示 Toast，点"加入收藏夹"再打开选择器
+          this.favoriteToastVisible = false;
+          setTimeout(() => { this.favoriteToastVisible = true; }, 50);
+        }
       }
     }).catch((error: Error) => {
       console.error(`[收藏] 数据存储失败，菜谱ID: ${recipeId}`, error);
@@ -330,6 +338,10 @@ struct IndexV2 {
     try {
       this.userProfile = await CookPreferences.getUserProfile(host);
     } catch { }
+  }
+
+  private isAvatarImage(avatar: string): boolean {
+    return avatar.startsWith('file://') || avatar.startsWith('/');
   }
 
   /**
@@ -905,186 +917,258 @@ struct IndexV2 {
   }
 
   @Builder
+  MySectionHeader(title: string, count: number, actionLabel: string, onAction: () => void) {
+    Row() {
+      Row({ space: 8 }) {
+        Text(title)
+          .fontSize(16).fontWeight(FontWeight.Bold).fontColor(this.currentTextColor)
+        if (count > 0) {
+          Text(`${count}`)
+            .fontSize(11).fontColor(AppColors.BRAND_COLOR)
+            .padding({ left: 7, right: 7, top: 2, bottom: 2 })
+            .backgroundColor(AppColors.BRAND_COLOR_LIGHT)
+            .borderRadius(100)
+        }
+      }
+      if (actionLabel.length > 0) {
+        Row({ space: 3 }) {
+          Text(actionLabel).fontSize(13).fontColor(AppColors.BRAND_COLOR)
+          SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(12).fontColor([AppColors.BRAND_COLOR])
+        }.onClick(onAction)
+      }
+    }
+    .width('100%').justifyContent(FlexAlign.SpaceBetween)
+    .padding({ left: 20, right: 20, top: 24, bottom: 12 })
+  }
+
+  @Builder
   buildMyTab() {
     Stack() {
       Column().width('100%').height('100%').backgroundColor(this.getBackgroundColor())
       Scroll(this.myTabScroller) {
         Column({ space: 0 }) {
-          // 用户信息头部
-          Row() {
-            Row({ space: 16 }) {
-              Column() { Text(this.userProfile.nickname.charAt(0)).fontSize(20).fontWeight(FontWeight.Bold).fontColor(this.currentSecondaryTextColor) }
-              .width(48).height(48).borderRadius(24).backgroundColor(this.currentBorderColor)
-              .justifyContent(FlexAlign.Center)
 
-              Column({ space: 2 }) {
-                Text(this.userProfile.nickname).fontSize(22).fontColor(this.currentTextColor).fontWeight(FontWeight.Bold)
-                Text(`已珍藏 ${this.favoriteIds.length} 道私家佳肴`).fontSize(13).fontColor(this.currentSecondaryTextColor)
+          // ── 头部：头像 + 昵称 + 双数据统计 + 设置 ──
+          Row() {
+            Row({ space: 14 }) {
+              // 头像
+              Column() {
+                if (this.isAvatarImage(this.userProfile.avatar)) {
+                  Image(this.userProfile.avatar)
+                    .width(56).height(56).borderRadius(28).objectFit(ImageFit.Cover)
+                } else {
+                  Text(this.userProfile.avatar).fontSize(30)
+                }
+              }
+              .width(56).height(56).borderRadius(28)
+              .backgroundColor(this.currentBorderColor)
+              .justifyContent(FlexAlign.Center).clip(true)
+
+              // 昵称 + 统计
+              Column({ space: 5 }) {
+                Text(this.userProfile.nickname)
+                  .fontSize(20).fontWeight(FontWeight.Bold).fontColor(this.currentTextColor)
+                Row({ space: 6 }) {
+                  Text(`${this.favoriteIds.length} 收藏`)
+                    .fontSize(12).fontColor(this.currentSecondaryTextColor)
+                  Text('·').fontSize(12).fontColor(this.currentBorderColor)
+                  Text(`${this.historyIds.length} 浏览`)
+                    .fontSize(12).fontColor(this.currentSecondaryTextColor)
+                  Text('·').fontSize(12).fontColor(this.currentBorderColor)
+                  Text(`${this.folders.length} 收藏夹`)
+                    .fontSize(12).fontColor(this.currentSecondaryTextColor)
+                }
               }.alignItems(HorizontalAlign.Start)
             }.layoutWeight(1)
 
-            Column() { SymbolGlyph($r('sys.symbol.gearshape')).fontSize(20).fontColor([this.currentSecondaryTextColor]) }
+            // 设置入口
+            Column() {
+              SymbolGlyph($r('sys.symbol.gearshape')).fontSize(20).fontColor([this.currentSecondaryTextColor])
+            }
             .width(40).height(40).borderRadius(20)
             .backgroundColor(this.getNavButtonBgColor())
             .backgroundBlurStyle(BlurStyle.Thin)
             .justifyContent(FlexAlign.Center)
             .onClick(() => {
               router.pushUrl({ url: 'pages/SettingsPage' }).catch((e: Error) => {
-                console.error(`路由跳转 SettingsPage 失败: ${e.message}`);
+                console.error(`SettingsPage: ${e.message}`)
               })
             })
-          }.width('100%').padding({ left: 24, right: 24, top: 16, bottom: 16 })
+          }.width('100%').padding({ left: 20, right: 20, top: 16, bottom: 8 })
 
-          // 子 Tab 切换：珍藏菜肴 / 我的收藏夹
-          Row({ space: 0 }) {
-            Column({ space: 4 }) {
-              Text('珍藏菜肴')
-                .fontSize(15)
-                .fontWeight(this.mySubTab === 0 ? FontWeight.Bold : FontWeight.Medium)
-                .fontColor(this.mySubTab === 0 ? this.currentTextColor : this.currentSecondaryTextColor)
-              Column()
-                .width(this.mySubTab === 0 ? 24 : 0)
-                .height(3)
-                .backgroundColor(AppColors.BRAND_COLOR)
-                .borderRadius(2)
-                .animation({ duration: 200, curve: Curve.EaseOut })
-            }
-            .layoutWeight(1)
-            .alignItems(HorizontalAlign.Center)
-            .padding({ top: 4, bottom: 12 })
-            .onClick(() => { this.mySubTab = 0; this.myTabScroller.scrollTo({ xOffset: 0, yOffset: 0 }) })
+          Divider().color(this.currentBorderColor).margin({ left: 20, right: 20, top: 8 })
 
-            Column({ space: 4 }) {
-              Text('我的收藏夹')
-                .fontSize(15)
-                .fontWeight(this.mySubTab === 1 ? FontWeight.Bold : FontWeight.Medium)
-                .fontColor(this.mySubTab === 1 ? this.currentTextColor : this.currentSecondaryTextColor)
-              Column()
-                .width(this.mySubTab === 1 ? 24 : 0)
-                .height(3)
-                .backgroundColor(AppColors.BRAND_COLOR)
-                .borderRadius(2)
-                .animation({ duration: 200, curve: Curve.EaseOut })
-            }
-            .layoutWeight(1)
-            .alignItems(HorizontalAlign.Center)
-            .padding({ top: 4, bottom: 12 })
-            .onClick(() => { this.mySubTab = 1; this.myTabScroller.scrollTo({ xOffset: 0, yOffset: 0 }) })
-          }
-          .width('100%')
-          .padding({ left: 24, right: 24 })
-          .borderWidth({ bottom: 0.5 })
-          .borderColor(this.currentBorderColor)
-
-          // 珍藏菜肴内容
-          if (this.mySubTab === 0) {
-            if (this.favoriteIds.length > 0) {
-              Column({ space: 48 }) {
-                Row() {
-                  Text('珍藏菜肴').fontSize(14).fontColor(this.currentSecondaryTextColor).layoutWeight(1)
-                  if (this.favoriteIds.length > 6) {
-                    Row({ space: 4 }) { Text(`全部`).fontSize(13).fontColor(AppColors.BRAND_COLOR); SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor([AppColors.BRAND_COLOR]) }
-                    .onClick(() => {
-                      router.pushUrl({ url: 'pages/FavoritesPage' }).catch((e: Error) => {
-                        console.error(`路由跳转 FavoritesPage 失败: ${e.message}`);
-                      })
-                    })
-                  }
-                }.width('100%').padding({ left: 24, right: 24 })
-                GridRow({ columns: 2, gutter: { x: 24, y: 48 } }) {
-                  ForEach(this.favoriteIds.slice(0, 6), (recipeId: number, index: number) => {
-                    GridCol({ span: 1 }) {
-                      Column() {
-                        PlateCard({
-                          dishName: RecipeRepository.getInstance().getById(recipeId)?.name || '未知菜品',
-                          emoji: RecipeRepository.getInstance().getById(recipeId)?.emojis?.[0] || '🍽️',
-                          onPlateClick: () => {
-                            const r = RecipeRepository.getInstance().getById(recipeId);
-                            if (r) this.openDetailSheet(r);
-                          }
-                        })
-                      }.margin({ top: index % 2 === 1 ? 48 : 0 })
-                    }
-                  }, (id: number) => `plate-${id}`)
-                }.width('100%').padding({ left: 24, right: 24 })
-              }.margin({ top: 20 })
-            } else {
-              Column({ space: 12 }) {
-                SymbolGlyph($r('sys.symbol.info_circle')).fontSize(48).fontColor([this.currentBorderColor])
-                Text('餐桌还空着呢').fontSize(16).fontColor(this.currentSecondaryTextColor).fontWeight(FontWeight.Medium)
-              }.width('100%').margin({ top: 80 })
-            }
-          }
-
-          // 我的收藏夹内容
-          if (this.mySubTab === 1) {
-            Column({ space: 0 }) {
-              // 创建新收藏夹按钮
-              Row({ space: 10 }) {
-                Text('+').fontSize(20).fontColor(AppColors.BRAND_COLOR).fontWeight(FontWeight.Bold)
-                Text('创建新收藏夹').fontSize(15).fontColor(AppColors.BRAND_COLOR).fontWeight(FontWeight.Medium)
-              }
-              .width('100%')
-              .padding({ left: 20, right: 20, top: 14, bottom: 14 })
-              .backgroundColor(this.currentCardBgColor)
-              .borderRadius(14)
-              .margin({ top: 16, left: 16, right: 16 })
-              .onClick(() => {
-                router.pushUrl({ url: 'pages/CreateFolderPage' }).catch((e: Error) => {
-                  console.error(`路由跳转 CreateFolderPage 失败: ${e.message}`);
-                })
+          // ── Section 1：珍藏菜肴（横向滚动餐盘）──
+          this.MySectionHeader(
+            '珍藏',
+            this.myFavoriteRecipes.length,
+            this.myFavoriteRecipes.length > 5 ? '全部' : '',
+            () => {
+              router.pushUrl({ url: 'pages/FavoritesPage' }).catch((e: Error) => {
+                console.error(`FavoritesPage: ${e.message}`)
               })
+            }
+          )
 
-              if (this.folders.length === 0) {
-                Column({ space: 10 }) {
-                  Text('📂').fontSize(48)
-                  Text('还没有收藏夹').fontSize(15).fontColor(this.currentSecondaryTextColor)
-                  Text('创建收藏夹来整理你的菜谱吧').fontSize(13).fontColor(this.currentBorderColor)
-                }.width('100%').margin({ top: 60 }).alignItems(HorizontalAlign.Center)
-              } else {
-                Column({ space: 12 }) {
-                  ForEach(this.folders, (folder: FolderItem) => {
-                    Row({ space: 14 }) {
-                      Text('📁').fontSize(32)
-                      Column({ space: 3 }) {
+          if (this.myFavoriteRecipes.length > 0) {
+            Scroll() {
+              Row({ space: 18 }) {
+                ForEach(this.myFavoriteRecipes.slice(0, 8), (recipe: RecipeWithId) => {
+                  PlateCard({
+                    dishName: recipe.name,
+                    emoji: recipe.emojis?.[0] ?? '🍽️',
+                    isFavorite: this.isRecipeFavorite(recipe.id),
+                    onPlateClick: () => this.openDetailSheet(recipe),
+                    onFavoriteClick: () => this.onTapFavorite(recipe.id)
+                  })
+                }, (r: RecipeWithId) => `plate-${r.id}`)
+              }.padding({ left: 20, right: 20, bottom: 4 })
+            }
+            .scrollable(ScrollDirection.Horizontal)
+            .scrollBar(BarState.Off)
+            .edgeEffect(EdgeEffect.Spring)
+            .width('100%')
+          } else {
+            Row({ space: 10 }) {
+              Text('🍽️').fontSize(22)
+              Text('在菜谱中点 ☆ 开始收藏').fontSize(14).fontColor(this.currentSecondaryTextColor)
+            }
+            .width('100%').padding({ left: 20, right: 20, top: 8, bottom: 16 })
+          }
+
+          Divider().color(this.currentBorderColor).margin({ left: 20, right: 20, top: 8 })
+
+          // ── Section 2：收藏夹（2列网格）──
+          Row() {
+            Row({ space: 8 }) {
+              Text('收藏夹')
+                .fontSize(16).fontWeight(FontWeight.Bold).fontColor(this.currentTextColor)
+              if (this.folders.length > 0) {
+                Text(`${this.folders.length}`)
+                  .fontSize(11).fontColor(AppColors.BRAND_COLOR)
+                  .padding({ left: 7, right: 7, top: 2, bottom: 2 })
+                  .backgroundColor(AppColors.BRAND_COLOR_LIGHT)
+                  .borderRadius(100)
+              }
+            }
+            Row({ space: 5 }) {
+              SymbolGlyph($r('sys.symbol.plus')).fontSize(14).fontColor([AppColors.BRAND_COLOR])
+              Text('新建').fontSize(13).fontColor(AppColors.BRAND_COLOR)
+            }
+            .onClick(() => {
+              router.pushUrl({ url: 'pages/CreateFolderPage' }).catch((e: Error) => {
+                console.error(`CreateFolderPage: ${e.message}`)
+              })
+            })
+          }
+          .width('100%').justifyContent(FlexAlign.SpaceBetween)
+          .padding({ left: 20, right: 20, top: 24, bottom: 12 })
+
+          if (this.folders.length === 0) {
+            Row({ space: 10 }) {
+              Text('📂').fontSize(22)
+              Text('新建收藏夹来整理菜谱').fontSize(14).fontColor(this.currentSecondaryTextColor)
+            }
+            .width('100%').padding({ left: 20, right: 20, top: 4, bottom: 16 })
+          } else {
+            GridRow({ columns: 2, gutter: { x: 12, y: 12 } }) {
+              ForEach(this.folders, (folder: FolderItem) => {
+                GridCol() {
+                  Column({ space: 10 }) {
+                    // 封面 emoji
+                    Column() {
+                      Text(
+                        folder.recipeIds.length > 0
+                          ? (RecipeRepository.getInstance().getById(folder.recipeIds[0])?.emojis?.[0] ?? '📁')
+                          : '📁'
+                      ).fontSize(36)
+                    }
+                    .width('100%').height(88)
+                    .backgroundColor(this.currentBorderColor)
+                    .borderRadius(12)
+                    .justifyContent(FlexAlign.Center)
+
+                    // 文字区
+                    Row() {
+                      Column({ space: 2 }) {
                         Text(folder.name)
-                          .fontSize(16)
-                          .fontColor(this.currentTextColor)
-                          .fontWeight(FontWeight.Medium)
-                          .maxLines(1)
-                          .textOverflow({ overflow: TextOverflow.Ellipsis })
-                        Text(`${folder.recipeIds.length} 道菜`)
-                          .fontSize(13)
-                          .fontColor(this.currentSecondaryTextColor)
+                          .fontSize(13).fontColor(this.currentTextColor).fontWeight(FontWeight.Medium)
+                          .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+                        Text(`${folder.recipeIds.length} 道`)
+                          .fontSize(11).fontColor(this.currentSecondaryTextColor)
                       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
 
-                      SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([this.currentBorderColor])
-
-                      // 删除按钮
-                      Text('🗑️')
-                        .fontSize(18)
-                        .padding({ left: 8, right: 4, top: 4, bottom: 4 })
+                      SymbolGlyph($r('sys.symbol.trash'))
+                        .fontSize(15).fontColor([AppColors.GRAY_300])
+                        .padding({ left: 8, top: 4, bottom: 4 })
                         .hitTestBehavior(HitTestMode.Block)
                         .onClick(() => {
-                          this.pendingDeleteFolderId = folder.id;
-                          this.pendingDeleteFolderName = folder.name;
-                          this.deleteFolderConfirmVisible = true;
+                          this.pendingDeleteFolderId = folder.id
+                          this.pendingDeleteFolderName = folder.name
+                          this.deleteFolderConfirmVisible = true
                         })
-                    }
-                    .width('100%')
-                    .padding({ left: 20, right: 20, top: 16, bottom: 16 })
-                    .backgroundColor(this.currentCardBgColor)
-                    .borderRadius(14)
-                    .onClick(() => {
-                      router.pushUrl({ url: 'pages/FolderDetailPage', params: { folderId: folder.id } }).catch((e: Error) => {
-                        console.error(`路由跳转 FolderDetailPage 失败: ${e.message}`);
-                      })
+                    }.width('100%')
+                  }
+                  .width('100%')
+                  .padding(12)
+                  .backgroundColor(this.currentCardBgColor)
+                  .borderRadius(16)
+                  .onClick(() => {
+                    router.pushUrl({ url: 'pages/FolderDetailPage', params: { folderId: folder.id } }).catch((e: Error) => {
+                      console.error(`FolderDetailPage: ${e.message}`)
                     })
-                  }, (f: FolderItem) => `folder-${f.id}`)
-                }.width('100%').padding({ left: 16, right: 16, top: 12 })
-              }
-            }
+                  })
+                }
+              }, (f: FolderItem) => `folder-${f.id}`)
+            }.width('100%').padding({ left: 20, right: 20 })
           }
+
+          Divider().color(this.currentBorderColor).margin({ left: 20, right: 20, top: 20 })
+
+          // ── Section 3：最近浏览（横向 Chip 滚动）──
+          this.MySectionHeader(
+            '最近浏览',
+            this.historyIds.length,
+            this.historyIds.length > 0 ? '全部' : '',
+            () => {
+              router.pushUrl({ url: 'pages/HistoryPage' }).catch((e: Error) => {
+                console.error(`HistoryPage: ${e.message}`)
+              })
+            }
+          )
+
+          if (this.historyIds.length > 0) {
+            Scroll() {
+              Row({ space: 10 }) {
+                ForEach(this.historyIds.slice(0, 10), (recipeId: number) => {
+                  Text(RecipeRepository.getInstance().getById(recipeId)?.name ?? '')
+                    .fontSize(13)
+                    .fontColor(this.currentTextColor)
+                    .padding({ left: 14, right: 14, top: 8, bottom: 8 })
+                    .backgroundColor(this.currentCardBgColor)
+                    .borderRadius(100)
+                    .borderWidth(0.5)
+                    .borderColor(this.currentBorderColor)
+                    .maxLines(1)
+                    .onClick(() => {
+                      const r = RecipeRepository.getInstance().getById(recipeId)
+                      if (r) this.openDetailSheet(r)
+                    })
+                }, (id: number) => `hist-chip-${id}`)
+              }.padding({ left: 20, right: 20, bottom: 4 })
+            }
+            .scrollable(ScrollDirection.Horizontal)
+            .scrollBar(BarState.Off)
+            .edgeEffect(EdgeEffect.Spring)
+            .width('100%')
+          } else {
+            Row({ space: 10 }) {
+              Text('🔍').fontSize(22)
+              Text('浏览菜谱后这里会有记录').fontSize(14).fontColor(this.currentSecondaryTextColor)
+            }
+            .width('100%').padding({ left: 20, right: 20, top: 4, bottom: 8 })
+          }
+
         }.width('100%').padding({ bottom: 120 })
       }.width('100%').height('100%').scrollBar(BarState.Off)
     }.width('100%').height('100%')
@@ -1093,20 +1177,56 @@ struct IndexV2 {
   @Builder
   DetailSheetBuilder() {
     if (this.selectedRecipe) {
-      RecipeDetailSheet({
-        recipe: this.selectedRecipe,
-        selectedStuff: this.selectedStuff.concat([]),
-        isFavorite: this.isRecipeFavorite(this.selectedRecipe.id),
-        onFavoriteToggle: () => {
-          if (this.selectedRecipe) {
-            this.onTapFavorite(this.selectedRecipe.id);
+      Stack() {
+        RecipeDetailSheet({
+          recipe: this.selectedRecipe,
+          selectedStuff: this.selectedStuff.concat([]),
+          isFavorite: this.isRecipeFavorite(this.selectedRecipe.id),
+          onFavoriteToggle: () => {
+            if (this.selectedRecipe) {
+              this.onTapFavorite(this.selectedRecipe.id);
+            }
+          },
+          onRequestClose: () => {
+            this.detailSheetVisible = false;
           }
-        },
-        onRequestClose: () => {
-          this.detailSheetVisible = false;
+        })
+
+        // 文件夹选择覆盖层：在详情页内部渲染，层级天然正确
+        if (this.folderPickerVisible) {
+          Stack() {
+            Column()
+              .width('100%').height('100%')
+              .backgroundColor('rgba(0,0,0,0.45)')
+              .onClick(() => { this.folderPickerVisible = false })
+            Column() {
+              FolderPickerSheet({
+                folders: this.folders,
+                onAddToFolder: (folderId: string) => { void this.onAddToFolder(folderId) },
+                onCreateAndAdd: (name: string) => { void this.onCreateAndAddToFolder(name) },
+                onClose: () => { this.folderPickerVisible = false }
+              })
+            }
+            .width('100%').height(480)
+            .position({ x: 0, y: '100%' })
+            .markAnchor({ x: 0, y: '100%' })
+          }
+          .width('100%').height('100%')
+          .zIndex(100)
         }
-      })
+      }
+      .width('100%').height('100%')
     }
+  }
+
+  @Builder
+  FolderPickerBuilder() {
+    FolderPickerSheet({
+      folders: this.folders,
+      onAddToFolder: (folderId: string) => { void this.onAddToFolder(folderId) },
+      onCreateAndAdd: (name: string) => { void this.onCreateAndAddToFolder(name) },
+      onClose: () => { this.folderPickerVisible = false }
+    })
   }
 
   build() {
@@ -1154,7 +1274,7 @@ struct IndexV2 {
 
       ToastView({ message: this.toastMessage, visible: this.toastVisible })
 
-      // 收藏成功底部弹窗（固定在导航栏上方）
+      // 收藏成功底部提示（仅在详情页未打开时显示）
       Column() {
         FavoriteToast({
           visible: this.favoriteToastVisible,
@@ -1171,17 +1291,13 @@ struct IndexV2 {
       .zIndex(9997)
       .hitTestBehavior(this.favoriteToastVisible ? HitTestMode.Default : HitTestMode.Transparent)
 
-      // 收藏夹选择覆盖层
-      if (this.folderPickerVisible) {
+      // 非详情页收藏夹选择（详情页内触发时由 DetailSheetBuilder 内部覆盖层处理）
+      if (this.folderPickerVisible && !this.detailSheetVisible) {
         Stack() {
-          // 半透明遮罩
           Column()
-            .width('100%')
-            .height('100%')
+            .width('100%').height('100%')
             .backgroundColor('rgba(0,0,0,0.4)')
             .onClick(() => { this.folderPickerVisible = false })
-
-          // 底部弹出面板
           Column() {
             FolderPickerSheet({
               folders: this.folders,
@@ -1190,13 +1306,11 @@ struct IndexV2 {
               onClose: () => { this.folderPickerVisible = false }
             })
           }
-          .width('100%')
-          .height(420)
+          .width('100%').height(480)
           .position({ x: 0, y: '100%' })
           .markAnchor({ x: 0, y: '100%' })
         }
-        .width('100%')
-        .height('100%')
+        .width('100%').height('100%')
         .zIndex(9999)
       }
 

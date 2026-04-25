@@ -108,7 +108,7 @@ struct FolderDetailPage {
             Text('返回').fontSize(16).fontColor(AppColors.GRAY_600)
           }
           .padding({ left: 16, right: 12, top: 8, bottom: 8 })
-          .onClick(() => router.back())
+          .onClick(() => this.getUIContext().getRouter().back())
 
           Text(this.folder?.name ?? '收藏夹')
             .fontSize(18)

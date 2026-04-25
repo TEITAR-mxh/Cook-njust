@@ -172,6 +172,69 @@ interface RecipeItem {
 - DevEco Studio 5.0+
 - HarmonyOS SDK API 22（HarmonyOS 6.0.2）
 
+### ⚠️ 首次克隆后必须手动创建 build-profile.json5
+
+根目录的 `build-profile.json5` 包含签名证书路径与密钥，已加入 `.gitignore`，**不在版本库中**。每次克隆项目后需手动在项目根目录创建该文件，否则 Hvigor 会报错 `Cannot find project build file build-profile.json5`。
+
+在项目根目录（与 `hvigor/` 同级）新建 `build-profile.json5`，内容如下，**根据本机实际签名文件路径修改 `material` 字段**：
+
+```json5
+{
+  "app": {
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "storeFile": "你的/keystore.p12路径",
+          "storePassword": "加密后的密钥库密码",
+          "keyAlias": "keystore",
+          "keyPassword": "加密后的密钥密码",
+          "signAlg": "SHA256withECDSA",
+          "profile": "你的/cook_profileRelease.p7b路径",
+          "certpath": "你的/发布证书.cer路径"
+        }
+      }
+    ],
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+        "targetSdkVersion": "6.0.2(22)",
+        "compatibleSdkVersion": "6.0.2(22)",
+        "runtimeOS": "HarmonyOS",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      }
+    ],
+    "buildModeSet": [
+      { "name": "debug" },
+      { "name": "release" }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": ["default"]
+        }
+      ]
+    }
+  ]
+}
+```
+
+> 签名文件（`.p12` / `.p7b` / `.cer`）可在 AppGallery Connect → 证书管理 中下载，密码加密格式由 DevEco Studio 的 **Project Structure → Signing Configs** 自动生成填入。
+
+---
+
 ### 构建运行
 
 ```bash

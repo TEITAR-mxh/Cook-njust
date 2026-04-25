@@ -1,225 +1,169 @@
 import { common } from '@kit.AbilityKit';
 import { router } from '@kit.ArkUI';
 import { RecipeRepository } from '../data/RecipeRepository';
+import type { RecipeWithId } from '../model/recipe';
 import { CookPreferences } from '../store/CookPreferences';
+import { AppColors } from '../constants/AppColors';
+import { RecipeCard, RecipeCardMode } from '../components/RecipeCard';
+import { RecipeDetailSheet } from '../components/RecipeDetailSheet';
 import { getSystemSafeTopVp } from '../util/StatusBarInset';
 
 @Entry
 @Component
 struct FavoritesPage {
+  @State recipes: RecipeWithId[] = []
   @State favoriteIds: number[] = []
-  @State keepLocalData: boolean = true
-  @State navTopInsetVp: number = 48
+  @State topInset: number = 48
+  @State detailSheetVisible: boolean = false
+  @State selectedRecipe: RecipeWithId | null = null
 
-  aboutToAppear(): void {
-    void this.load();
-    const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
-    if (ctx !== undefined) {
-      void getSystemSafeTopVp(ctx).then((vp: number) => {
-        this.navTopInsetVp = vp;
-      });
+  aboutToAppear() {
+    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    if (host) {
+      void getSystemSafeTopVp(host).then((vp: number) => { this.topInset = vp });
     }
+    void this.load();
   }
 
-  onPageShow(): void {
+  onPageShow() {
     void this.load();
-    const ctx2 = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
-    if (ctx2 !== undefined) {
-      void getSystemSafeTopVp(ctx2).then((vp: number) => {
-        this.navTopInsetVp = vp;
-      });
-    }
   }
 
   private async load(): Promise<void> {
     const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
-    if (host === undefined) {
-      return;
-    }
+    if (!host) return;
     try {
-      if (RecipeRepository.getInstance().getCount() === 0) {
-        await RecipeRepository.getInstance().load(host);
+      const repo = RecipeRepository.getInstance();
+      if (repo.getCount() === 0) await repo.load(host);
+      const ids = await CookPreferences.getFavoriteIds(host);
+      const n = repo.getCount();
+      const valid = ids.filter(id => id >= 0 && id < n);
+      this.favoriteIds = valid;
+      const recipeList: RecipeWithId[] = [];
+      for (let i = 0; i < valid.length; i++) {
+        const r = repo.getById(valid[i]);
+        if (r !== null) recipeList.push(r);
       }
-      const settings = await CookPreferences.getSettings(host);
-      this.keepLocalData = settings.keepLocalData;
-      if (!this.keepLocalData) {
-        this.favoriteIds = [];
-        return;
-      }
-      const raw = await CookPreferences.getFavoriteIds(host);
-      const n = RecipeRepository.getInstance().getCount();
-      const next: number[] = [];
-      for (let i = 0; i < raw.length; i++) {
-        const id = raw[i];
-        if (id >= 0 && id < n) {
-          next.push(id);
-        }
-      }
-      this.favoriteIds = next;
-    } catch {
-      console.error('FavoritesPage.load failed');
-    }
+      this.recipes = recipeList;
+    } catch { }
   }
 
-  private rowTitle(recipeId: number): string {
-    const r = RecipeRepository.getInstance().getById(recipeId);
-    if (r !== null) {
-      return r.name;
-    }
-    return '';
-  }
-
-  private onToggleFavorite(recipeId: number): void {
+  private async clearAll(): Promise<void> {
     const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
-    if (host === undefined || !this.keepLocalData) {
-      return;
-    }
+    if (!host) return;
+    await CookPreferences.clearFavorites(host);
+    this.recipes = [];
+    this.favoriteIds = [];
+  }
+
+  private isRecipeFavorite(id: number): boolean {
+    return this.favoriteIds.includes(id);
+  }
+
+  private onTapFavorite(recipeId: number): void {
+    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    if (!host) return;
     void CookPreferences.toggleFavoriteId(host, recipeId).then(() => {
       void this.load();
     });
   }
 
-  private async clearAll(): Promise<void> {
-    const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
-    if (host === undefined) {
-      return;
-    }
-    try {
-      await CookPreferences.clearFavorites(host);
-      this.favoriteIds = [];
-    } catch {
-      console.error('FavoritesPage.clearAll failed');
-    }
-  }
-
   @Builder
-  favoriteRow(recipeId: number) {
-    Row() {
-      Row() {
-        Text(this.rowTitle(recipeId))
-          .fontSize(15)
-          .layoutWeight(1)
-          .maxLines(2)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .fontColor(Color.Black)
-      }
-      .layoutWeight(1)
-
-      if (this.keepLocalData) {
-        Text('★')
-          .fontSize(22)
-          .fontColor('#FFB020')
-          .padding({ left: 8, right: 4 })
-          .onClick(() => {
-            this.onToggleFavorite(recipeId);
-          })
-      }
+  DetailSheetBuilder() {
+    if (this.selectedRecipe) {
+      RecipeDetailSheet({
+        recipe: this.selectedRecipe,
+        selectedStuff: [],
+        isFavorite: this.isRecipeFavorite(this.selectedRecipe.id),
+        onFavoriteToggle: () => {
+          if (this.selectedRecipe) this.onTapFavorite(this.selectedRecipe.id);
+        },
+        onRequestClose: () => { this.detailSheetVisible = false }
+      })
     }
-    .width('100%')
-    .padding(12)
-    .backgroundColor('#F9F9F9')
-    .borderRadius(8)
-    .margin({ bottom: 8 })
   }
 
   build() {
-    Column() {
+    Stack() {
       Column() {
+        // 顶部导航
         Row() {
-          Row() {
-            Text('‹')
-              .fontSize(28)
-              .fontColor('#18A058')
-              .fontWeight(FontWeight.Medium)
+          Row({ space: 6 }) {
+            SymbolGlyph($r('sys.symbol.chevron_left'))
+              .fontSize(20)
+              .fontColor([AppColors.GRAY_600])
+            Text('返回')
+              .fontSize(16)
+              .fontColor(AppColors.GRAY_600)
           }
-          .width(56)
-          .height(48)
-          .justifyContent(FlexAlign.Center)
-          .onClick(() => {
-            try {
-              this.getUIContext().getRouter().back();
-            } catch {
-              console.error('router.back failed');
-            }
-          })
+          .padding({ left: 16, right: 12, top: 8, bottom: 8 })
+          .onClick(() => this.getUIContext().getRouter().back())
 
           Text('收藏')
             .fontSize(18)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(Color.Black)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppColors.GRAY_900)
             .layoutWeight(1)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
             .textAlign(TextAlign.Center)
 
           Row() {
-            if (this.keepLocalData && this.favoriteIds.length > 0) {
+            if (this.recipes.length > 0) {
               Text('清空')
                 .fontSize(15)
-                .fontColor('#18A058')
-                .onClick(() => {
-                  void this.clearAll();
-                })
+                .fontColor(AppColors.GRAY_400)
+                .onClick(() => { void this.clearAll() })
             }
+          }.width(56).justifyContent(FlexAlign.Center)
+        }
+        .width('100%')
+        .padding({ top: this.topInset, bottom: 4 })
+
+        // 内容区
+        if (this.recipes.length === 0) {
+          Column({ space: 12 }) {
+            Text('☆').fontSize(56)
+            Text('还没有收藏').fontSize(16).fontColor(AppColors.GRAY_400)
           }
-          .width(56)
-          .height(48)
+          .width('100%')
+          .layoutWeight(1)
           .justifyContent(FlexAlign.Center)
+        } else {
+          Scroll() {
+            Column({ space: 12 }) {
+              ForEach(this.recipes, (recipe: RecipeWithId) => {
+                RecipeCard({
+                  recipe: recipe,
+                  mode: RecipeCardMode.SMALL,
+                  isFavorite: this.isRecipeFavorite(recipe.id),
+                  onCardClick: () => {
+                    this.selectedRecipe = recipe;
+                    this.detailSheetVisible = true;
+                  },
+                  onFavoriteClick: () => this.onTapFavorite(recipe.id)
+                })
+              }, (r: RecipeWithId) => `fav-${r.id}`)
+            }
+            .width('100%')
+            .padding({ left: 16, right: 16, top: 8, bottom: 40 })
+          }
+          .layoutWeight(1)
+          .scrollBar(BarState.Off)
+          .edgeEffect(EdgeEffect.Spring)
         }
-        .width('100%')
       }
       .width('100%')
-      .padding({ top: this.navTopInsetVp })
-      .backgroundColor('#F5F5F5')
-      .borderWidth({ bottom: 1 })
-      .borderColor('#E8E8E8')
-
-      Scroll() {
-        Column({ space: 0 }) {
-          if (this.keepLocalData && this.favoriteIds.length > 0) {
-            Text(`共 ${this.favoriteIds.length} 条`)
-              .fontSize(12)
-              .fontColor('#888888')
-              .width('100%')
-              .textAlign(TextAlign.Start)
-              .margin({ top: 12, bottom: 8 })
-          }
-
-          if (!this.keepLocalData) {
-            Text('开启「保留本地数据」后可使用收藏')
-              .fontSize(14)
-              .fontColor('#888888')
-              .width('100%')
-              .textAlign(TextAlign.Start)
-              .margin({ top: 12 })
-          } else if (this.favoriteIds.length === 0) {
-            Text('暂无收藏，在列表中点 ☆ 添加')
-              .fontSize(14)
-              .fontColor('#888888')
-              .width('100%')
-              .textAlign(TextAlign.Start)
-              .margin({ top: 12 })
-          } else {
-            ForEach(this.favoriteIds, (recipeId: number) => {
-              this.favoriteRow(recipeId);
-            }, (recipeId: number) => `f-${recipeId}`)
-          }
-        }
-        .width('100%')
-        .alignItems(HorizontalAlign.Start)
-        .justifyContent(FlexAlign.Start)
-        .constraintSize({ minHeight: '100%' })
-        .padding({ left: 12, right: 12, bottom: 24 })
-      }
-      .width('100%')
-      .layoutWeight(1)
-      .scrollBar(BarState.Auto)
-      .align(Alignment.TopStart)
+      .height('100%')
+      .backgroundColor(AppColors.BG_COLOR)
     }
     .width('100%')
     .height('100%')
-    .justifyContent(FlexAlign.Start)
-    .alignItems(HorizontalAlign.Start)
-    .backgroundColor(Color.White)
+    .bindSheet($$this.detailSheetVisible, this.DetailSheetBuilder(), {
+      height: SheetSize.LARGE,
+      detents: [SheetSize.MEDIUM, SheetSize.LARGE],
+      dragBar: false,
+      backgroundColor: Color.Transparent,
+      showClose: false,
+      preferType: SheetType.BOTTOM
+    })
   }
 }

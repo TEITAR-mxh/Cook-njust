@@ -115,14 +115,19 @@ struct DietaryStructurePage {
   private get t3(): string      { return this.isDark ? AppColors.DARK_GRAY_400 : AppColors.GRAY_400  }
   private get brandBg(): string { return this.isDark ? '#2A1215' : AppColors.BRAND_COLOR_LIGHT       }
 
+  private get intakeRatio(): number {
+    return Math.min(this.todayTotal.totalCalories / 2000, 1.0)
+  }
+
+  private get intakeBarColor(): string {
+    const r = this.intakeRatio
+    return r < 0.6 ? '#22C55E' : (r < 0.9 ? AppColors.BRAND_COLOR : '#F97316')
+  }
+
   // ── 今日已摄入进度卡片 ────────────────────────────────────────────────────
 
   @Builder
   private TodayIntakeCard() {
-    const DAILY_GOAL = 2000
-    const ratio: number = Math.min(this.todayTotal.totalCalories / DAILY_GOAL, 1.0)
-    const barColor: string = ratio < 0.6 ? '#22C55E' : (ratio < 0.9 ? AppColors.BRAND_COLOR : '#F97316')
-
     Column({ space: 0 }) {
       // 标题行
       Row() {
@@ -139,14 +144,14 @@ struct DietaryStructurePage {
       // 热量大字 + 目标
       Row({ space: 4 }) {
         Text(`${Math.round(this.todayTotal.totalCalories)}`)
-          .fontSize(36).fontWeight(FontWeight.Bold).fontColor(barColor)
+          .fontSize(36).fontWeight(FontWeight.Bold).fontColor(this.intakeBarColor)
         Text('/ 2000 千卡').fontSize(14).fontColor(this.t2).margin({ top: 12 })
       }.padding({ left: 20, right: 20 }).alignSelf(ItemAlign.Start)
 
       // 进度条
       Stack({ alignContent: Alignment.Start }) {
         Row().width('100%').height(8).backgroundColor(this.track).borderRadius(4)
-        Row().width(`${ratio * 100}%`).height(8).backgroundColor(barColor).borderRadius(4)
+        Row().width(`${this.intakeRatio * 100}%`).height(8).backgroundColor(this.intakeBarColor).borderRadius(4)
       }.width('100%').padding({ left: 20, right: 20, top: 10, bottom: 12 })
 
       Divider().color(this.divider).margin({ left: 20, right: 20 })

@@ -36,6 +36,23 @@
 - 随机抽取含视频教程的菜谱
 - 淡入淡出切换动画
 - 右上角「?」快捷入口，跳转**饮食结构建议页**
+- **热量识别入口卡片**（随机按钮下方）→ 点击进入热量识别页
+
+### 热量识别 — CalorieScanPage
+
+> 入口：**发现 Tab → 随机按钮下方的「热量识别」卡片**
+
+| 步骤 | 说明 |
+|------|------|
+| 1 拍照/选图 | 系统相机（cameraPicker）或相册选图（PhotoViewPicker） |
+| 2 端侧识别 | VisionKit `objectDetection` 识别物体类型，本地 60+ 种食物营养库模糊匹配 |
+| 3 云端降级 | 端侧未命中时 HTTP POST 至云端 API（15 s 超时），可配置真实接口 |
+| 4 手动输入 | 全部识别失败时展示输入框，按食物名查询本地营养库 |
+| 5 份量调整 | ±0.5 份步长，范围 0.5–10 份，实时刷新热量 |
+| 6 选择餐次 | 早餐 / 午餐 / 晚餐 / 加餐 |
+| 7 保存记录 | 写入本地 `relationalStore` 数据库（`diet_records` 表） |
+
+饮食结构建议页顶部展示「今日已摄入」进度卡片（热量进度条 + 三大营养素摘要），点击「去记录」直接跳转热量识别页。
 
 ### 饮食结构建议页
 - 中国居民平衡膳食宝塔示意图展示
@@ -111,7 +128,8 @@ entry/src/main/ets/
 │
 ├── data/
 │   ├── RecipeRepository.ets     # 菜谱数据单例（rawfile JSON 索引化加载）
-│   └── foodCatalog.ets          # 食材 / 厨具目录（含 emoji 映射）
+│   ├── foodCatalog.ets          # 食材 / 厨具目录（含 emoji 映射）
+│   └── DietDatabaseHelper.ets   # 饮食记录 relationalStore 单例（diet_records 表 CRUD）
 │
 ├── model/
 │   └── recipe.ets               # RecipeItem / RecipeWithId / SearchMode 类型定义
@@ -123,12 +141,15 @@ entry/src/main/ets/
 │   ├── SettingsPage.ets         # 设置与管理
 │   ├── FavoritesPage.ets        # 收藏列表
 │   ├── HistoryPage.ets          # 浏览历史
-│   └── DietaryStructurePage.ets # 饮食结构建议（膳食宝塔 + 营养素 + 推荐量）
+│   ├── DietaryStructurePage.ets # 饮食结构建议（膳食宝塔 + 营养素 + 推荐量 + 今日摄入卡片）
+│   └── CalorieScanPage.ets      # 热量识别页（拍照→识别→份量→保存，5态状态机）
 │
 ├── service/
 │   ├── RecipeSearchService.ets  # 纯函数搜索（严格 / 模糊 / 生存三算法）
 │   ├── ShoppingListService.ets  # 缺料对比 + 剪贴板导出
-│   └── RecipeVideoLauncher.ets  # Bilibili BV 跳转 / 剪贴板回退
+│   ├── RecipeVideoLauncher.ets  # Bilibili BV 跳转 / 剪贴板回退
+│   ├── FoodRecognitionService.ets # 识别链路（VisionKit → 本地库 → 云端 → 手动）
+│   └── CloudFoodAnalyzer.ets    # 云端食物识别 HTTP 封装（配置 CLOUD_API_URL 启用）
 │
 ├── store/
 │   └── CookPreferences.ets      # HarmonyOS Preferences 持久化封装
@@ -136,6 +157,10 @@ entry/src/main/ets/
 ├── util/
 │   ├── StatusBarInset.ets       # 系统安全区顶部高度计算
 │   └── ThemeManager.ets         # 主题状态读取工具
+│
+├── utils/
+│   ├── CalorieCalculator.ets    # 60+ 种食物营养数据库 + 模糊匹配 + 份量换算
+│   └── PhotoPickerHelper.ets    # photoAccessHelper 相册选图封装（无需 READ_IMAGEVIDEO）
 │
 └── entryability/
     └── EntryAbility.ets         # 沉浸式 UI 初始化 + 系统主题监听
@@ -262,7 +287,7 @@ node ./hvigor/hvigor-wrapper.js --mode module \
 | 首次启动隐私同意弹窗 | ✅ |
 | 隐私政策页面（独立页） | ✅ |
 | 用户协议页面（独立页） | ✅ |
-| 权限声明（相册读写 / 屏幕常亮） | ✅ |
+| 权限声明（相机 / 屏幕常亮 / 网络 / 媒体读写） | ✅ |
 | 应用图标与名称配置 | ✅ |
 | AGC 后台数据安全说明 | ⚠️ 上架前需填报 |
 
@@ -272,6 +297,8 @@ node ./hvigor/hvigor-wrapper.js --mode module \
 
 本项目代码以学习交流为目的开源，菜谱内容整理自公开烹饪知识。
 
-仓库地址：[https://github.com/Ruheluobixieqing/Cook.git](https://github.com/Ruheluobixieqing/Cook.git)
+团队仓库：[https://github.com/Ruheluobixieqing/Cook.git](https://github.com/Ruheluobixieqing/Cook.git)（不含热量识别功能）
+
+个人开发分支（含热量识别）：[https://github.com/TEITAR-mxh/Cook-njust.git](https://github.com/TEITAR-mxh/Cook-njust.git)
 
 © 2026 AUV 项目组 · 南京理工大学

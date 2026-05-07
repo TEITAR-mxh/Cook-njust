@@ -568,7 +568,7 @@ struct CalorieScanPage {
               this.PreviewView()
             } else if (this.scanState === ScanState.RECOGNIZING) {
               this.RecognizingView()
-            } else if (this.scanState === ScanState.RESULT) {
+            } else if (this.scanState === ScanState.RESULT && this.recognitionResult !== null) {
               this.ResultView()
             } else {
               this.ManualView()

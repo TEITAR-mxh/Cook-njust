@@ -104,12 +104,10 @@ export class CloudFoodAnalyzer {
   // ── 内部：将图片 URI 读取并编码为 base64 字符串 ───────────────────
 
   private static async uriToBase64(uri: string): Promise<string> {
-    // 处理 file:// 前缀
-    const filePath = uri.startsWith('file://') ? uri.substring(7) : uri
-
-    const file = await fileIo.open(filePath, fileIo.OpenMode.READ_ONLY)
+    // HarmonyOS fileIo 原生支持 file://media/... 媒体库 URI，不需要剥离前缀
+    const file = await fileIo.open(uri, fileIo.OpenMode.READ_ONLY)
     try {
-      const stat = await fileIo.stat(filePath)
+      const stat = await fileIo.stat(uri)
       const buf = new ArrayBuffer(stat.size)
       await fileIo.read(file.fd, buf)
       return CloudFoodAnalyzer.arrayBufferToBase64(buf)

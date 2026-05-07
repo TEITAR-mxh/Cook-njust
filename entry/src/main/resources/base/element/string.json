@@ -15,26 +15,6 @@
     {
       "name": "permission_running_lock_reason",
       "value": "在用户查看烹饪步骤时，防止屏幕自动熄灭，确保操作连贯性"
-    },
-    {
-      "name": "permission_camera_reason",
-      "value": "拍摄食物照片以进行热量识别和营养分析"
-    },
-    {
-      "name": "permission_media_location_reason",
-      "value": "读取照片的位置信息，用于记录饮食地点"
-    },
-    {
-      "name": "permission_write_media_reason",
-      "value": "保存拍摄的食物照片到相册"
-    },
-    {
-      "name": "permission_read_media_reason",
-      "value": "从相册读取食物照片进行热量识别"
-    },
-    {
-      "name": "permission_internet_reason",
-      "value": "访问云端食物识别服务，提升识别准确度"
     }
   ]
 }

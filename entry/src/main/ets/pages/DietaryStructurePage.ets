@@ -3,10 +3,8 @@
  * 数据来源：《中国居民膳食指南（2022）》
  */
 import { common } from '@kit.AbilityKit'
-import { router } from '@kit.ArkUI'
 import { AppColors } from '../constants/AppColors'
 import { getSystemSafeTopVp } from '../util/StatusBarInset'
-import { DietDatabaseHelper, DailyTotal } from '../data/DietDatabaseHelper'
 
 // ─── 数据结构 ─────────────────────────────────────────────────────────────────
 
@@ -61,9 +59,6 @@ const TIPS: string[] = [
 @Component
 struct DietaryStructurePage {
   @State private safeTopVp: number = 48
-  @State private todayTotal: DailyTotal = {
-    totalCalories: 0, totalProtein: 0, totalFat: 0, totalCarbs: 0, recordCount: 0
-  }
 
   @StorageProp('currentThemeMode')
   @Watch('onThemeChange')
@@ -82,17 +77,6 @@ struct DietaryStructurePage {
     const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined
     if (ctx !== undefined) {
       getSystemSafeTopVp(ctx).then((vp: number) => { this.safeTopVp = vp }).catch(() => {})
-      void this.loadTodayTotal(ctx)
-    }
-  }
-
-  private async loadTodayTotal(ctx: common.UIAbilityContext): Promise<void> {
-    try {
-      const helper = DietDatabaseHelper.getInstance()
-      await helper.ensureReady(ctx)
-      this.todayTotal = await helper.queryTodayTotal(ctx)
-    } catch (e) {
-      console.warn('[DietaryStructurePage] 加载今日摄入失败:', JSON.stringify(e))
     }
   }
 
@@ -114,72 +98,6 @@ struct DietaryStructurePage {
   private get t2(): string      { return this.isDark ? AppColors.DARK_GRAY_500 : AppColors.GRAY_500  }
   private get t3(): string      { return this.isDark ? AppColors.DARK_GRAY_400 : AppColors.GRAY_400  }
   private get brandBg(): string { return this.isDark ? '#2A1215' : AppColors.BRAND_COLOR_LIGHT       }
-
-  // ── 今日已摄入进度卡片 ────────────────────────────────────────────────────
-
-  @Builder
-  private TodayIntakeCard() {
-    const DAILY_GOAL = 2000
-    const ratio: number = Math.min(this.todayTotal.totalCalories / DAILY_GOAL, 1.0)
-    const barColor: string = ratio < 0.6 ? '#22C55E' : (ratio < 0.9 ? AppColors.BRAND_COLOR : '#F97316')
-
-    Column({ space: 0 }) {
-      // 标题行
-      Row() {
-        Text('今日已摄入').fontSize(15).fontWeight(FontWeight.Bold).fontColor(this.t1).layoutWeight(1)
-        Text('去记录')
-          .fontSize(13).fontColor(AppColors.BRAND_COLOR)
-          .onClick(() => {
-            router.pushUrl({ url: 'pages/CalorieScanPage' }).catch((e: Error) => {
-              console.error(`跳转 CalorieScanPage 失败: ${e.message}`)
-            })
-          })
-      }.width('100%').padding({ left: 20, right: 20, top: 16, bottom: 10 })
-
-      // 热量大字 + 目标
-      Row({ space: 4 }) {
-        Text(`${Math.round(this.todayTotal.totalCalories)}`)
-          .fontSize(36).fontWeight(FontWeight.Bold).fontColor(barColor)
-        Text('/ 2000 千卡').fontSize(14).fontColor(this.t2).margin({ top: 12 })
-      }.padding({ left: 20, right: 20 }).alignSelf(ItemAlign.Start)
-
-      // 进度条
-      Stack({ alignContent: Alignment.Start }) {
-        Row().width('100%').height(8).backgroundColor(this.track).borderRadius(4)
-        Row().width(`${ratio * 100}%`).height(8).backgroundColor(barColor).borderRadius(4)
-      }.width('100%').padding({ left: 20, right: 20, top: 10, bottom: 12 })
-
-      Divider().color(this.divider).margin({ left: 20, right: 20 })
-
-      // 三大营养素摘要
-      Row() {
-        Column({ space: 4 }) {
-          Text(`${Math.round(this.todayTotal.totalProtein)} g`).fontSize(15).fontWeight(FontWeight.Bold).fontColor('#22C55E')
-          Text('蛋白质').fontSize(12).fontColor(this.t3)
-        }.layoutWeight(1).alignItems(HorizontalAlign.Center)
-
-        Column({ space: 4 }) {
-          Text(`${Math.round(this.todayTotal.totalFat)} g`).fontSize(15).fontWeight(FontWeight.Bold).fontColor('#F59E0B')
-          Text('脂肪').fontSize(12).fontColor(this.t3)
-        }.layoutWeight(1).alignItems(HorizontalAlign.Center)
-
-        Column({ space: 4 }) {
-          Text(`${Math.round(this.todayTotal.totalCarbs)} g`).fontSize(15).fontWeight(FontWeight.Bold).fontColor('#3B82F6')
-          Text('碳水').fontSize(12).fontColor(this.t3)
-        }.layoutWeight(1).alignItems(HorizontalAlign.Center)
-
-        Column({ space: 4 }) {
-          Text(`${this.todayTotal.recordCount}`).fontSize(15).fontWeight(FontWeight.Bold).fontColor(this.t1)
-          Text('记录条数').fontSize(12).fontColor(this.t3)
-        }.layoutWeight(1).alignItems(HorizontalAlign.Center)
-      }.width('100%').padding({ top: 12, bottom: 16 })
-    }
-    .width('100%')
-    .backgroundColor(this.surface)
-    .borderRadius(16)
-    .margin({ left: 16, right: 16 })
-    .clip(true)
-  }
 
   // ── 导航栏 ────────────────────────────────────────────────────────────────
 
@@ -431,9 +349,6 @@ struct DietaryStructurePage {
 
       Scroll() {
         Column({ space: 0 }) {
-          this.SectionTitle('今日饮食追踪')
-          this.TodayIntakeCard()
-
           this.ImageCard()
 
           this.SectionTitle('三大营养素供能比（占总热量）')

@@ -4,8 +4,17 @@
  * TODO: 将 CLOUD_API_URL 替换为真实的食物识别云端接口地址。
  */
 import { http } from '@kit.NetworkKit'
-import { image } from '@kit.ImageKit'
 import { fileIo } from '@kit.CoreFileKit'
+
+/** 云端 API 响应体结构（对应 JSON.parse 结果，避免索引访问） */
+interface CloudApiResponse {
+  foodName: string
+  calories: number
+  protein: number
+  fat: number
+  carbs: number
+  servingWeight: number
+}
 
 /** 云端返回的识别结果结构 */
 export interface CloudAnalysisResult {
@@ -69,16 +78,16 @@ export class CloudFoodAnalyzer {
       }
 
       const body = response.result as string
-      const parsed = JSON.parse(body) as Record<string, number | string>
+      const parsed = JSON.parse(body) as CloudApiResponse
 
-      const foodName = parsed['foodName'] as string
-      const calories = parsed['calories'] as number
-      const protein  = parsed['protein']  as number
-      const fat      = parsed['fat']      as number
-      const carbs    = parsed['carbs']    as number
-      const servingWeight = (parsed['servingWeight'] as number | undefined) ?? 200
+      const foodName      = parsed.foodName
+      const calories      = parsed.calories
+      const protein       = parsed.protein
+      const fat           = parsed.fat
+      const carbs         = parsed.carbs
+      const servingWeight = parsed.servingWeight > 0 ? parsed.servingWeight : 200
 
-      if (!foodName || typeof calories !== 'number') {
+      if (!foodName || calories <= 0) {
         console.warn('[CloudFoodAnalyzer] API 返回格式不符合预期:', body)
         return null
       }
@@ -118,10 +127,10 @@ export class CloudFoodAnalyzer {
       const b0 = bytes[i++]
       const b1 = i < bytes.length ? bytes[i++] : 0
       const b2 = i < bytes.length ? bytes[i++] : 0
-      result += CHARS[b0 >> 2]
-      result += CHARS[((b0 & 3) << 4) | (b1 >> 4)]
-      result += CHARS[((b1 & 15) << 2) | (b2 >> 6)]
-      result += CHARS[b2 & 63]
+      result += CHARS.charAt(b0 >> 2)
+      result += CHARS.charAt(((b0 & 3) << 4) | (b1 >> 4))
+      result += CHARS.charAt(((b1 & 15) << 2) | (b2 >> 6))
+      result += CHARS.charAt(b2 & 63)
     }
     // 末尾填充
     const pad = bytes.length % 3

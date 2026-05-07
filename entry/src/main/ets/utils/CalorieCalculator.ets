@@ -35,6 +35,20 @@ export interface FoodNutrition {
   source: 'local' | 'cloud' | 'manual'
 }
 
+/** fuzzyMatch 返回结果（避免 ArkTS 禁止内联对象字面量类型） */
+export interface FuzzyMatchResult {
+  name: string
+  data: NutrientData
+}
+
+/** calcByQuantity 返回结果（避免 ArkTS 不支持 Pick<> 工具类型） */
+export interface CalcResult {
+  totalCalories: number
+  totalProtein: number
+  totalFat: number
+  totalCarbs: number
+}
+
 export class CalorieCalculator {
   /**
    * 本地营养数据库（60+ 种常见中国食材与菜肴）
@@ -129,7 +143,7 @@ export class CalorieCalculator {
    * @param candidates 端侧或云端返回的候选名称（中英文均可）
    * @returns 匹配到的食物名 + 数据，或 null
    */
-  static fuzzyMatch(candidates: string[]): { name: string; data: NutrientData } | null {
+  static fuzzyMatch(candidates: string[]): FuzzyMatchResult | null {
     let bestName: string = ''
     let bestScore: number = 0
     let bestData: NutrientData | null = null
@@ -174,7 +188,7 @@ export class CalorieCalculator {
     data: NutrientData,
     quantity: number,
     servingWeightOverride?: number
-  ): Pick<FoodNutrition, 'totalCalories' | 'totalProtein' | 'totalFat' | 'totalCarbs'> {
+  ): CalcResult {
     const grams = (servingWeightOverride ?? data.servingWeight) * quantity
     const factor = grams / 100.0
     return {

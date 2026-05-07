@@ -261,6 +261,17 @@ struct CalorieScanPage {
     ).totalCalories
   }
 
+  /** 安全的识别结果（Builder 内不允许 null 守卫，用 getter 代替） */
+  private get safeResult(): FoodRecognitionResult {
+    return this.recognitionResult ?? {
+      identified: false,
+      foodName: '',
+      nutrient: { calories: 0, protein: 0, fat: 0, carbs: 0, servingWeight: 100 },
+      source: 'none',
+      rawLabels: [],
+    }
+  }
+
   // ── UI Builders ───────────────────────────────────────────────────────
 
   @Builder
@@ -307,7 +318,7 @@ struct CalorieScanPage {
 
       Button() {
         Row({ space: 10 }) {
-          SymbolGlyph($r('sys.symbol.photo')).fontSize(20).fontColor([AppColors.BRAND_COLOR])
+          SymbolGlyph($r('sys.symbol.picture_fill')).fontSize(20).fontColor([AppColors.BRAND_COLOR])
           Text('从相册选图').fontSize(16).fontColor(AppColors.BRAND_COLOR).fontWeight(FontWeight.Medium)
         }
       }
@@ -421,9 +432,6 @@ struct CalorieScanPage {
   /** 结果态：展示营养信息 + 份量调整 + 保存 */
   @Builder
   ResultView() {
-    if (this.recognitionResult === null) return
-    const r = this.recognitionResult
-
     Column({ space: 0 }) {
       // 图片小缩略图
       if (this.capturedUri.length > 0) {
@@ -436,9 +444,9 @@ struct CalorieScanPage {
       Column({ space: 0 }) {
         // 食物名称 + 来源标签
         Row({ space: 8 }) {
-          Text(r.foodName)
+          Text(this.safeResult.foodName)
             .fontSize(22).fontWeight(FontWeight.Bold).fontColor(this.textColor).layoutWeight(1)
-          Text(r.source === 'local' ? '本地库' : r.source === 'cloud' ? '云端' : '手动')
+          Text(this.safeResult.source === 'local' ? '本地库' : this.safeResult.source === 'cloud' ? '云端' : '手动')
             .fontSize(11).fontColor(AppColors.BRAND_COLOR)
             .padding({ left: 8, right: 8, top: 3, bottom: 3 })
             .backgroundColor(AppColors.BRAND_COLOR_LIGHT).borderRadius(10)
@@ -456,19 +464,19 @@ struct CalorieScanPage {
         Column() {
           this.NutrientRow(
             '蛋白质',
-            `${CalorieCalculator.calcByQuantity(r.nutrient, this.quantity).totalProtein}`,
+            `${CalorieCalculator.calcByQuantity(this.safeResult.nutrient, this.quantity).totalProtein}`,
             'g', '#22C55E'
           )
           Divider().color(this.dividerColor)
           this.NutrientRow(
             '脂肪',
-            `${CalorieCalculator.calcByQuantity(r.nutrient, this.quantity).totalFat}`,
+            `${CalorieCalculator.calcByQuantity(this.safeResult.nutrient, this.quantity).totalFat}`,
             'g', '#F59E0B'
           )
           Divider().color(this.dividerColor)
           this.NutrientRow(
             '碳水化合物',
-            `${CalorieCalculator.calcByQuantity(r.nutrient, this.quantity).totalCarbs}`,
+            `${CalorieCalculator.calcByQuantity(this.safeResult.nutrient, this.quantity).totalCarbs}`,
             'g', '#3B82F6'
           )
         }.padding({ left: 20, right: 20, top: 8, bottom: 8 })

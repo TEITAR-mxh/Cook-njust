@@ -19,3 +19,8 @@ tools/
 
 # 证书文件相关
 /build-profile.json5
+
+# Claude Code 指南与配置
+CLAUDE.md
+INDEXV2_TEST_GUIDE.md
+.claude/

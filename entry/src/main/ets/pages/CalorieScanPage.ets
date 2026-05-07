@@ -41,21 +41,29 @@ struct CalorieScanPage {
   @State private capturedUri: string = ''
   @State private recognitionResult: FoodRecognitionResult | null = null
 
-  /** 用户调整的份量（步长 0.5） */
+  /** 用户调整的份量（步长 0.5）；@Watch 触发重算展示热量 */
+  @Watch('onQuantityChange')
   @State private quantity: number = 1.0
   /** 当前所选餐次 */
   @State private selectedMealType: string = '加餐'
   /** 手动输入的食物名称 */
   @State private manualFoodName: string = ''
 
-  // ── 结果展示用扁平 @State（避免 ArkUI proxy 对 nullable @State getter 返回 undefined） ──
+  // ── 结果展示用扁平 @State（避免 ArkUI proxy 对 getter/method 返回 undefined） ──
+  // 识别结果元数据
   @State private resultFoodName: string = ''
   @State private resultSourceLabel: string = '手动'
-  @State private resultCalPer100: number = 0
-  @State private resultProteinPer100: number = 0
-  @State private resultFatPer100: number = 0
-  @State private resultCarbsPer100: number = 0
-  @State private resultServingWeight: number = 200
+  // 每 100g 营养（用于 recalcDisplay 重算，不在 Builder 中直接使用）
+  private resultCalPer100: number = 0
+  private resultProteinPer100: number = 0
+  private resultFatPer100: number = 0
+  private resultCarbsPer100: number = 0
+  private resultServingWeight: number = 200
+  // 按当前份量算出的展示值（直接在 ResultView 中读取，全为 @State 基本类型）
+  @State private displayCalories: number = 0
+  @State private displayProtein: number = 0
+  @State private displayFat: number = 0
+  @State private displayCarbs: number = 0
 
   @State private toastMessage: string = ''
   @State private toastVisible: boolean = false
@@ -265,7 +273,10 @@ struct CalorieScanPage {
 
   // ── 结果展示辅助 ─────────────────────────────────────────────────────
 
-  /** 将识别结果写入扁平 @State，避免 ArkUI proxy 在 ResultView 中返回 undefined */
+  /**
+   * 将识别结果写入私有字段并触发展示值重算。
+   * 仅在非-Builder 上下文（事件/watcher）中调用，不受 ArkUI proxy 影响。
+   */
   private setDisplayResult(r: FoodRecognitionResult): void {
     this.resultFoodName      = r.foodName
     this.resultSourceLabel   = r.source === 'cloud' ? '云端' : r.source === 'local' ? '本地库' : '手动'
@@ -274,22 +285,21 @@ struct CalorieScanPage {
     this.resultFatPer100     = r.nutrient.fat
     this.resultCarbsPer100   = r.nutrient.carbs
     this.resultServingWeight = r.nutrient.servingWeight
+    this.recalcDisplay()
   }
 
-  /** 由扁平 @State 还原 NutrientData（仅用于 CalorieCalculator，全为基本类型，proxy 安全） */
-  private get flatNutrient(): NutrientData {
-    return {
-      calories:      this.resultCalPer100,
-      protein:       this.resultProteinPer100,
-      fat:           this.resultFatPer100,
-      carbs:         this.resultCarbsPer100,
-      servingWeight: this.resultServingWeight,
-    }
+  /** 按当前份量重算展示值，写入 @State 基本类型，供 ResultView 直接读取 */
+  private recalcDisplay(): void {
+    const factor = this.resultServingWeight * this.quantity / 100.0
+    this.displayCalories = Math.round(this.resultCalPer100 * factor)
+    this.displayProtein  = Math.round(this.resultProteinPer100 * factor * 10) / 10
+    this.displayFat      = Math.round(this.resultFatPer100     * factor * 10) / 10
+    this.displayCarbs    = Math.round(this.resultCarbsPer100   * factor * 10) / 10
   }
 
-  private get currentCalories(): number {
-    if (this.resultFoodName.length === 0) return 0
-    return CalorieCalculator.calcByQuantity(this.flatNutrient, this.quantity).totalCalories
+  /** 份量变化时重算展示值 */
+  private onQuantityChange(): void {
+    this.recalcDisplay()
   }
 
   // ── UI Builders ───────────────────────────────────────────────────────
@@ -474,31 +484,19 @@ struct CalorieScanPage {
 
         // 热量大字
         Row({ space: 4 }) {
-          Text(`${this.currentCalories}`).fontSize(40).fontColor(AppColors.BRAND_COLOR).fontWeight(FontWeight.Bold)
+          Text(`${this.displayCalories}`).fontSize(40).fontColor(AppColors.BRAND_COLOR).fontWeight(FontWeight.Bold)
           Text('千卡').fontSize(16).fontColor(this.secondaryColor).margin({ top: 16 })
         }.padding({ left: 20, bottom: 8 })
 
         Divider().color(this.dividerColor).margin({ left: 20, right: 20 })
 
-        // 三大营养素
+        // 三大营养素（直接读取 @State 基本类型，不经过任何 getter/方法）
         Column() {
-          this.NutrientRow(
-            '蛋白质',
-            `${CalorieCalculator.calcByQuantity(this.flatNutrient, this.quantity).totalProtein}`,
-            'g', '#22C55E'
-          )
+          this.NutrientRow('蛋白质',    `${this.displayProtein}`, 'g', '#22C55E')
           Divider().color(this.dividerColor)
-          this.NutrientRow(
-            '脂肪',
-            `${CalorieCalculator.calcByQuantity(this.flatNutrient, this.quantity).totalFat}`,
-            'g', '#F59E0B'
-          )
+          this.NutrientRow('脂肪',      `${this.displayFat}`,     'g', '#F59E0B')
           Divider().color(this.dividerColor)
-          this.NutrientRow(
-            '碳水化合物',
-            `${CalorieCalculator.calcByQuantity(this.flatNutrient, this.quantity).totalCarbs}`,
-            'g', '#3B82F6'
-          )
+          this.NutrientRow('碳水化合物', `${this.displayCarbs}`,   'g', '#3B82F6')
         }.padding({ left: 20, right: 20, top: 8, bottom: 8 })
 
         Divider().color(this.dividerColor).margin({ left: 20, right: 20 })

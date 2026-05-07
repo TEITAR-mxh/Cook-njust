@@ -1011,7 +1011,7 @@ struct IndexV2 {
             bgColor:      this.currentCardBgColor,
             textColor:    this.currentTextColor,
             secondaryColor: this.currentSecondaryTextColor,
-            borderColor:  this.currentBorderColor,
+            dividerColor: this.currentBorderColor,
             isDark:       this.isEffectivelyDark(),
           })
           .margin({ left: 16, right: 16, top: 8, bottom: 0 })

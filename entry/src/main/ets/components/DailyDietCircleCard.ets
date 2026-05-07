@@ -18,7 +18,7 @@ export struct DailyDietCircleCard {
   @Prop bgColor: string = AppColors.CARD_BG
   @Prop textColor: string = AppColors.GRAY_900
   @Prop secondaryColor: string = AppColors.GRAY_500
-  @Prop borderColor: string = AppColors.GRAY_100
+  @Prop dividerColor: string = AppColors.GRAY_100
   @Prop isDark: boolean = false
 
   /** 父组件在 onPageShow 中递增此值来触发数据刷新 */
@@ -177,8 +177,8 @@ export struct DailyDietCircleCard {
           if (this.loading) {
             // 骨架屏
             Column({ space: 8 }) {
-              Row().width(80).height(14).backgroundColor(this.borderColor).borderRadius(7)
-              Row().width(60).height(11).backgroundColor(this.borderColor).borderRadius(6)
+              Row().width(80).height(14).backgroundColor(this.dividerColor).borderRadius(7)
+              Row().width(60).height(11).backgroundColor(this.dividerColor).borderRadius(6)
             }
           } else if (this.recordCount === 0) {
             // 空状态
@@ -235,7 +235,7 @@ export struct DailyDietCircleCard {
       .padding({ left: 20, right: 20, top: 20, bottom: 14 })
       .alignItems(VerticalAlign.Center)
 
-      Divider().color(this.borderColor).margin({ left: 20, right: 20 })
+      Divider().color(this.dividerColor).margin({ left: 20, right: 20 })
 
       // 底部：饮食建议链接
       Row({ space: 4 }) {

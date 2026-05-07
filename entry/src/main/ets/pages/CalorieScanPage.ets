@@ -1,9 +1,3 @@
-/**
- * 热量识别页面 — Premium UI
- * 沉浸式图片预览 + 玻璃态结果卡片 + 扫描动画
- *
- * !! ArkUI proxy 限制：所有 @Builder 内只读 @State 基本类型，零 getter / 方法调用 !!
- */
 import { cameraPicker } from '@kit.CameraKit'
 import { camera } from '@kit.CameraKit'
 import { common, abilityAccessCtrl, Permissions } from '@kit.AbilityKit'
@@ -15,157 +9,178 @@ import { CalorieCalculator, NutrientData } from '../utils/CalorieCalculator'
 import { DietDatabaseHelper, DietRecord } from '../data/DietDatabaseHelper'
 import { ToastView } from '../components/ToastView'
 
+// 取景框专用常量，不随主题变化
+const CAMERA_BG     = AppColors.DARK_BG_COLOR   // '#121212'
+const CORNER_COLOR  = '#CCFFFFFF'               // L形标线白色 80%透明
+const SCAN_OVERLAY  = '#5F000000'               // 扫描蒙层
+
 const enum ScanState { IDLE = 0, PREVIEW = 1, RECOGNIZING = 2, RESULT = 3, MANUAL = 4 }
 
-const MEAL_TYPES: string[] = ['早餐', '午餐', '晚餐', '加餐']
+const MEAL_TYPES:  string[] = ['早餐', '午餐', '晚餐', '加餐']
 const MEAL_EMOJIS: string[] = ['🌅', '☀️', '🌙', '🍵']
 
 @Entry
 @Component
 struct CalorieScanPage {
-
-  // ── 页面基础 ────────────────────────────────────────────────────────────
   @State private safeTopVp: number = 48
+  @Watch('onScanStateChange')
   @State private scanState: ScanState = ScanState.IDLE
   @State private capturedUri: string = ''
   @State private recognitionResult: FoodRecognitionResult | null = null
 
-  // ── 动画状态（@State 基本类型）──────────────────────────────────────────
-  @State private pageOpacity: number = 0
+  // 脉冲动画
   @State private pulseScale: number = 1.0
-  @State private pulseOpacity: number = 0.6
-  @State private resultCardOpacity: number = 0
-  @State private resultCardOffset: number = 60
-  @State private saveBtnScale: number = 1.0
-  @State private qtyMinusScale: number = 1.0
-  @State private qtyPlusScale: number = 1.0
+  @State private pulseAlpha: number = 0.6
 
-  // ── 结果展示 @State 基本类型（proxy-safe）──────────────────────────────
-  @State private resultFoodName: string = ''
-  @State private resultSourceLabel: string = '手动'
-  @State private displayCalories: number = 0
-  @State private displayProtein: number = 0
-  @State private displayFat: number = 0
-  @State private displayCarbs: number = 0
-  // 每 100g 原始数据（不在 Builder 中使用）
-  private resultCalPer100: number = 0
-  private resultProteinPer100: number = 0
-  private resultFatPer100: number = 0
-  private resultCarbsPer100: number = 0
-  private resultServingWeight: number = 200
+  // 结果卡浮现动画
+  @State private cardOpacity: number = 0
+  @State private cardOffset:  number = 20
 
-  // ── 交互 ────────────────────────────────────────────────────────────────
-  @Watch('onQuantityChange')
-  @State private quantity: number = 1.0
-  @State private selectedMealType: string = '加餐'
-  @State private manualFoodName: string = ''
-  @State private saving: boolean = false
+  // 按钮弹性
+  @State private saveBtnScale:  number = 1.0
+  @State private qtyMinusSc:    number = 1.0
+  @State private qtyPlusSc:     number = 1.0
 
-  // ── Toast ───────────────────────────────────────────────────────────────
-  @State private toastMessage: string = ''
+  // 页面淡入
+  @State private pageOpacity: number = 0
+
+  // 结果展示 — 全部 @State 基本类型，proxy 安全
+  @State private resultName:    string = ''
+  @State private resultTag:     string = '手动'
+  @State private dispCalories:  number = 0
+  @State private dispProtein:   number = 0
+  @State private dispFat:       number = 0
+  @State private dispCarbs:     number = 0
+  // 每100g 原始数据，只在非 Builder 上下文中读写
+  private rawCal:     number = 0
+  private rawPro:     number = 0
+  private rawFat:     number = 0
+  private rawCarbs:   number = 0
+  private rawServing: number = 200
+
+  @Watch('onQtyChange')
+  @State private quantity:    number = 1.0
+  @State private mealType:    string = '加餐'
+  @State private manualInput: string = ''
+  @State private saving:      boolean = false
+
+  @State private toastMsg:     string = ''
   @State private toastVisible: boolean = false
 
-  // ── 主题 ────────────────────────────────────────────────────────────────
-  @StorageProp('isSystemDarkMode')
-  @Watch('onThemeChange')
-  private isSystemDark: boolean = false
+  // 主题
+  @StorageProp('isSystemDarkMode') @Watch('onThemeChange') private isSystemDark: boolean = false
+  @StorageProp('currentThemeMode') @Watch('onThemeChange') private themeMode:    string  = '系统默认'
+  @State private bgColor:     string  = AppColors.BG_COLOR
+  @State private cardBg:      string  = AppColors.CARD_BG
+  @State private textColor:   string  = AppColors.GRAY_900
+  @State private secondColor: string  = AppColors.GRAY_500
+  @State private divColor:    string  = AppColors.GRAY_100
+  @State private isDark:      boolean = false
+  // 导航栏背景随状态切换，用 @State 变量驱动
+  @State private navBg: string = '#00000000'
 
-  @StorageProp('currentThemeMode')
-  @Watch('onThemeChange')
-  private storedThemeMode: string = '系统默认'
+  private pulseActive: boolean = false
 
-  @State private bgColor: string = AppColors.BG_COLOR
-  @State private cardBg: string = AppColors.CARD_BG
-  @State private textColor: string = AppColors.GRAY_900
-  @State private secondaryColor: string = AppColors.GRAY_500
-  @State private dividerColor: string = AppColors.GRAY_100
-  @State private isDark: boolean = false
-
-  // ── 生命周期 ─────────────────────────────────────────────────────────────
+  // ── 生命周期 ──────────────────────────────────────────────────────────
 
   aboutToAppear(): void {
-    this.isDark = this.calcIsDark()
-    this.applyTheme()
+    this.isDark = this.resolveDark()
+    this.syncTheme()
+    this.navBg = '#00000000'
     const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined
     if (host) {
-      void getSystemSafeTopVp(host).then((vp: number) => { this.safeTopVp = vp })
+      void getSystemSafeTopVp(host).then((v: number) => { this.safeTopVp = v })
     }
-    animateTo({ duration: 380, curve: Curve.EaseOut }, () => { this.pageOpacity = 1 })
-    this.loopPulse()
+    animateTo({ duration: 350, curve: Curve.EaseOut }, () => { this.pageOpacity = 1 })
+    this.pulseActive = true
+    this.pulseLoop()
   }
 
-  // ── 主题 ─────────────────────────────────────────────────────────────────
+  aboutToDisappear(): void {
+    this.pulseActive = false
+  }
+
+  // ── 主题 ─────────────────────────────────────────────────────────────
 
   private onThemeChange(): void {
-    this.isDark = this.calcIsDark()
-    this.applyTheme()
+    this.isDark = this.resolveDark()
+    this.syncTheme()
+    this.refreshNavBg()
   }
 
-  private calcIsDark(): boolean {
-    if (this.storedThemeMode === '深色模式') return true
-    if (this.storedThemeMode === '浅色模式') return false
+  private onScanStateChange(): void {
+    this.refreshNavBg()
+  }
+
+  private resolveDark(): boolean {
+    if (this.themeMode === '深色模式') return true
+    if (this.themeMode === '浅色模式') return false
     return this.isSystemDark
   }
 
-  private applyTheme(): void {
-    this.bgColor      = ThemeManager.getBackgroundColor(this.storedThemeMode)
-    this.cardBg       = ThemeManager.getCardBackgroundColor(this.storedThemeMode)
-    this.textColor    = ThemeManager.getTextColor(this.storedThemeMode)
-    this.secondaryColor = ThemeManager.getSecondaryTextColor(this.storedThemeMode)
-    this.dividerColor = ThemeManager.getBorderColor(this.storedThemeMode)
+  private syncTheme(): void {
+    this.bgColor     = ThemeManager.getBackgroundColor(this.themeMode)
+    this.cardBg      = ThemeManager.getCardBackgroundColor(this.themeMode)
+    this.textColor   = ThemeManager.getTextColor(this.themeMode)
+    this.secondColor = ThemeManager.getSecondaryTextColor(this.themeMode)
+    this.divColor    = ThemeManager.getBorderColor(this.themeMode)
   }
 
-  // ── 扫描脉冲动画 ─────────────────────────────────────────────────────────
+  private refreshNavBg(): void {
+    this.navBg = this.scanState === ScanState.IDLE
+      ? '#00000000'
+      : (this.isDark ? '#DD121212' : '#EEF9FAFB')
+  }
 
-  private loopPulse(): void {
-    animateTo({ duration: 900, curve: Curve.EaseOut }, () => {
-      this.pulseScale   = 1.18
-      this.pulseOpacity = 0.0
+  // ── 脉冲动画 ─────────────────────────────────────────────────────────
+
+  private pulseLoop(): void {
+    if (!this.pulseActive) return
+    animateTo({ duration: 780, curve: Curve.EaseOut }, () => {
+      this.pulseScale = 1.18
+      this.pulseAlpha = 0.0
     })
     setTimeout(() => {
-      this.pulseScale   = 1.0
-      this.pulseOpacity = 0.55
-      this.loopPulse()
-    }, 940)
+      if (!this.pulseActive) return
+      this.pulseScale = 1.0
+      this.pulseAlpha = 0.6
+      this.pulseLoop()
+    }, 800)
   }
 
-  // ── 相机 & 相册 ───────────────────────────────────────────────────────────
+  // ── 相机与相册 ────────────────────────────────────────────────────────
 
-  private async requestCameraPermission(): Promise<boolean> {
+  private async requestCamera(): Promise<boolean> {
     const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined
     if (!host) return false
     try {
       const mgr = abilityAccessCtrl.createAtManager()
-      const perms: Permissions[] = ['ohos.permission.CAMERA']
-      const res = await mgr.requestPermissionsFromUser(host, perms)
-      return res.authResults[0] === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED
-    } catch (e) {
-      console.error('[CalorieScan] 权限请求失败:', JSON.stringify(e))
+      const r = await mgr.requestPermissionsFromUser(host, ['ohos.permission.CAMERA'] as Permissions[])
+      return r.authResults[0] === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED
+    } catch {
       return false
     }
   }
 
   private async launchCamera(): Promise<void> {
-    if (!(await this.requestCameraPermission())) {
-      this.showPermissionDeniedDialog()
-      return
-    }
+    if (!(await this.requestCamera())) { this.showPermDenied(); return }
     const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined
     if (!host) return
     try {
-      const profile: cameraPicker.PickerProfile = { cameraPosition: camera.CameraPosition.CAMERA_POSITION_BACK }
-      const res = await cameraPicker.pick(host, [cameraPicker.PickerMediaType.PHOTO], profile)
-      if (res.resultCode === 0 && res.resultUri.length > 0) {
-        this.capturedUri = res.resultUri
+      const r = await cameraPicker.pick(host, [cameraPicker.PickerMediaType.PHOTO], {
+        cameraPosition: camera.CameraPosition.CAMERA_POSITION_BACK,
+      } as cameraPicker.PickerProfile)
+      if (r.resultCode === 0 && r.resultUri.length > 0) {
+        this.capturedUri = r.resultUri
         this.scanState   = ScanState.PREVIEW
       }
     } catch (e) {
-      console.error('[CalorieScan] 调起相机失败:', JSON.stringify(e))
-      this.showToast('相机启动失败，请重试')
+      console.error('[CalorieScan] camera error:', JSON.stringify(e))
+      this.toast('相机启动失败，请重试')
     }
   }
 
-  private async launchPhotoPicker(): Promise<void> {
+  private async launchPicker(): Promise<void> {
     const uri = await PhotoPickerHelper.selectSinglePhoto()
     if (uri) {
       this.capturedUri = uri
@@ -173,136 +188,129 @@ struct CalorieScanPage {
     }
   }
 
-  // ── 识别 ─────────────────────────────────────────────────────────────────
+  // ── 识别流程 ─────────────────────────────────────────────────────────
 
   private async startRecognition(): Promise<void> {
     if (this.capturedUri.length === 0) return
     this.scanState = ScanState.RECOGNIZING
     try {
-      const result = await FoodRecognitionService.recognize(this.capturedUri)
-      this.recognitionResult = result
+      const r = await FoodRecognitionService.recognize(this.capturedUri)
+      this.recognitionResult = r
       this.quantity = 1.0
-      if (result.identified) {
-        this.setDisplayResult(result)
-        this.showResultCard()
+      if (r.identified) {
+        this.applyResult(r)
+        this.animateCardIn()
       } else {
         this.scanState = ScanState.MANUAL
-        this.showToast('未能自动识别，请手动输入食物名称')
+        this.toast('未能识别，请手动输入食物名称')
       }
     } catch (e) {
-      console.error('[CalorieScan] 识别异常:', JSON.stringify(e))
+      console.error('[CalorieScan] recognition error:', JSON.stringify(e))
       this.scanState = ScanState.MANUAL
-      this.showToast('识别服务暂时不可用，请手动输入')
+      this.toast('识别服务暂时不可用，请手动输入')
     }
   }
 
-  private showResultCard(): void {
-    this.resultCardOpacity = 0
-    this.resultCardOffset  = 60
-    this.scanState = ScanState.RESULT
-    animateTo({ duration: 420, curve: Curve.EaseOut }, () => {
-      this.resultCardOpacity = 1
-      this.resultCardOffset  = 0
+  private animateCardIn(): void {
+    this.cardOpacity = 0
+    this.cardOffset  = 20
+    this.scanState   = ScanState.RESULT
+    animateTo({ duration: 360, curve: Curve.EaseOut }, () => {
+      this.cardOpacity = 1
+      this.cardOffset  = 0
     })
   }
 
-  // ── 手动输入 ─────────────────────────────────────────────────────────────
+  // ── 手动输入 ─────────────────────────────────────────────────────────
 
-  private applyManualFood(): void {
-    const name = this.manualFoodName.trim()
-    if (name.length === 0) { this.showToast('请输入食物名称'); return }
-    const nutrient = CalorieCalculator.lookup(name)
+  private confirmManual(): void {
+    const name = this.manualInput.trim()
+    if (name.length === 0) { this.toast('请输入食物名称'); return }
+    const n = CalorieCalculator.lookup(name)
       ?? CalorieCalculator.fuzzyMatch([name])?.data
       ?? { calories: 100, protein: 5, fat: 3, carbs: 15, servingWeight: 200 } as NutrientData
-    const r: FoodRecognitionResult = { identified: true, foodName: name, nutrient, source: 'manual', rawLabels: [] }
+    const r: FoodRecognitionResult = { identified: true, foodName: name, nutrient: n, source: 'manual', rawLabels: [] }
     this.recognitionResult = r
-    this.setDisplayResult(r)
+    this.applyResult(r)
     this.quantity = 1.0
-    this.showResultCard()
+    this.animateCardIn()
   }
 
-  // ── 保存 ─────────────────────────────────────────────────────────────────
+  // ── 保存 ─────────────────────────────────────────────────────────────
 
-  private async saveRecord(): Promise<void> {
+  private async save(): Promise<void> {
     if (this.saving || this.recognitionResult === null) return
     const host = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined
     if (!host) return
     this.saving = true
-    animateTo({ duration: 100, curve: Curve.EaseIn }, () => { this.saveBtnScale = 0.95 })
-    setTimeout(() => { animateTo({ duration: 150, curve: Curve.EaseOut }, () => { this.saveBtnScale = 1.0 }) }, 110)
+    animateTo({ duration: 90 }, () => { this.saveBtnScale = 0.94 })
+    setTimeout(() => { animateTo({ duration: 130, curve: Curve.EaseOut }, () => { this.saveBtnScale = 1.0 }) }, 95)
     try {
       const r    = this.recognitionResult
       const calc = CalorieCalculator.calcByQuantity(r.nutrient, this.quantity)
-      const record: DietRecord = {
-        date:      DietDatabaseHelper.todayDateStr(),
-        mealType:  this.selectedMealType,
-        foodName:  r.foodName,
-        quantity:  this.quantity,
-        unit:      '份',
-        calories:  calc.totalCalories,
-        protein:   calc.totalProtein,
-        fat:       calc.totalFat,
-        carbs:     calc.totalCarbs,
-        imageUri:  this.capturedUri,
-        timestamp: Date.now(),
+      const rec: DietRecord = {
+        date: DietDatabaseHelper.todayDateStr(), mealType: this.mealType,
+        foodName: r.foodName, quantity: this.quantity, unit: '份',
+        calories: calc.totalCalories, protein: calc.totalProtein,
+        fat: calc.totalFat, carbs: calc.totalCarbs,
+        imageUri: this.capturedUri, timestamp: Date.now(),
       }
-      await DietDatabaseHelper.getInstance().insertRecord(host, record)
-      this.showToast(`✅ 已记录：${r.foodName}  ${calc.totalCalories} 千卡`)
+      await DietDatabaseHelper.getInstance().insertRecord(host, rec)
+      this.toast(`✅ 已记录：${r.foodName}  ${calc.totalCalories} 千卡`)
       setTimeout(() => {
-        this.scanState  = ScanState.IDLE
+        this.scanState = ScanState.IDLE
         this.capturedUri = ''
         this.recognitionResult = null
-      }, 1600)
+      }, 1500)
     } catch (e) {
-      console.error('[CalorieScan] 保存失败:', JSON.stringify(e))
-      this.showToast('保存失败，请重试')
+      console.error('[CalorieScan] save error:', JSON.stringify(e))
+      this.toast('保存失败，请重试')
     } finally {
       this.saving = false
     }
   }
 
-  // ── 结果展示辅助（非 Builder 上下文，proxy 安全）─────────────────────────
+  // ── 结果数据 ──────────────────────────────────────────────────────────
 
-  private setDisplayResult(r: FoodRecognitionResult): void {
-    this.resultFoodName      = r.foodName
-    this.resultSourceLabel   = r.source === 'cloud' ? '云端' : r.source === 'local' ? '本地库' : '手动'
-    this.resultCalPer100     = r.nutrient.calories
-    this.resultProteinPer100 = r.nutrient.protein
-    this.resultFatPer100     = r.nutrient.fat
-    this.resultCarbsPer100   = r.nutrient.carbs
-    this.resultServingWeight = r.nutrient.servingWeight
-    this.recalcDisplay()
+  private applyResult(r: FoodRecognitionResult): void {
+    this.resultName  = r.foodName
+    this.resultTag   = r.source === 'cloud' ? '云端' : r.source === 'local' ? '本地库' : '手动'
+    this.rawCal      = r.nutrient.calories
+    this.rawPro      = r.nutrient.protein
+    this.rawFat      = r.nutrient.fat
+    this.rawCarbs    = r.nutrient.carbs
+    this.rawServing  = r.nutrient.servingWeight
+    this.recalc()
   }
 
-  private recalcDisplay(): void {
-    const f = this.resultServingWeight * this.quantity / 100.0
-    this.displayCalories = Math.round(this.resultCalPer100 * f)
-    this.displayProtein  = Math.round(this.resultProteinPer100 * f * 10) / 10
-    this.displayFat      = Math.round(this.resultFatPer100     * f * 10) / 10
-    this.displayCarbs    = Math.round(this.resultCarbsPer100   * f * 10) / 10
+  private recalc(): void {
+    const f = this.rawServing * this.quantity / 100
+    this.dispCalories = Math.round(this.rawCal   * f)
+    this.dispProtein  = Math.round(this.rawPro   * f * 10) / 10
+    this.dispFat      = Math.round(this.rawFat   * f * 10) / 10
+    this.dispCarbs    = Math.round(this.rawCarbs * f * 10) / 10
   }
 
-  private onQuantityChange(): void { this.recalcDisplay() }
+  private onQtyChange(): void { this.recalc() }
 
-  // ── Toast & Dialog ────────────────────────────────────────────────────────
+  // ── Toast & Dialog ────────────────────────────────────────────────────
 
-  private showToast(msg: string): void {
-    this.toastMessage = msg
+  private toast(msg: string): void {
+    this.toastMsg     = msg
     this.toastVisible = true
-    setTimeout(() => { this.toastVisible = false }, 2500)
+    setTimeout(() => { this.toastVisible = false }, 2600)
   }
 
-  private showPermissionDeniedDialog(): void {
+  private showPermDenied(): void {
     AlertDialog.show({
       title: '需要相机权限',
-      message: '热量识别功能需要使用相机拍摄食物照片。\n请在系统设置 → 应用管理 → 您吃了么 → 权限 中开启相机权限。',
+      message: '请在系统设置 → 应用管理 → 您吃了么 → 权限 中开启相机权限。',
       primaryButton: { value: '知道了', action: () => {} },
       secondaryButton: {
-        value: '退出功能',
+        value: '退出',
         action: () => {
           const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined
-          if (ctx) ctx.terminateSelf()
-          else this.getUIContext().getRouter().back()
+          ctx ? ctx.terminateSelf() : this.getUIContext().getRouter().back()
         },
       },
       autoCancel: false,
@@ -310,17 +318,18 @@ struct CalorieScanPage {
   }
 
   // ════════════════════════════════════════════════════════════════════════
-  // UI Builders
-  // 重要：所有 @Builder 只读 @State 基本类型，零 getter，零方法调用
+  // Builders
+  // 规则：所有 @Builder 只读 @State 基本类型变量，禁止 getter 和方法调用
   // ════════════════════════════════════════════════════════════════════════
 
-  /** 悬浮导航栏（毛玻璃）*/
+  // 悬浮导航栏 — 透明(IDLE) / 毛玻璃(其他状态)
   @Builder
   FloatNav() {
     Row() {
       Row() {
         SymbolGlyph($r('sys.symbol.chevron_left'))
-          .fontSize(20).fontColor([this.scanState === ScanState.IDLE ? '#FFFFFF' : this.textColor])
+          .fontSize(20)
+          .fontColor([this.scanState === ScanState.IDLE ? '#FFFFFF' : this.textColor])
       }
       .width(44).height(44).justifyContent(FlexAlign.Center)
       .onClick(() => this.getUIContext().getRouter().back())
@@ -332,11 +341,10 @@ struct CalorieScanPage {
 
       if (this.scanState === ScanState.IDLE) {
         Row() {
-          SymbolGlyph($r('sys.symbol.picture_fill'))
-            .fontSize(18).fontColor(['#FFFFFF'])
+          SymbolGlyph($r('sys.symbol.picture_fill')).fontSize(18).fontColor(['#FFFFFF'])
         }
         .width(44).height(44).justifyContent(FlexAlign.Center)
-        .onClick(() => { void this.launchPhotoPicker() })
+        .onClick(() => { void this.launchPicker() })
       } else {
         Blank().width(44)
       }
@@ -344,443 +352,386 @@ struct CalorieScanPage {
     .width('100%')
     .height(this.safeTopVp + 48)
     .padding({ top: this.safeTopVp, left: 4, right: 4 })
+    .backgroundColor(this.navBg)
     .backgroundBlurStyle(this.scanState === ScanState.IDLE ? BlurStyle.NONE : BlurStyle.Thin)
-    .backgroundColor(this.scanState === ScanState.IDLE ? '#00000000' : this.cardBg + 'CC')
   }
 
-  /** 图片/占位取景框 */
+  // 取景框区（52%屏高，始终深色底）
   @Builder
   CameraFrame() {
-    Stack({ alignContent: Alignment.Center }) {
+    Stack() {
+      // 深色底板，不跟随主题
+      Column().width('100%').height('100%').backgroundColor(CAMERA_BG)
 
-      // ── 背景：已有图片时显示图片，否则深色占位 ──
+      // 已选图片
       if (this.capturedUri.length > 0) {
         Image(this.capturedUri)
           .width('100%').height('100%')
           .objectFit(ImageFit.Cover)
-      } else {
-        Column()
-          .width('100%').height('100%')
-          .backgroundColor(this.isDark ? '#0D0D0D' : '#1A1A2E')
       }
 
-      // ── 识别中：脉冲动画叠加 ──
-      if (this.scanState === ScanState.RECOGNIZING) {
-        Column({ space: 0 }) {
-          // 暗化蒙层
-          Column()
-            .width('100%').height('100%')
-            .backgroundColor('#66000000')
-            .position({ x: 0, y: 0 })
-
-          // 脉冲圆环
-          Circle()
-            .width(120).height(120)
-            .fill('transparent')
-            .strokeWidth(2)
-            .stroke(AppColors.BRAND_COLOR)
-            .opacity(this.pulseOpacity)
-            .scale({ x: this.pulseScale, y: this.pulseScale })
-
-          Text('正在识别…')
-            .fontSize(15).fontColor('#FFFFFF').fontWeight(FontWeight.Medium)
-            .margin({ top: 16 })
-            .textShadow({ radius: 6, color: '#80000000', offsetX: 0, offsetY: 2 })
-        }
-        .width('100%').height('100%')
-        .justifyContent(FlexAlign.Center)
-        .position({ x: 0, y: 0 })
-      }
-
-      // ── 空态：引导文案 ──
+      // 空态引导文字
       if (this.scanState === ScanState.IDLE) {
         Column({ space: 14 }) {
-          Text('📸').fontSize(64)
+          Text('📸').fontSize(60)
           Text('对准食物，轻点拍摄')
-            .fontSize(16).fontColor('#FFFFFFCC').fontWeight(FontWeight.Medium)
-          Text('支持识别常见中国家常菜、食材和零食')
-            .fontSize(12).fontColor('#FFFFFF80')
+            .fontSize(15).fontColor(CORNER_COLOR).fontWeight(FontWeight.Medium)
+          Text('识别常见中国家常菜、食材和零食')
+            .fontSize(12).fontColor('#80FFFFFF')
         }
-        .alignItems(HorizontalAlign.Center)
-        .justifyContent(FlexAlign.Center)
+        .width('100%').height('100%')
+        .justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
       }
 
-      // ── 取景框角标（四个角的 L 形线，仅 IDLE/PREVIEW 态显示）──
+      // 识别中：蒙层 + 脉冲圆环
+      if (this.scanState === ScanState.RECOGNIZING) {
+        Stack() {
+          Column().width('100%').height('100%').backgroundColor(SCAN_OVERLAY)
+          Column({ space: 12 }) {
+            Circle()
+              .width(110).height(110)
+              .fill('transparent')
+              .stroke(AppColors.BRAND_COLOR)
+              .strokeWidth(2.5)
+              .opacity(this.pulseAlpha)
+              .scale({ x: this.pulseScale, y: this.pulseScale })
+            Text('正在识别…')
+              .fontSize(15).fontColor('#FFFFFF').fontWeight(FontWeight.Medium)
+          }
+          .width('100%').height('100%')
+          .justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+        }.width('100%').height('100%')
+      }
+
+      // L 形角标（IDLE / PREVIEW），顶部用 margin 避开导航栏
       if (this.scanState === ScanState.IDLE || this.scanState === ScanState.PREVIEW) {
-        Row() {
-          // 左上
-          Column() {
-            Row().width(28).height(3).backgroundColor('#FFFFFFCC').borderRadius(2)
-            Row().width(3).height(28).backgroundColor('#FFFFFFCC').borderRadius(2).margin({ top: -3 })
-          }.alignItems(HorizontalAlign.Start)
+        Column() {
+          Row() {
+            Column() {
+              Row().width(26).height(2.5).backgroundColor(CORNER_COLOR).borderRadius(1.5)
+              Row().width(2.5).height(22).backgroundColor(CORNER_COLOR).borderRadius(1.5).margin({ top: -1 })
+            }.alignItems(HorizontalAlign.Start)
+            Blank()
+            Column() {
+              Row().width(26).height(2.5).backgroundColor(CORNER_COLOR).borderRadius(1.5)
+              Row().width(2.5).height(22).backgroundColor(CORNER_COLOR)
+                .borderRadius(1.5).margin({ top: -1 }).alignSelf(ItemAlign.End)
+            }.alignItems(HorizontalAlign.End)
+          }
+          .width('100%').padding({ left: 22, right: 22 })
+          .margin({ top: this.safeTopVp + 52 })
 
-          Blank()
+          Blank().layoutWeight(1)
 
-          // 右上
-          Column() {
-            Row().width(28).height(3).backgroundColor('#FFFFFFCC').borderRadius(2)
-            Row().width(3).height(28).backgroundColor('#FFFFFFCC').borderRadius(2)
-              .margin({ top: -3 }).alignSelf(ItemAlign.End)
-          }.alignItems(HorizontalAlign.End)
+          Row() {
+            Column() {
+              Row().width(2.5).height(22).backgroundColor(CORNER_COLOR).borderRadius(1.5)
+              Row().width(26).height(2.5).backgroundColor(CORNER_COLOR).borderRadius(1.5).margin({ top: -1 })
+            }.alignItems(HorizontalAlign.Start)
+            Blank()
+            Column() {
+              Row().width(2.5).height(22).backgroundColor(CORNER_COLOR)
+                .borderRadius(1.5).alignSelf(ItemAlign.End)
+              Row().width(26).height(2.5).backgroundColor(CORNER_COLOR)
+                .borderRadius(1.5).margin({ top: -1 }).alignSelf(ItemAlign.End)
+            }.alignItems(HorizontalAlign.End)
+          }
+          .width('100%').padding({ left: 22, right: 22 })
+          .margin({ bottom: 16 })
+        }.width('100%').height('100%')
+
+        // PREVIEW 右上角"重新拍摄"按钮
+        if (this.scanState === ScanState.PREVIEW) {
+          Row() {
+            Blank()
+            Row({ space: 5 }) {
+              SymbolGlyph($r('sys.symbol.camera')).fontSize(12).fontColor(['#FFFFFF'])
+              Text('重新拍摄').fontSize(11).fontColor('#FFFFFF')
+            }
+            .padding({ left: 12, right: 12, top: 7, bottom: 7 })
+            .backgroundColor('#60000000').borderRadius(20)
+            .onClick(() => { this.capturedUri = ''; this.scanState = ScanState.IDLE })
+          }
+          .width('100%').padding({ top: this.safeTopVp + 56, right: 16 })
         }
-        .width('100%').padding({ left: 24, right: 24 })
-        .position({ x: 0, y: 24 })
-
-        Row() {
-          // 左下
-          Column() {
-            Row().width(3).height(28).backgroundColor('#FFFFFFCC').borderRadius(2)
-            Row().width(28).height(3).backgroundColor('#FFFFFFCC').borderRadius(2).margin({ top: -3 })
-          }.alignItems(HorizontalAlign.Start)
-
-          Blank()
-
-          // 右下
-          Column() {
-            Row().width(3).height(28).backgroundColor('#FFFFFFCC').borderRadius(2)
-              .alignSelf(ItemAlign.End)
-            Row().width(28).height(3).backgroundColor('#FFFFFFCC').borderRadius(2)
-              .margin({ top: -3 }).alignSelf(ItemAlign.End)
-          }.alignItems(HorizontalAlign.End)
-        }
-        .width('100%').padding({ left: 24, right: 24 })
-        .position({ x: 0, y: undefined })
-        .margin({ top: '100%' })
-        .translate({ y: -80 })
       }
-
-      // ── PREVIEW：右上角"重新拍摄"按钮 ──
-      if (this.scanState === ScanState.PREVIEW) {
-        Row({ space: 5 }) {
-          SymbolGlyph($r('sys.symbol.camera')).fontSize(13).fontColor(['#FFFFFF'])
-          Text('重新拍摄').fontSize(12).fontColor('#FFFFFF')
-        }
-        .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-        .backgroundColor('#66000000')
-        .borderRadius(20)
-        .position({ x: undefined, y: 12 })
-        .margin({ right: 12 })
-        .onClick(() => {
-          this.capturedUri = ''
-          this.scanState   = ScanState.IDLE
-        })
-        .alignSelf(ItemAlign.End)
-      }
-
     }
-    .width('100%')
-    .height(this.scanState === ScanState.RESULT ? 220 : '52%')
+    .width('100%').height('52%')
     .borderRadius({ bottomLeft: 28, bottomRight: 28 })
     .clip(true)
   }
 
-  /** 初始态底部操作区 */
+  // 营养素行（色点 + 标签 + 粗体值）
   @Builder
-  IdleActions() {
-    Column({ space: 16 }) {
-      Button() {
-        Row({ space: 10 }) {
-          SymbolGlyph($r('sys.symbol.camera')).fontSize(22).fontColor([Color.White])
-          Text('拍照识别').fontSize(17).fontColor(Color.White).fontWeight(FontWeight.Bold)
-        }
-      }
-      .width('88%').height(56)
-      .backgroundColor(AppColors.BRAND_COLOR)
-      .borderRadius(28)
-      .shadow({ radius: 16, color: AppColors.BRAND_COLOR + '55', offsetX: 0, offsetY: 6 })
-      .onClick(() => { void this.launchCamera() })
-
-      Button() {
-        Row({ space: 10 }) {
-          SymbolGlyph($r('sys.symbol.picture_fill')).fontSize(20).fontColor([AppColors.BRAND_COLOR])
-          Text('从相册选图').fontSize(15).fontColor(AppColors.BRAND_COLOR).fontWeight(FontWeight.Medium)
-        }
-      }
-      .width('88%').height(48)
-      .backgroundColor(this.isDark ? '#1A1A1A' : AppColors.BRAND_COLOR_LIGHT)
-      .borderRadius(24)
-      .onClick(() => { void this.launchPhotoPicker() })
-    }
-    .width('100%').alignItems(HorizontalAlign.Center)
-    .padding({ top: 28, bottom: 16 })
-  }
-
-  /** PREVIEW 态底部操作区 */
-  @Builder
-  PreviewActions() {
-    Row({ space: 14 }) {
-      Button('从相册重选')
-        .layoutWeight(1).height(52)
-        .backgroundColor(this.cardBg).fontColor(this.textColor).borderRadius(26)
-        .border({ width: 1, color: this.dividerColor })
-        .onClick(() => { void this.launchPhotoPicker() })
-
-      Button('开始识别')
-        .layoutWeight(2).height(52)
-        .backgroundColor(AppColors.BRAND_COLOR).fontColor(Color.White)
-        .fontWeight(FontWeight.Bold).borderRadius(26)
-        .shadow({ radius: 12, color: AppColors.BRAND_COLOR + '44', offsetX: 0, offsetY: 4 })
-        .onClick(() => { void this.startRecognition() })
-    }
-    .width('100%').padding({ left: 20, right: 20, top: 24, bottom: 16 })
-  }
-
-  /** 营养素指示行（带色点）*/
-  @Builder
-  NutrientDotRow(dot: string, label: string, value: string, unit: string) {
+  NutrientRow(dot: string, label: string, value: string) {
     Row({ space: 10 }) {
-      Row()
-        .width(10).height(10).borderRadius(5)
-        .backgroundColor(dot)
-        .flexShrink(0)
-      Text(label)
-        .fontSize(13).fontColor(this.secondaryColor)
-        .layoutWeight(1)
-      Text(value)
-        .fontSize(16).fontColor(this.textColor).fontWeight(FontWeight.Bold)
-      Text(' ' + unit)
-        .fontSize(12).fontColor(this.secondaryColor)
+      Row().width(10).height(10).borderRadius(5).backgroundColor(dot).flexShrink(0)
+      Text(label).fontSize(13).fontColor(this.secondColor).layoutWeight(1)
+      Text(value).fontSize(16).fontWeight(FontWeight.Bold).fontColor(this.textColor)
     }
-    .width('100%')
-    .padding({ top: 10, bottom: 10 })
+    .width('100%').height(44)
   }
 
-  /** 份量选择器（胶囊式）*/
+  // 份量胶囊选择器
   @Builder
-  QuantityPill() {
-    Row({ space: 0 }) {
-      Text('份量').fontSize(14).fontColor(this.secondaryColor).layoutWeight(1)
-
+  QtyPill() {
+    Row() {
+      Text('份量').fontSize(14).fontColor(this.secondColor).layoutWeight(1)
       Row() {
-        // 减号
         Text('－')
-          .fontSize(18).fontColor(AppColors.BRAND_COLOR)
-          .width(40).height(40).textAlign(TextAlign.Center)
-          .scale({ x: this.qtyMinusScale, y: this.qtyMinusScale })
+          .fontSize(20).fontColor(AppColors.BRAND_COLOR)
+          .width(44).height(44).textAlign(TextAlign.Center)
+          .scale({ x: this.qtyMinusSc, y: this.qtyMinusSc })
           .onClick(() => {
-            if (this.quantity > 0.5) {
-              animateTo({ duration: 80, curve: Curve.EaseIn }, () => { this.qtyMinusScale = 0.88 })
-              setTimeout(() => {
-                animateTo({ duration: 100, curve: Curve.EaseOut }, () => { this.qtyMinusScale = 1.0 })
-              }, 85)
-              this.quantity = Math.round((this.quantity - 0.5) * 10) / 10
-            }
+            if (this.quantity <= 0.5) return
+            animateTo({ duration: 80 }, () => { this.qtyMinusSc = 0.86 })
+            setTimeout(() => { animateTo({ duration: 120, curve: Curve.EaseOut }, () => { this.qtyMinusSc = 1.0 }) }, 85)
+            this.quantity = Math.round((this.quantity - 0.5) * 10) / 10
           })
-
         Text(`${this.quantity}`)
-          .fontSize(18).fontWeight(FontWeight.Bold).fontColor(this.textColor)
-          .width(44).textAlign(TextAlign.Center)
-
-        // 加号
+          .fontSize(19).fontWeight(FontWeight.Bold).fontColor(this.textColor)
+          .width(46).textAlign(TextAlign.Center)
         Text('＋')
-          .fontSize(18).fontColor(AppColors.BRAND_COLOR)
-          .width(40).height(40).textAlign(TextAlign.Center)
-          .scale({ x: this.qtyPlusScale, y: this.qtyPlusScale })
+          .fontSize(20).fontColor(AppColors.BRAND_COLOR)
+          .width(44).height(44).textAlign(TextAlign.Center)
+          .scale({ x: this.qtyPlusSc, y: this.qtyPlusSc })
           .onClick(() => {
-            if (this.quantity < 10) {
-              animateTo({ duration: 80, curve: Curve.EaseIn }, () => { this.qtyPlusScale = 0.88 })
-              setTimeout(() => {
-                animateTo({ duration: 100, curve: Curve.EaseOut }, () => { this.qtyPlusScale = 1.0 })
-              }, 85)
-              this.quantity = Math.round((this.quantity + 0.5) * 10) / 10
-            }
+            if (this.quantity >= 10) return
+            animateTo({ duration: 80 }, () => { this.qtyPlusSc = 0.86 })
+            setTimeout(() => { animateTo({ duration: 120, curve: Curve.EaseOut }, () => { this.qtyPlusSc = 1.0 }) }, 85)
+            this.quantity = Math.round((this.quantity + 0.5) * 10) / 10
           })
       }
-      .height(40)
+      .height(44)
       .backgroundColor(this.isDark ? AppColors.DARK_GRAY_100 : AppColors.GRAY_100)
-      .borderRadius(20)
-    }
-    .width('100%')
-    .padding({ top: 6, bottom: 6 })
+      .borderRadius(22)
+    }.width('100%')
   }
 
-  /** 餐次选择（图标+文字胶囊）*/
+  // 餐次选择（emoji + 文字双行）
   @Builder
-  MealTypeRow() {
-    Row({ space: 8 }) {
-      ForEach(MEAL_TYPES, (meal: string, idx: number) => {
+  MealRow() {
+    Row({ space: 10 }) {
+      ForEach(MEAL_TYPES, (meal: string, i: number) => {
         Column({ space: 2 }) {
-          Text(MEAL_EMOJIS[idx]).fontSize(16)
+          Text(MEAL_EMOJIS[i]).fontSize(18)
           Text(meal)
             .fontSize(11)
-            .fontColor(this.selectedMealType === meal ? AppColors.BRAND_COLOR : this.secondaryColor)
-            .fontWeight(this.selectedMealType === meal ? FontWeight.Bold : FontWeight.Normal)
+            .fontColor(this.mealType === meal ? AppColors.BRAND_COLOR : this.secondColor)
+            .fontWeight(this.mealType === meal ? FontWeight.Bold : FontWeight.Normal)
         }
         .width(56).height(52).justifyContent(FlexAlign.Center)
         .backgroundColor(
-          this.selectedMealType === meal
+          this.mealType === meal
             ? (this.isDark ? '#2A1215' : AppColors.BRAND_COLOR_LIGHT)
             : 'transparent'
         )
         .borderRadius(12)
-        .border({
-          width: this.selectedMealType === meal ? 1.5 : 0,
-          color: AppColors.BRAND_COLOR,
-        })
-        .onClick(() => { this.selectedMealType = meal })
+        .border({ width: this.mealType === meal ? 1.5 : 0, color: AppColors.BRAND_COLOR })
+        .onClick(() => { this.mealType = meal })
       }, (meal: string) => meal)
-    }
-    .width('100%')
+    }.width('100%')
   }
 
-  /** 结果卡片（玻璃态）*/
+  // 识别结果卡（有数据才调用）
   @Builder
   ResultCard() {
     Column({ space: 0 }) {
-
       // 食物名 + 来源标签
       Row({ space: 10 }) {
-        Text(this.resultFoodName)
-          .fontSize(22).fontWeight(FontWeight.Bold).fontColor(this.textColor)
+        Text(this.resultName)
+          .fontSize(20).fontWeight(FontWeight.Bold).fontColor(this.textColor)
           .layoutWeight(1).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-        Text(this.resultSourceLabel)
+        Text(this.resultTag)
           .fontSize(11).fontColor(AppColors.BRAND_COLOR)
           .padding({ left: 9, right: 9, top: 4, bottom: 4 })
           .backgroundColor(this.isDark ? '#2A1215' : AppColors.BRAND_COLOR_LIGHT)
           .borderRadius(12)
-      }
-      .width('100%').padding({ left: 20, right: 20, top: 18, bottom: 4 })
+      }.padding({ left: 20, right: 20, top: 20, bottom: 6 })
 
       // 热量大字
       Row({ space: 4 }) {
-        Text(`${this.displayCalories}`)
-          .fontSize(48).fontWeight(FontWeight.Bold).fontColor(AppColors.BRAND_COLOR)
-          .fontStyle(FontStyle.Normal)
+        Text(`${this.dispCalories}`)
+          .fontSize(46).fontWeight(FontWeight.Bold).fontColor(AppColors.BRAND_COLOR)
         Column({ space: 2 }) {
-          Text('千卡').fontSize(14).fontColor(this.secondaryColor)
+          Text('千卡').fontSize(14).fontColor(this.secondColor)
           Text('本份').fontSize(11).fontColor(this.isDark ? AppColors.DARK_GRAY_400 : AppColors.GRAY_400)
-        }.margin({ top: 18 }).alignItems(HorizontalAlign.Start)
-      }
-      .padding({ left: 20, bottom: 12 })
+        }.margin({ top: 16 }).alignItems(HorizontalAlign.Start)
+      }.padding({ left: 20, bottom: 12 })
 
-      // 分隔线
-      Divider().color(this.dividerColor).margin({ left: 20, right: 20 })
+      Divider().color(this.divColor).margin({ left: 20, right: 20 })
 
       // 三大营养素
-      Column({ space: 0 }) {
-        this.NutrientDotRow('#22C55E', '蛋白质', `${this.displayProtein}`, 'g')
-        Divider().color(this.dividerColor)
-        this.NutrientDotRow('#F59E0B', '脂肪',   `${this.displayFat}`,     'g')
-        Divider().color(this.dividerColor)
-        this.NutrientDotRow('#3B82F6', '碳水化合物', `${this.displayCarbs}`, 'g')
-      }.padding({ left: 20, right: 20, top: 4, bottom: 4 })
+      Column() {
+        this.NutrientRow('#22C55E', '蛋白质',    `${this.dispProtein} g`)
+        Divider().color(this.divColor)
+        this.NutrientRow('#F59E0B', '脂肪',      `${this.dispFat} g`)
+        Divider().color(this.divColor)
+        this.NutrientRow('#3B82F6', '碳水化合物', `${this.dispCarbs} g`)
+      }.padding({ left: 20, right: 20 })
 
-      Divider().color(this.dividerColor).margin({ left: 20, right: 20 })
+      Divider().color(this.divColor).margin({ left: 20, right: 20 })
 
       // 份量
-      Column() {
-        this.QuantityPill()
-      }.padding({ left: 20, right: 20, top: 2, bottom: 2 })
+      Column() { this.QtyPill() }.padding({ left: 20, right: 20 })
 
-      Divider().color(this.dividerColor).margin({ left: 20, right: 20 })
+      Divider().color(this.divColor).margin({ left: 20, right: 20 })
 
       // 餐次
       Column({ space: 8 }) {
-        Text('选择餐次').fontSize(12).fontColor(this.secondaryColor).alignSelf(ItemAlign.Start)
-        this.MealTypeRow()
+        Text('选择餐次').fontSize(12).fontColor(this.secondColor).alignSelf(ItemAlign.Start)
+        this.MealRow()
       }.padding({ left: 20, right: 20, top: 12, bottom: 14 })
 
-      Divider().color(this.dividerColor).margin({ left: 20, right: 20 })
+      Divider().color(this.divColor).margin({ left: 20, right: 20 })
 
-      // 操作按钮行
+      // 操作按钮
       Row({ space: 12 }) {
         Button('重新识别')
-          .layoutWeight(1).height(50)
+          .layoutWeight(1).height(52)
           .backgroundColor(this.isDark ? AppColors.DARK_GRAY_100 : AppColors.GRAY_100)
-          .fontColor(this.textColor).fontSize(14).borderRadius(25)
+          .fontColor(this.textColor).fontSize(14).borderRadius(26)
           .onClick(() => {
             this.recognitionResult = null
-            this.capturedUri       = ''
-            this.scanState         = ScanState.IDLE
+            this.capturedUri = ''
+            this.scanState = ScanState.IDLE
           })
 
         Button(this.saving ? '保存中…' : '✓ 记录今日饮食')
-          .layoutWeight(2).height(50)
+          .layoutWeight(2).height(52)
           .backgroundColor(AppColors.BRAND_COLOR)
           .fontColor(Color.White).fontWeight(FontWeight.Bold).fontSize(15)
-          .borderRadius(25)
+          .borderRadius(26)
           .scale({ x: this.saveBtnScale, y: this.saveBtnScale })
-          .shadow({ radius: 14, color: AppColors.BRAND_COLOR + '44', offsetX: 0, offsetY: 5 })
+          .shadow({ radius: 12, color: AppColors.BRAND_COLOR + '44', offsetX: 0, offsetY: 4 })
           .enabled(!this.saving)
-          .onClick(() => { void this.saveRecord() })
-      }
-      .width('100%').padding({ left: 20, right: 20, top: 14, bottom: 20 })
+          .onClick(() => { void this.save() })
+      }.padding({ left: 20, right: 20, top: 14, bottom: 28 })
     }
     .width('100%')
     .backgroundColor(this.cardBg)
-    .borderRadius({ topLeft: 24, topRight: 24 })
-    .shadow({ radius: 20, color: this.isDark ? '#00000080' : '#00000018', offsetX: 0, offsetY: -4 })
-    .opacity(this.resultCardOpacity)
-    .translate({ y: this.resultCardOffset })
+    .opacity(this.cardOpacity)
+    .translate({ y: this.cardOffset })
   }
 
-  /** 手动输入态 */
+  // 手动输入
   @Builder
   ManualView() {
     Column({ space: 20 }) {
       Column({ space: 6 }) {
         Text('未能自动识别').fontSize(20).fontWeight(FontWeight.Bold).fontColor(this.textColor)
-        Text('请输入食物名称').fontSize(14).fontColor(this.secondaryColor)
+        Text('输入食物名称，从本地库查找营养数据').fontSize(13).fontColor(this.secondColor)
       }.alignItems(HorizontalAlign.Center)
 
-      TextInput({ placeholder: '番茄炒蛋、米饭、苹果…', text: this.manualFoodName })
+      TextInput({ placeholder: '番茄炒蛋、米饭、苹果…', text: this.manualInput })
         .fontSize(16).fontColor(this.textColor)
-        .placeholderColor(this.secondaryColor)
+        .placeholderColor(this.secondColor)
         .caretColor(AppColors.BRAND_COLOR)
         .backgroundColor(this.isDark ? AppColors.DARK_GRAY_100 : AppColors.GRAY_50)
-        .borderRadius(14)
-        .padding({ left: 18, right: 18, top: 16, bottom: 16 })
+        .borderRadius(14).height(52)
+        .padding({ left: 16, right: 16 })
         .width('100%')
         .border({ width: 1.5, color: AppColors.BRAND_COLOR })
-        .onChange((v: string) => { this.manualFoodName = v })
+        .onChange((v: string) => { this.manualInput = v })
 
       Button('查询并继续')
-        .width('88%').height(52)
+        .width('100%').height(52)
         .backgroundColor(AppColors.BRAND_COLOR).fontColor(Color.White)
         .fontWeight(FontWeight.Bold).borderRadius(26)
-        .shadow({ radius: 12, color: AppColors.BRAND_COLOR + '44', offsetX: 0, offsetY: 4 })
-        .onClick(() => this.applyManualFood())
+        .shadow({ radius: 10, color: AppColors.BRAND_COLOR + '44', offsetX: 0, offsetY: 4 })
+        .onClick(() => this.confirmManual())
 
       Button('返回重新拍照')
-        .width('88%').height(46)
-        .backgroundColor('transparent').fontColor(this.secondaryColor).borderRadius(23)
+        .width('100%').height(48)
+        .backgroundColor('transparent').fontColor(this.secondColor)
         .onClick(() => {
-          this.capturedUri      = ''
-          this.manualFoodName   = ''
-          this.scanState        = ScanState.IDLE
+          this.capturedUri  = ''
+          this.manualInput  = ''
+          this.scanState    = ScanState.IDLE
         })
     }
-    .width('100%')
-    .padding({ left: 24, right: 24, top: 32, bottom: 24 })
+    .width('100%').padding({ left: 24, right: 24, top: 28, bottom: 24 })
     .alignItems(HorizontalAlign.Center)
   }
 
-  // ── build ──────────────────────────────────────────────────────────────────
+  // ── build ─────────────────────────────────────────────────────────────
+  //
+  // 布局结构：
+  //   Stack（全屏）
+  //     ├─ Column（主流）opacity=pageOpacity
+  //     │    ├─ CameraFrame  height='52%'
+  //     │    └─ 内容区       layoutWeight(1)
+  //     ├─ FloatNav（悬浮在 CameraFrame 顶部）
+  //     └─ ToastView
+  //
+  // CameraFrame 与 内容区 在同一 Column 中，绝对不重叠。
+  // FloatNav 是 Stack 上层，只视觉覆盖 CameraFrame 顶部，L 形角标已让开导航栏高度。
 
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
       Column() {
-        // ── 图片 / 取景框区 ──
+        // 取景框区
         this.CameraFrame()
 
-        // ── 底部内容区 ──
+        // 内容区，随状态切换，用 layoutWeight(1) 填满剩余 48%
         if (this.scanState === ScanState.IDLE) {
-          this.IdleActions()
-        } else if (this.scanState === ScanState.PREVIEW) {
-          this.PreviewActions()
-        } else if (this.scanState === ScanState.RECOGNIZING) {
-          Column({ space: 12 }) {
-            LoadingProgress().width(40).height(40).color(AppColors.BRAND_COLOR)
-            Text('AI 正在识别食物…').fontSize(14).fontColor(this.secondaryColor)
-            Text('通常需要 2 – 5 秒').fontSize(12).fontColor(this.isDark ? AppColors.DARK_GRAY_400 : AppColors.GRAY_400)
+          Column({ space: 16 }) {
+            Button() {
+              Row({ space: 10 }) {
+                SymbolGlyph($r('sys.symbol.camera')).fontSize(22).fontColor([Color.White])
+                Text('拍照识别').fontSize(17).fontColor(Color.White).fontWeight(FontWeight.Bold)
+              }
+            }
+            .width('88%').height(56)
+            .backgroundColor(AppColors.BRAND_COLOR).borderRadius(28)
+            .shadow({ radius: 16, color: AppColors.BRAND_COLOR + '55', offsetX: 0, offsetY: 6 })
+            .onClick(() => { void this.launchCamera() })
+
+            Button() {
+              Row({ space: 10 }) {
+                SymbolGlyph($r('sys.symbol.picture_fill')).fontSize(20).fontColor([AppColors.BRAND_COLOR])
+                Text('从相册选图').fontSize(15).fontColor(AppColors.BRAND_COLOR).fontWeight(FontWeight.Medium)
+              }
+            }
+            .width('88%').height(50)
+            .backgroundColor(this.isDark ? AppColors.DARK_GRAY_100 : AppColors.BRAND_COLOR_LIGHT)
+            .borderRadius(25)
+            .onClick(() => { void this.launchPicker() })
           }
-          .width('100%').layoutWeight(1)
-          .justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+          .layoutWeight(1).alignItems(HorizontalAlign.Center).justifyContent(FlexAlign.Center)
+
+        } else if (this.scanState === ScanState.PREVIEW) {
+          Row({ space: 14 }) {
+            Button('从相册重选')
+              .layoutWeight(1).height(52)
+              .backgroundColor(this.cardBg).fontColor(this.textColor)
+              .borderRadius(26).border({ width: 1, color: this.divColor })
+              .onClick(() => { void this.launchPicker() })
+
+            Button('开始识别')
+              .layoutWeight(2).height(52)
+              .backgroundColor(AppColors.BRAND_COLOR).fontColor(Color.White)
+              .fontWeight(FontWeight.Bold).borderRadius(26)
+              .shadow({ radius: 10, color: AppColors.BRAND_COLOR + '44', offsetX: 0, offsetY: 4 })
+              .onClick(() => { void this.startRecognition() })
+          }
+          .layoutWeight(1).padding({ left: 20, right: 20 }).alignItems(VerticalAlign.Center)
+
+        } else if (this.scanState === ScanState.RECOGNIZING) {
+          Column({ space: 10 }) {
+            LoadingProgress().width(38).height(38).color(AppColors.BRAND_COLOR)
+            Text('AI 正在识别食物…').fontSize(14).fontColor(this.secondColor)
+            Text('通常需要 2 – 5 秒').fontSize(12)
+              .fontColor(this.isDark ? AppColors.DARK_GRAY_400 : AppColors.GRAY_400)
+          }
+          .layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+
         } else if (this.scanState === ScanState.RESULT) {
           Scroll() {
             this.ResultCard()
           }
           .layoutWeight(1).scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring)
+
         } else {
           Scroll() {
             this.ManualView()
@@ -792,11 +743,10 @@ struct CalorieScanPage {
       .backgroundColor(this.bgColor)
       .opacity(this.pageOpacity)
 
-      // ── 悬浮导航栏 ──
+      // 悬浮导航栏（在 CameraFrame 上方，内容区不受影响）
       this.FloatNav()
 
-      // ── Toast ──
-      ToastView({ message: this.toastMessage, visible: this.toastVisible })
+      ToastView({ message: this.toastMsg, visible: this.toastVisible })
     }
     .width('100%').height('100%')
   }

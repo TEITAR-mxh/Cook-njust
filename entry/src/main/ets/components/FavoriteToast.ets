@@ -4,6 +4,8 @@ import { AppColors } from '../constants/AppColors'
 export struct FavoriteToast {
   @Prop @Watch('onVisibleChange') visible: boolean = false
   onAddToFolder?: () => void
+  /** 动画完全结束后回调，父组件应在此将 visible 置 false 以释放 hitTestBehavior */
+  onHide?: () => void
 
   @State translateY: number = 120
   @State opacityValue: number = 0
@@ -23,6 +25,12 @@ export struct FavoriteToast {
       this.translateY = 120
       this.opacityValue = 0
     })
+    // 动画结束后通知父组件释放 hitTestBehavior，避免透明遮层持续拦截底部导航触摸事件
+    setTimeout(() => {
+      if (this.onHide) {
+        this.onHide()
+      }
+    }, 300)
   }
 
   build() {

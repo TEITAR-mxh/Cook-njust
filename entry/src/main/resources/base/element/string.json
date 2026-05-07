@@ -13,12 +13,8 @@
       "value": "AUV您吃了么"
     },
     {
-      "name": "permission_read_imagevideo_reason",
-      "value": "用于选择图片作为头像"
-    },
-    {
-      "name": "permission_write_imagevideo_reason",
-      "value": "用于保存选择的头像图片"
+      "name": "permission_running_lock_reason",
+      "value": "在用户查看烹饪步骤时，防止屏幕自动熄灭，确保操作连贯性"
     }
   ]
 }

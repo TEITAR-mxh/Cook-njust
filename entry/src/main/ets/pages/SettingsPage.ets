@@ -61,7 +61,7 @@ struct SettingsPage {
   @State themeMode: string = '系统默认'
   @State showThemeSheet: boolean = false
   @State enableDailyPush: boolean = false
-  @State cacheSize: string = '18.6 MB'
+  @State cacheSize: string = '计算中...'
   @State toastMessage: string = ''
   @State toastVisible: boolean = false
   @State currentBgColor: string = AppColors.BG_COLOR
@@ -73,6 +73,7 @@ struct SettingsPage {
   aboutToAppear(): void {
     void this.loadSafeArea()
     void this.loadData()
+    void this.loadCacheSize()
     // 确保主题颜色正确初始化
     this.updateThemeColors()
   }
@@ -113,6 +114,58 @@ struct SettingsPage {
     if (host) {
       this.safeTopVp = await getSystemSafeTopVp(host)
     }
+  }
+
+  /** 递归统计目录大小（字节） */
+  private async calcDirSize(dir: string): Promise<number> {
+    let total: number = 0
+    try {
+      const names = await fileIo.listFile(dir)
+      for (const name of names) {
+        const fullPath = `${dir}/${name}`
+        try {
+          const st = await fileIo.stat(fullPath)
+          if (st.isDirectory()) {
+            total += await this.calcDirSize(fullPath)
+          } else {
+            total += st.size
+          }
+        } catch { /* 单个文件不可读时跳过 */ }
+      }
+    } catch { /* 目录不可读时跳过 */ }
+    return total
+  }
+
+  /** 读取并展示真实缓存大小 */
+  private async loadCacheSize(): Promise<void> {
+    const host = this.getHostContext()
+    if (!host) { this.cacheSize = '0.0 MB'; return }
+    try {
+      const bytes = await this.calcDirSize(host.cacheDir)
+      const mb = bytes / (1024 * 1024)
+      this.cacheSize = mb < 0.05 ? '0.0 MB' : `${mb.toFixed(1)} MB`
+    } catch {
+      this.cacheSize = '0.0 MB'
+    }
+  }
+
+  /** 递归删除目录内所有文件与子目录 */
+  private async clearCacheDir(dir: string): Promise<void> {
+    try {
+      const names = await fileIo.listFile(dir)
+      for (const name of names) {
+        const fullPath = `${dir}/${name}`
+        try {
+          const st = await fileIo.stat(fullPath)
+          if (st.isDirectory()) {
+            await this.clearCacheDir(fullPath)
+            await fileIo.rmdir(fullPath)
+          } else {
+            await fileIo.unlink(fullPath)
+          }
+        } catch { /* 单个条目删除失败时跳过，不影响其余文件 */ }
+      }
+    } catch { /* 目录不可访问时跳过 */ }
   }
 
   private async loadData(): Promise<void> {
@@ -610,11 +663,13 @@ struct SettingsPage {
               this.buildSettingCard('保留本地数据', '关闭后将清空历史记录与收藏内容', true, this.keepLocalData, '', () => { void this.onKeepLocalChange(!this.keepLocalData) })
               Divider().color(this.currentBorderColor).margin({ left: 20, right: 20 })
               this.buildSettingCard('清理缓存', '清除应用运行产生的图片和临时文件', false, false, this.cacheSize, () => {
+                const host = this.getHostContext()
+                if (!host) return
                 this.cacheSize = '清理中...'
-                setTimeout(() => {
-                  this.cacheSize = '0.0 MB'
+                void this.clearCacheDir(host.cacheDir).then(async () => {
+                  await this.loadCacheSize()
                   this.showToast('✨ 缓存已清理完毕')
-                }, 800)
+                })
               })
             }.margin({ left: 16, right: 16 }).backgroundColor(this.currentCardBgColor).borderRadius(20)
 

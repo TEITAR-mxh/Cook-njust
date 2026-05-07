@@ -1281,7 +1281,9 @@ struct IndexV2 {
           onAddToFolder: () => {
             this.favoriteToastVisible = false;
             this.folderPickerVisible = true;
-          }
+          },
+          // 动画消失后重置状态，确保底部导航不被透明遮层持续拦截
+          onHide: () => { this.favoriteToastVisible = false; }
         })
       }
       .width('100%')

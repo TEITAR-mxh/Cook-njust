@@ -896,6 +896,27 @@ struct IndexV2 {
             }
           }.margin({ top: 8 }).alignSelf(ItemAlign.Start)
 
+          // 热量识别入口卡片
+          Row({ space: 12 }) {
+            Row({ space: 10 }) {
+              SymbolGlyph($r('sys.symbol.camera'))
+                .fontSize(20).fontColor([AppColors.BRAND_COLOR])
+              Column({ space: 2 }) {
+                Text('热量识别').fontSize(15).fontWeight(FontWeight.Bold).fontColor(this.currentTextColor)
+                Text('拍照识别食物热量').fontSize(12).fontColor(this.currentSecondaryTextColor)
+              }.alignItems(HorizontalAlign.Start).layoutWeight(1)
+              SymbolGlyph($r('sys.symbol.chevron_right'))
+                .fontSize(16).fontColor([this.currentSecondaryTextColor])
+            }.width('100%')
+          }
+          .width('100%').padding({ left: 16, right: 16, top: 14, bottom: 14 })
+          .backgroundColor(this.currentCardBgColor).borderRadius(16)
+          .onClick(() => {
+            router.pushUrl({ url: 'pages/CalorieScanPage' }).catch((e: Error) => {
+              console.error(`路由跳转 CalorieScanPage 失败: ${e.message}`)
+            })
+          })
+
           if (this.showRandomAnimation && this.randomAnimationNames.length > 0) {
             Column() {
               Text(this.randomAnimationNames[this.currentRandomIndex])

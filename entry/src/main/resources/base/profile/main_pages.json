@@ -9,6 +9,7 @@
     "pages/LegalDocPage",
     "pages/DietaryStructurePage",
     "pages/CreateFolderPage",
-    "pages/FolderDetailPage"
+    "pages/FolderDetailPage",
+    "pages/CalorieScanPage"
   ]
 }

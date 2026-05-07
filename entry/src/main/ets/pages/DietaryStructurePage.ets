@@ -124,60 +124,81 @@ struct DietaryStructurePage {
     return r < 0.6 ? '#22C55E' : (r < 0.9 ? AppColors.BRAND_COLOR : '#F97316')
   }
 
-  // ── 今日已摄入进度卡片 ────────────────────────────────────────────────────
+  // ── 今日 vs 推荐对比卡片 ─────────────────────────────────────────────────
+  // 注意：此卡片仅展示"实际摄入 vs 推荐"对比，不重复展示 餐桌Tab 的圆环数据。
 
   @Builder
-  private TodayIntakeCard() {
+  private CompareRow(label: string, actual: number, goal: number, unit: string,
+                     barColor: string, barRatio: number) {
+    Column({ space: 6 }) {
+      Row() {
+        Text(label).fontSize(14).fontColor(this.t1).layoutWeight(1)
+        Text(`${Math.round(actual)}`).fontSize(14).fontWeight(FontWeight.Bold)
+          .fontColor(barRatio > 1.0 ? '#F97316' : barColor)
+        Text(` / ${goal} ${unit}`).fontSize(13).fontColor(this.t3)
+      }.width('100%').alignItems(VerticalAlign.Bottom)
+
+      Stack({ alignContent: Alignment.Start }) {
+        Row().width('100%').height(6).backgroundColor(this.track).borderRadius(3)
+        Row()
+          .width(`${Math.min(barRatio * 100, 100)}%`).height(6)
+          .backgroundColor(barRatio > 1.0 ? '#F97316' : barColor)
+          .borderRadius(3)
+      }.width('100%')
+    }.width('100%').padding({ top: 12, bottom: 4 })
+  }
+
+  @Builder
+  private TodayCompareCard() {
     Column({ space: 0 }) {
       // 标题行
       Row() {
-        Text('今日已摄入').fontSize(15).fontWeight(FontWeight.Bold).fontColor(this.t1).layoutWeight(1)
-        Text('去记录')
-          .fontSize(13).fontColor(AppColors.BRAND_COLOR)
-          .onClick(() => {
-            router.pushUrl({ url: 'pages/CalorieScanPage' }).catch((e: Error) => {
-              console.error(`跳转 CalorieScanPage 失败: ${e.message}`)
+        Text('今日摄入 vs 推荐').fontSize(15).fontWeight(FontWeight.Bold).fontColor(this.t1).layoutWeight(1)
+        if (this.todayTotal.recordCount === 0) {
+          Text('去记录 →').fontSize(13).fontColor(AppColors.BRAND_COLOR)
+            .onClick(() => {
+              router.pushUrl({ url: 'pages/CalorieScanPage' }).catch((e: Error) => {
+                console.error(`跳转 CalorieScanPage 失败: ${e.message}`)
+              })
             })
-          })
-      }.width('100%').padding({ left: 20, right: 20, top: 16, bottom: 10 })
+        } else {
+          Text(`已记录 ${this.todayTotal.recordCount} 餐`).fontSize(12).fontColor(this.t3)
+        }
+      }.width('100%').padding({ left: 20, right: 20, top: 16, bottom: 4 })
 
-      // 热量大字 + 目标
-      Row({ space: 4 }) {
-        Text(`${Math.round(this.todayTotal.totalCalories)}`)
-          .fontSize(36).fontWeight(FontWeight.Bold).fontColor(this.intakeBarColor)
-        Text('/ 2000 千卡').fontSize(14).fontColor(this.t2).margin({ top: 12 })
-      }.padding({ left: 20, right: 20 }).alignSelf(ItemAlign.Start)
-
-      // 进度条
-      Stack({ alignContent: Alignment.Start }) {
-        Row().width('100%').height(8).backgroundColor(this.track).borderRadius(4)
-        Row().width(`${this.intakeRatio * 100}%`).height(8).backgroundColor(this.intakeBarColor).borderRadius(4)
-      }.width('100%').padding({ left: 20, right: 20, top: 10, bottom: 12 })
-
-      Divider().color(this.divider).margin({ left: 20, right: 20 })
-
-      // 三大营养素摘要
-      Row() {
-        Column({ space: 4 }) {
-          Text(`${Math.round(this.todayTotal.totalProtein)} g`).fontSize(15).fontWeight(FontWeight.Bold).fontColor('#22C55E')
-          Text('蛋白质').fontSize(12).fontColor(this.t3)
-        }.layoutWeight(1).alignItems(HorizontalAlign.Center)
-
-        Column({ space: 4 }) {
-          Text(`${Math.round(this.todayTotal.totalFat)} g`).fontSize(15).fontWeight(FontWeight.Bold).fontColor('#F59E0B')
-          Text('脂肪').fontSize(12).fontColor(this.t3)
-        }.layoutWeight(1).alignItems(HorizontalAlign.Center)
-
-        Column({ space: 4 }) {
-          Text(`${Math.round(this.todayTotal.totalCarbs)} g`).fontSize(15).fontWeight(FontWeight.Bold).fontColor('#3B82F6')
-          Text('碳水').fontSize(12).fontColor(this.t3)
-        }.layoutWeight(1).alignItems(HorizontalAlign.Center)
-
-        Column({ space: 4 }) {
-          Text(`${this.todayTotal.recordCount}`).fontSize(15).fontWeight(FontWeight.Bold).fontColor(this.t1)
-          Text('记录条数').fontSize(12).fontColor(this.t3)
-        }.layoutWeight(1).alignItems(HorizontalAlign.Center)
-      }.width('100%').padding({ top: 12, bottom: 16 })
+      if (this.todayTotal.recordCount === 0) {
+        Row({ space: 10 }) {
+          Text('📊').fontSize(28)
+          Column({ space: 4 }) {
+            Text('暂无今日记录').fontSize(14).fontColor(this.t1).fontWeight(FontWeight.Medium)
+            Text('记录饮食后，这里将展示摄入与推荐量的对比')
+              .fontSize(12).fontColor(this.t3).lineHeight(18)
+          }.alignItems(HorizontalAlign.Start).layoutWeight(1)
+        }
+        .width('100%').padding({ left: 20, right: 20, top: 8, bottom: 20 })
+      } else {
+        Column({ space: 0 }) {
+          this.CompareRow(
+            '热量', this.todayTotal.totalCalories, 2000, '千卡',
+            this.intakeBarColor, this.intakeRatio
+          )
+          Divider().color(this.divider).margin({ top: 8 })
+          this.CompareRow(
+            '蛋白质', this.todayTotal.totalProtein, 75, 'g',
+            '#22C55E', this.todayTotal.totalProtein / 75
+          )
+          Divider().color(this.divider)
+          this.CompareRow(
+            '脂肪', this.todayTotal.totalFat, 55, 'g',
+            '#F59E0B', this.todayTotal.totalFat / 55
+          )
+          Divider().color(this.divider)
+          this.CompareRow(
+            '碳水化合物', this.todayTotal.totalCarbs, 300, 'g',
+            '#3B82F6', this.todayTotal.totalCarbs / 300
+          )
+        }.width('100%').padding({ left: 20, right: 20, bottom: 16 })
+      }
     }
     .width('100%')
     .backgroundColor(this.surface)
@@ -436,8 +457,8 @@ struct DietaryStructurePage {
 
       Scroll() {
         Column({ space: 0 }) {
-          this.SectionTitle('今日饮食追踪')
-          this.TodayIntakeCard()
+          this.SectionTitle('今日摄入对比')
+          this.TodayCompareCard()
 
           this.ImageCard()
 

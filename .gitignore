@@ -19,11 +19,3 @@ tools/
 
 # 证书文件相关
 /build-profile.json5
-
-# Claude Code 指南与配置
-CLAUDE.md
-INDEXV2_TEST_GUIDE.md
-.claude/
-
-# API 密钥配置（不提交到仓库）
-entry/src/main/ets/config/CloudApiConfig.ets

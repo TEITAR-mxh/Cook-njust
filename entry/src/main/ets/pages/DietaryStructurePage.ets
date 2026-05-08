@@ -3,10 +3,8 @@
  * 数据来源：《中国居民膳食指南（2022）》
  */
 import { common } from '@kit.AbilityKit'
-import { router } from '@kit.ArkUI'
 import { AppColors } from '../constants/AppColors'
 import { getSystemSafeTopVp } from '../util/StatusBarInset'
-import { DietDatabaseHelper, DailyTotal } from '../data/DietDatabaseHelper'
 
 // ─── 数据结构 ─────────────────────────────────────────────────────────────────
 
@@ -61,9 +59,6 @@ const TIPS: string[] = [
 @Component
 struct DietaryStructurePage {
   @State private safeTopVp: number = 48
-  @State private todayTotal: DailyTotal = {
-    totalCalories: 0, totalProtein: 0, totalFat: 0, totalCarbs: 0, recordCount: 0
-  }
 
   @StorageProp('currentThemeMode')
   @Watch('onThemeChange')
@@ -82,17 +77,6 @@ struct DietaryStructurePage {
     const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined
     if (ctx !== undefined) {
       getSystemSafeTopVp(ctx).then((vp: number) => { this.safeTopVp = vp }).catch(() => {})
-      void this.loadTodayTotal(ctx)
-    }
-  }
-
-  private async loadTodayTotal(ctx: common.UIAbilityContext): Promise<void> {
-    try {
-      const helper = DietDatabaseHelper.getInstance()
-      await helper.ensureReady(ctx)
-      this.todayTotal = await helper.queryTodayTotal(ctx)
-    } catch (e) {
-      console.warn('[DietaryStructurePage] 加载今日摄入失败:', JSON.stringify(e))
     }
   }
 
@@ -114,98 +98,6 @@ struct DietaryStructurePage {
   private get t2(): string      { return this.isDark ? AppColors.DARK_GRAY_500 : AppColors.GRAY_500  }
   private get t3(): string      { return this.isDark ? AppColors.DARK_GRAY_400 : AppColors.GRAY_400  }
   private get brandBg(): string { return this.isDark ? '#2A1215' : AppColors.BRAND_COLOR_LIGHT       }
-
-  private get intakeRatio(): number {
-    return Math.min(this.todayTotal.totalCalories / 2000, 1.0)
-  }
-
-  private get intakeBarColor(): string {
-    const r = this.intakeRatio
-    return r < 0.6 ? '#22C55E' : (r < 0.9 ? AppColors.BRAND_COLOR : '#F97316')
-  }
-
-  // ── 今日 vs 推荐对比卡片 ─────────────────────────────────────────────────
-  // 注意：此卡片仅展示"实际摄入 vs 推荐"对比，不重复展示 餐桌Tab 的圆环数据。
-
-  @Builder
-  private CompareRow(label: string, actual: number, goal: number, unit: string,
-                     barColor: string, barRatio: number) {
-    Column({ space: 6 }) {
-      Row() {
-        Text(label).fontSize(14).fontColor(this.t1).layoutWeight(1)
-        Text(`${Math.round(actual)}`).fontSize(14).fontWeight(FontWeight.Bold)
-          .fontColor(barRatio > 1.0 ? '#F97316' : barColor)
-        Text(` / ${goal} ${unit}`).fontSize(13).fontColor(this.t3)
-      }.width('100%').alignItems(VerticalAlign.Bottom)
-
-      Stack({ alignContent: Alignment.Start }) {
-        Row().width('100%').height(6).backgroundColor(this.track).borderRadius(3)
-        Row()
-          .width(`${Math.min(barRatio * 100, 100)}%`).height(6)
-          .backgroundColor(barRatio > 1.0 ? '#F97316' : barColor)
-          .borderRadius(3)
-      }.width('100%')
-    }.width('100%').padding({ top: 12, bottom: 4 })
-  }
-
-  @Builder
-  private TodayCompareCard() {
-    Column({ space: 0 }) {
-      // 标题行
-      Row() {
-        Text('今日摄入 vs 推荐').fontSize(15).fontWeight(FontWeight.Bold).fontColor(this.t1).layoutWeight(1)
-        if (this.todayTotal.recordCount === 0) {
-          Text('去记录 →').fontSize(13).fontColor(AppColors.BRAND_COLOR)
-            .onClick(() => {
-              router.pushUrl({ url: 'pages/CalorieScanPage' }).catch((e: Error) => {
-                console.error(`跳转 CalorieScanPage 失败: ${e.message}`)
-              })
-            })
-        } else {
-          Text(`已记录 ${this.todayTotal.recordCount} 餐`).fontSize(12).fontColor(this.t3)
-        }
-      }.width('100%').padding({ left: 20, right: 20, top: 16, bottom: 4 })
-
-      if (this.todayTotal.recordCount === 0) {
-        Row({ space: 10 }) {
-          Text('📊').fontSize(28)
-          Column({ space: 4 }) {
-            Text('暂无今日记录').fontSize(14).fontColor(this.t1).fontWeight(FontWeight.Medium)
-            Text('记录饮食后，这里将展示摄入与推荐量的对比')
-              .fontSize(12).fontColor(this.t3).lineHeight(18)
-          }.alignItems(HorizontalAlign.Start).layoutWeight(1)
-        }
-        .width('100%').padding({ left: 20, right: 20, top: 8, bottom: 20 })
-      } else {
-        Column({ space: 0 }) {
-          this.CompareRow(
-            '热量', this.todayTotal.totalCalories, 2000, '千卡',
-            this.intakeBarColor, this.intakeRatio
-          )
-          Divider().color(this.divider).margin({ top: 8 })
-          this.CompareRow(
-            '蛋白质', this.todayTotal.totalProtein, 75, 'g',
-            '#22C55E', this.todayTotal.totalProtein / 75
-          )
-          Divider().color(this.divider)
-          this.CompareRow(
-            '脂肪', this.todayTotal.totalFat, 55, 'g',
-            '#F59E0B', this.todayTotal.totalFat / 55
-          )
-          Divider().color(this.divider)
-          this.CompareRow(
-            '碳水化合物', this.todayTotal.totalCarbs, 300, 'g',
-            '#3B82F6', this.todayTotal.totalCarbs / 300
-          )
-        }.width('100%').padding({ left: 20, right: 20, bottom: 16 })
-      }
-    }
-    .width('100%')
-    .backgroundColor(this.surface)
-    .borderRadius(16)
-    .margin({ left: 16, right: 16 })
-    .clip(true)
-  }
 
   // ── 导航栏 ────────────────────────────────────────────────────────────────
 
@@ -457,9 +349,6 @@ struct DietaryStructurePage {
 
       Scroll() {
         Column({ space: 0 }) {
-          this.SectionTitle('今日摄入对比')
-          this.TodayCompareCard()
-
           this.ImageCard()
 
           this.SectionTitle('三大营养素供能比（占总热量）')

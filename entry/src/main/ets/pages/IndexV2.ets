@@ -19,7 +19,6 @@ import { RecipeCard, RecipeCardMode } from '../components/RecipeCard'
 import { PlateCard } from '../components/PlateCard'
 import { FavoriteToast } from '../components/FavoriteToast'
 import { FolderPickerSheet } from '../components/FolderPickerSheet';
-import { DailyDietCircleCard } from '../components/DailyDietCircleCard';
 
 // 引入统一管理的食材与厨具全库
 import { meatItems, stapleItems, toolItems, vegetableItems } from '../data/foodCatalog';
@@ -81,11 +80,6 @@ struct IndexV2 {
   @State deleteFolderConfirmVisible: boolean = false
   @State pendingDeleteFolderId: string = ''
   @State pendingDeleteFolderName: string = ''
-
-  /** 每次 onPageShow 递增，触发 DailyDietCircleCard 刷新今日饮食数据 */
-  @State dietRefreshKey: number = 0
-  /** 主题切换时递增，触发圆环重绘 */
-  @State dietThemeSignal: number = 0
 
   @State randomAnimationNames: string[] = []
   @State currentRandomIndex: number = 0
@@ -149,7 +143,6 @@ struct IndexV2 {
     void this.refreshFavorites();
     void this.refreshFolders();
     void this.refreshUserProfile();
-    this.dietRefreshKey++;
 
     // 页面从后台恢复时立即重算颜色：
     // 解决"从 SettingsPage 返回后主题未更新"的问题。
@@ -392,7 +385,6 @@ struct IndexV2 {
     this.currentSecondaryTextColor = ThemeManager.getSecondaryTextColor(mode);
     this.currentBorderColor = ThemeManager.getBorderColor(mode);
     this.lastThemeMode = mode;
-    this.dietThemeSignal++;
   }
 
   private runSearch(): void {
@@ -1004,19 +996,7 @@ struct IndexV2 {
             })
           }.width('100%').padding({ left: 20, right: 20, top: 16, bottom: 8 })
 
-          // ── 今日饮食圆环卡片 ──
-          DailyDietCircleCard({
-            refreshKey:   this.dietRefreshKey,
-            themeSignal:  this.dietThemeSignal,
-            bgColor:      this.currentCardBgColor,
-            textColor:    this.currentTextColor,
-            secondaryColor: this.currentSecondaryTextColor,
-            dividerColor: this.currentBorderColor,
-            isDark:       this.isEffectivelyDark(),
-          })
-          .margin({ left: 16, right: 16, top: 8, bottom: 0 })
-
-          Divider().color(this.currentBorderColor).margin({ left: 20, right: 20, top: 16 })
+          Divider().color(this.currentBorderColor).margin({ left: 20, right: 20, top: 8 })
 
           // ── Section 1：珍藏菜肴（横向滚动餐盘）──
           this.MySectionHeader(

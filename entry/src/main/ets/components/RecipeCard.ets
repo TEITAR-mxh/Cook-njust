@@ -39,6 +39,7 @@ export struct RecipeCard {
   onFavoriteClick?: () => void
 
   @State scaleValue: number = 1.0
+  @State favoriteScaleValue: number = 1.0
 
   private cardPointerDownX: number = 0
   private cardPointerDownY: number = 0
@@ -50,6 +51,13 @@ export struct RecipeCard {
     const dy = localY - this.cardPointerDownY
     const slop = RECIPE_CARD_TAP_SLOP_VP
     return dx * dx + dy * dy > slop * slop
+  }
+
+  private pulseFavorite(): void {
+    this.favoriteScaleValue = 1.2
+    setTimeout(() => {
+      this.favoriteScaleValue = 1.0
+    }, 100)
   }
 
   /**
@@ -90,8 +98,10 @@ export struct RecipeCard {
         // 收藏按钮 (右上角)
         Column() {
           Text(this.isFavorite ? '★' : '☆')
-            .fontSize(24)
-            .fontColor(this.isFavorite ? '#FFB020' : AppColors.GRAY_400)
+            .fontSize(22)
+            .fontColor(this.isFavorite ? AppColors.FAVORITE_ACTIVE : AppColors.GRAY_400)
+            .scale({ x: this.favoriteScaleValue, y: this.favoriteScaleValue })
+            .animation({ duration: 100, curve: Curve.EaseOut })
         }
         .width(44)
         .height(44)
@@ -111,6 +121,7 @@ export struct RecipeCard {
         .hitTestBehavior(HitTestMode.Block)
         .zIndex(100)
         .onClick(() => {
+          this.pulseFavorite()
           if (this.onFavoriteClick) {
             this.onFavoriteClick()
           }
@@ -184,118 +195,103 @@ export struct RecipeCard {
    */
   @Builder
   buildSmallCard() {
-    Stack() {
-      Row({ space: 16 }) {
-        // 左侧图标/图片
-        if (this.recipe.imageUri) {
-          Image(this.recipe.imageUri)
-            .width(96)
-            .height(96)
-            .objectFit(ImageFit.Cover)
-            .borderRadius(14)
-        } else {
-          // 无图片时显示 Emoji
-          Column() {
-            Text(this.getEmoji())
-              .fontSize(40)
-          }
-          .width(96)
-          .height(96)
-          .borderRadius(14)
-          .backgroundColor('#F0FDF4') // bg-green-50
-          .justifyContent(FlexAlign.Center)
+    Row({ space: 12 }) {
+      // 左侧图片/Emoji
+      if (this.recipe.imageUri) {
+        Image(this.recipe.imageUri)
+          .width(72)
+          .height(72)
+          .objectFit(ImageFit.Cover)
+          .borderRadius(12)
+          .flexShrink(0)
+      } else {
+        Column() {
+          Text(this.getEmoji())
+            .fontSize(34)
         }
+        .width(72)
+        .height(72)
+        .borderRadius(12)
+        .backgroundColor('#F0FDF4')
+        .justifyContent(FlexAlign.Center)
+        .flexShrink(0)
+      }
 
-        // 右侧信息
-        Column({ space: 6 }) {
-          Text(this.recipe.name)
-            .fontSize(16)
-            .fontColor(AppColors.GRAY_900)
-            .fontWeight(FontWeight.Bold)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
+      // 中间信息区
+      Column({ space: 6 }) {
+        Text(this.recipe.name)
+          .fontSize(15)
+          .fontColor(AppColors.GRAY_900)
+          .fontWeight(FontWeight.Bold)
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-          // 难度 + 烹饪方式标签行
-          Flex({ wrap: FlexWrap.Wrap, alignItems: ItemAlign.Center }) {
-            // 难度标签
-            if (this.recipe.difficulty) {
-              Text(this.recipe.difficulty)
+        // 难度 + 烹饪方式标签行
+        Flex({ wrap: FlexWrap.Wrap, alignItems: ItemAlign.Center }) {
+          if (this.recipe.difficulty) {
+            Text(this.recipe.difficulty)
+              .fontSize(11)
+              .fontColor(difficultyColor(this.recipe.difficulty))
+              .fontWeight(FontWeight.Medium)
+              .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+              .backgroundColor(difficultyBg(this.recipe.difficulty))
+              .borderRadius(4)
+              .margin({ right: 6, bottom: 4 })
+          }
+          if (this.recipe.methods && this.recipe.methods.length > 0) {
+            ForEach(this.recipe.methods.slice(0, 2), (method: string) => {
+              Text(method)
                 .fontSize(11)
-                .fontColor(difficultyColor(this.recipe.difficulty))
+                .fontColor('#6366F1')
                 .fontWeight(FontWeight.Medium)
                 .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-                .backgroundColor(difficultyBg(this.recipe.difficulty))
+                .backgroundColor('#EEF2FF')
                 .borderRadius(4)
-                .margin({ right: 6 })
-            }
-            // 烹饪方式标签（最多2个）
-            if (this.recipe.methods && this.recipe.methods.length > 0) {
-              ForEach(this.recipe.methods.slice(0, 2), (method: string) => {
-                Text(method)
-                  .fontSize(11)
-                  .fontColor('#6366F1')
-                  .fontWeight(FontWeight.Medium)
-                  .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-                  .backgroundColor('#EEF2FF')
-                  .borderRadius(4)
-                  .margin({ right: 6 })
-              })
-            }
-            // 无难度也无方式时显示食材数量作为补充信息
-            if (!this.recipe.difficulty && (!this.recipe.methods || this.recipe.methods.length === 0)) {
-              Text(`${this.recipe.stuff.length} 种食材`)
-                .fontSize(11)
-                .fontColor(AppColors.GRAY_500)
-                .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-                .backgroundColor(AppColors.GRAY_100)
-                .borderRadius(4)
-            }
+                .margin({ right: 6, bottom: 4 })
+            })
           }
-          .width('100%')
+          if (!this.recipe.difficulty && (!this.recipe.methods || this.recipe.methods.length === 0)) {
+            Text(`${this.recipe.stuff.length} 种食材`)
+              .fontSize(11)
+              .fontColor(AppColors.GRAY_500)
+              .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+              .backgroundColor(AppColors.GRAY_100)
+              .borderRadius(4)
+          }
         }
-        .layoutWeight(1)
-        .alignItems(HorizontalAlign.Start)
-        .justifyContent(FlexAlign.Center)
+        .width('100%')
       }
-      .width('100%')
-      .padding(12)
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
+      .justifyContent(FlexAlign.Center)
 
-      // 收藏按钮 (右上角)
+      // 右侧收藏按钮（in-flow，不遮挡文字）
       Column() {
         Text(this.isFavorite ? '★' : '☆')
           .fontSize(20)
-          .fontColor(this.isFavorite ? '#FFB020' : AppColors.GRAY_400)
+          .fontColor(this.isFavorite ? AppColors.FAVORITE_ACTIVE : AppColors.GRAY_400)
+          .scale({ x: this.favoriteScaleValue, y: this.favoriteScaleValue })
+          .animation({ duration: 100, curve: Curve.EaseOut })
       }
-      .width(40)
-      .height(40)
-      .borderRadius(20)
-      .backgroundColor('rgba(255, 255, 255, 0.95)')
-      .backdropBlur(8)
+      .width(36)
+      .height(36)
+      .borderRadius(18)
+      .backgroundColor(AppColors.GRAY_100)
       .justifyContent(FlexAlign.Center)
-      .shadow({
-        radius: 4,
-        color: 'rgba(0,0,0,0.08)',
-        offsetX: 0,
-        offsetY: 2
-      })
-      .position({ x: '100%', y: 0 })
-      .markAnchor({ x: '100%', y: 0 })
-      .translate({ x: -12, y: 12 })
+      .flexShrink(0)
       .hitTestBehavior(HitTestMode.Block)
-      .zIndex(100)
       .onClick(() => {
-        console.log('[RecipeCard] 收藏按钮被点击')
+        this.pulseFavorite()
         if (this.onFavoriteClick) {
-          console.log('[RecipeCard] 调用 onFavoriteClick 回调')
           this.onFavoriteClick()
-        } else {
-          console.log('[RecipeCard] onFavoriteClick 回调未定义')
         }
       })
     }
     .width('100%')
+    .padding(12)
+    .alignItems(VerticalAlign.Center)
     .backgroundColor(Color.White)
-    .borderRadius(20)
+    .borderRadius(16)
     .shadow({
       radius: 4,
       color: 'rgba(0,0,0,0.05)',
@@ -354,3 +350,4 @@ export struct RecipeCard {
     .hitTestBehavior(HitTestMode.Default) // 确保整个卡片区域都可点击
   }
 }
+

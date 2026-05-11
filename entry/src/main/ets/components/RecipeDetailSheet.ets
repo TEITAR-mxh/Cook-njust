@@ -6,6 +6,9 @@ import { CookingFocusView } from './CookingFocusView'
 import { ToastView } from './ToastView'
 import { DSColor, DSRadius, DSSpace, DSType, DSShadow, DSSheet, pickTagTone } from '../constants/DesignSystem'
 import { AppColors } from '../constants/AppColors'
+import { scaleIngredientAmount } from '../service/IngredientAmountService'
+import { calcNutriScore, getNutriScoreColors } from '../service/NutritionCalculator'
+import type { NutriScore } from '../model/recipe'
 
 interface RecipeDetail {
   id: number
@@ -16,6 +19,13 @@ interface RecipeDetail {
   stuff: string[]
   tools: string[]
   steps: string[]
+  stuffAmount: Record<string, string>
+}
+
+interface NutritionItem {
+  label: string
+  value: string
+  color: string
 }
 
 const EMPTY_DETAIL: RecipeDetail = {
@@ -26,7 +36,8 @@ const EMPTY_DETAIL: RecipeDetail = {
   tags: [],
   stuff: [],
   tools: [],
-  steps: []
+  steps: [],
+  stuffAmount: {}
 }
 
 @Component
@@ -34,15 +45,25 @@ export struct RecipeDetailSheet {
   @Prop recipe: RecipeWithId | null = null
   @Prop selectedStuff: string[] = []
   @Prop isFavorite: boolean = false
+  /** 是否已在今日餐桌中 */
+  @Prop isTodayMenu: boolean = false
 
   onFavoriteToggle?: () => void
   onRequestClose?: () => void
+  /** 切换今日餐桌状态 */
+  onTodayMenuToggle?: () => void
 
   @State private detail: RecipeDetail = EMPTY_DETAIL
   @State private loadState: 'loading' | 'ok' | 'empty' = 'loading'
   @State private focusModeVisible: boolean = false
+  @State private focusInitIndex: number = 0
   @State private toastMessage: string = ''
   @State private toastVisible: boolean = false
+  @State private servingCount: number = 1
+  @State private nutriScore: string = ''
+  @State private nutriScoreBgColor: string = '#9CA3AF'
+  @State private nutriScoreTextColor: string = '#FFFFFF'
+  @State private nutritionItems: NutritionItem[] = []
 
   private readonly contentScroller: Scroller = new Scroller()
 
@@ -54,17 +75,41 @@ export struct RecipeDetailSheet {
   private syncFromProp(): void {
     if (!this.recipe) {
       this.detail = EMPTY_DETAIL
+      this.nutriScore = ''
       return
     }
+    const rawAmount = this.recipe.stuffAmount
+    const amount: Record<string, string> = rawAmount !== undefined ? rawAmount : {}
+    const tags = this.recipe.tags ?? []
     this.detail = {
       id: this.recipe.id,
       name: this.recipe.name,
       emojis: this.recipe.emojis ?? [],
       difficulty: this.recipe.difficulty ?? '',
-      tags: this.recipe.tags ?? [],
+      tags: tags,
       stuff: this.recipe.stuff,
       tools: this.recipe.tools,
-      steps: []
+      steps: [],
+      stuffAmount: amount
+    }
+    // 计算 Nutri-Score 和营养表格
+    if (this.recipe.nutrition !== undefined) {
+      const n = this.recipe.nutrition
+      const score = calcNutriScore(n, tags)
+      const colors = getNutriScoreColors(score)
+      this.nutriScore = score
+      this.nutriScoreBgColor = colors.bg
+      this.nutriScoreTextColor = colors.text
+      const item0: NutritionItem = { label: '热量', value: `${n.calories}kcal`, color: '#E85D04' }
+      const item1: NutritionItem = { label: '蛋白质', value: `${n.protein}g`, color: '#1A7C3E' }
+      const item2: NutritionItem = { label: '脂肪', value: `${n.fat}g`, color: '#F28B0C' }
+      const item3: NutritionItem = { label: '碳水', value: `${n.carbs}g`, color: '#3B82F6' }
+      const item4: NutritionItem = { label: '纤维', value: `${n.fiber}g`, color: '#56AB2F' }
+      const item5: NutritionItem = { label: '钠', value: `${n.sodium}mg`, color: '#9CA3AF' }
+      this.nutritionItems = [item0, item1, item2, item3, item4, item5]
+    } else {
+      this.nutriScore = ''
+      this.nutritionItems = []
     }
   }
 
@@ -87,7 +132,8 @@ export struct RecipeDetailSheet {
           tags: this.detail.tags,
           stuff: this.detail.stuff,
           tools: this.detail.tools,
-          steps: data.steps
+          steps: data.steps,
+          stuffAmount: this.detail.stuffAmount
         }
         this.loadState = 'ok'
       } else {
@@ -130,14 +176,27 @@ export struct RecipeDetailSheet {
     }
   }
 
+  private getStepDuration(step: string): string {
+    const match = step.match(/(\d+\s*(秒|分钟|小时|min|mins|h))/i)
+    return match !== null && match.length > 0 ? match[0] : ''
+  }
+
   private requestClose(): void {
     if (this.onRequestClose) {
       this.onRequestClose()
     }
   }
 
+  /** 获取某食材在当前人数下换算后的用量字符串 */
+  private getScaledAmount(ingredient: string): string {
+    const raw = this.detail.stuffAmount[ingredient]
+    if (raw === undefined || raw.length === 0) return ''
+    if (this.servingCount === 1) return raw
+    return scaleIngredientAmount(raw, this.servingCount)
+  }
+
   // ──────────────────────────────────────────────
-  // 拖拽条：视觉引导用户上拉/下拉操作面板
+  // 拖拽条
   // ──────────────────────────────────────────────
   @Builder
   private DragHandle() {
@@ -154,7 +213,7 @@ export struct RecipeDetailSheet {
   }
 
   // ──────────────────────────────────────────────
-  // 头部：菜品大图、名称、难度标签
+  // 头部
   // ──────────────────────────────────────────────
   @Builder
   private HeroSection() {
@@ -167,6 +226,17 @@ export struct RecipeDetailSheet {
         .fontWeight(FontWeight.Bold)
         .fontColor(DSColor.TEXT_PRIMARY)
         .textAlign(TextAlign.Center)
+
+      // Nutri-Score 徽章（仅当 recipe 非空且有营养数据时展示）
+      if (this.nutriScore.length > 0) {
+        Text(`Nutri-Score ${this.nutriScore}`)
+          .fontSize(12)
+          .fontColor(this.nutriScoreTextColor)
+          .fontWeight(FontWeight.Bold)
+          .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+          .backgroundColor(this.nutriScoreBgColor)
+          .borderRadius(DSRadius.PILL)
+      }
 
       if (this.detail.difficulty.length > 0) {
         Text(this.detail.difficulty)
@@ -185,7 +255,7 @@ export struct RecipeDetailSheet {
   }
 
   // ──────────────────────────────────────────────
-  // 标签组：彩色 # 标签展示
+  // 标签组
   // ──────────────────────────────────────────────
   @Builder
   private TagsSection() {
@@ -219,25 +289,53 @@ export struct RecipeDetailSheet {
   }
 
   // ──────────────────────────────────────────────
-  // 通用信息卡片：食材 / 工具
-  // copyEnabled = true 时，标题右侧出现「缺失食材」快捷复制按钮
+  // 食材卡片（含人数换算）
   // ──────────────────────────────────────────────
   @Builder
-  private SectionCard(title: string, items: string[], emptyHint: string, copyEnabled: boolean = false) {
+  private IngredientsCard() {
     Column({ space: DSSpace.SM }) {
+      // 标题行：食材 + 缺失食材按钮 + 人数选择器
       Row() {
-        Text(title)
+        Text('食材')
           .fontSize(DSType.TITLE)
           .fontColor(DSColor.TEXT_PRIMARY)
           .fontWeight(FontWeight.Medium)
 
         Blank()
 
-        if (copyEnabled) {
+        // 人数换算 Counter
+        Row({ space: 8 }) {
+          Text('人数')
+            .fontSize(12)
+            .fontColor(DSColor.TEXT_TERTIARY)
+          Row({ space: 4 }) {
+            Text('−')
+              .fontSize(16).fontColor(this.servingCount > 1 ? DSColor.BRAND_PRIMARY : DSColor.TEXT_TERTIARY)
+              .width(28).height(28).textAlign(TextAlign.Center)
+              .backgroundColor(DSColor.BG_SOFT).borderRadius(DSRadius.PILL)
+              .onClick(() => {
+                if (this.servingCount > 1) {
+                  this.servingCount = this.servingCount - 1
+                }
+              })
+            Text(`${this.servingCount}`)
+              .fontSize(14).fontColor(DSColor.TEXT_PRIMARY).fontWeight(FontWeight.Bold)
+              .width(24).textAlign(TextAlign.Center)
+            Text('+')
+              .fontSize(16).fontColor(this.servingCount < 6 ? DSColor.BRAND_PRIMARY : DSColor.TEXT_TERTIARY)
+              .width(28).height(28).textAlign(TextAlign.Center)
+              .backgroundColor(DSColor.BG_SOFT).borderRadius(DSRadius.PILL)
+              .onClick(() => {
+                if (this.servingCount < 6) {
+                  this.servingCount = this.servingCount + 1
+                }
+              })
+          }
+
           Text('缺失食材')
             .fontSize(DSType.CAPTION)
             .fontColor(DSColor.BRAND_PRIMARY)
-            .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+            .padding({ left: 8, right: 8, top: 5, bottom: 5 })
             .backgroundColor('#FFF2F0')
             .borderRadius(DSRadius.SM)
             .borderWidth(1)
@@ -247,9 +345,82 @@ export struct RecipeDetailSheet {
       }
       .width('100%')
 
-      if (items.length > 0) {
+      if (this.detail.stuff.length > 0) {
         Flex({ wrap: FlexWrap.Wrap }) {
-          ForEach(items, (item: string) => {
+          ForEach(this.detail.stuff, (item: string) => {
+            Column() {
+              Text(item)
+                .fontSize(DSType.BODY)
+                .fontColor(DSColor.TEXT_SECONDARY)
+              if (this.getScaledAmount(item).length > 0) {
+                Text(this.getScaledAmount(item))
+                  .fontSize(10)
+                  .fontColor(DSColor.BRAND_PRIMARY)
+                  .margin({ top: 1 })
+              }
+            }
+            .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+            .backgroundColor('#FDFEFF')
+            .borderRadius(DSRadius.SM)
+            .borderWidth(1)
+            .borderColor(DSColor.STROKE_SOFT)
+            .margin({ right: 8, bottom: 8 })
+            .alignItems(HorizontalAlign.Center)
+          }, (item: string) => item)
+        }
+        .width('100%')
+      } else {
+        Text('暂无食材信息')
+          .fontSize(DSType.BODY)
+          .fontColor(DSColor.TEXT_TERTIARY)
+      }
+    }
+    .width('100%')
+    .padding(DSSpace.MD)
+    .backgroundColor(DSColor.BG_ELEVATED)
+    .borderRadius(DSRadius.LG)
+    .borderWidth(1)
+    .borderColor(DSColor.STROKE_SOFT)
+    .shadow(DSShadow.CARD)
+  }
+
+  @Builder
+  private TodayMenuButtonSection() {
+    Row({ space: 8 }) {
+      Text(this.isTodayMenu ? '✓' : '+')
+        .fontSize(16)
+        .fontColor(this.isTodayMenu ? Color.White : DSColor.BRAND_PRIMARY)
+      Text(this.isTodayMenu ? '已加入今日餐桌' : '加入今日餐桌')
+        .fontSize(15)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(this.isTodayMenu ? Color.White : DSColor.BRAND_PRIMARY)
+    }
+    .width('100%')
+    .height(48)
+    .justifyContent(FlexAlign.Center)
+    .backgroundColor(this.isTodayMenu ? DSColor.BRAND_PRIMARY : Color.Transparent)
+    .borderRadius(DSRadius.MD)
+    .borderWidth(this.isTodayMenu ? 0 : 1.5)
+    .borderColor(DSColor.BRAND_PRIMARY)
+    .onClick(() => {
+      if (this.onTodayMenuToggle) this.onTodayMenuToggle()
+    })
+  }
+
+  // ──────────────────────────────────────────────
+  // 通用信息卡片：工具
+  // ──────────────────────────────────────────────
+  @Builder
+  private ToolsCard() {
+    Column({ space: DSSpace.SM }) {
+      Text('烹饪工具')
+        .fontSize(DSType.TITLE)
+        .fontColor(DSColor.TEXT_PRIMARY)
+        .fontWeight(FontWeight.Medium)
+
+      if (this.detail.tools.length > 0) {
+        Flex({ wrap: FlexWrap.Wrap }) {
+          ForEach(this.detail.tools, (item: string) => {
             Text(item)
               .fontSize(DSType.BODY)
               .fontColor(DSColor.TEXT_SECONDARY)
@@ -263,7 +434,7 @@ export struct RecipeDetailSheet {
         }
         .width('100%')
       } else {
-        Text(emptyHint)
+        Text('暂无工具信息')
           .fontSize(DSType.BODY)
           .fontColor(DSColor.TEXT_TERTIARY)
       }
@@ -281,7 +452,7 @@ export struct RecipeDetailSheet {
   // 步骤卡片：编号气泡 + 步骤文本，支持专注模式
   // ──────────────────────────────────────────────
   @Builder
-  private StepsSection() {
+  private TimelineStepsSection() {
     Column({ space: DSSpace.SM }) {
       Row() {
         Text('步骤')
@@ -301,6 +472,7 @@ export struct RecipeDetailSheet {
           .borderColor('#FFD6D1')
           .onClick(() => {
             if (this.detail.steps.length > 0) {
+              this.focusInitIndex = 0
               this.focusModeVisible = true
             } else {
               this.showToast('暂无步骤数据')
@@ -334,6 +506,7 @@ export struct RecipeDetailSheet {
                 .textAlign(TextAlign.Center)
                 .backgroundColor(DSColor.BRAND_PRIMARY)
                 .borderRadius(DSRadius.PILL)
+                .flexShrink(0)
 
               Text(step)
                 .fontSize(DSType.BODY)
@@ -347,6 +520,11 @@ export struct RecipeDetailSheet {
             .borderWidth(1)
             .borderColor(DSColor.STROKE_SOFT)
             .alignItems(VerticalAlign.Top)
+            .onClick(() => {
+              // 点击步骤卡片，从该步骤进入全屏 Swiper
+              this.focusInitIndex = index
+              this.focusModeVisible = true
+            })
           }, (step: string, index: number) => `${index}-${step}`)
         }
         .width('100%')
@@ -358,21 +536,53 @@ export struct RecipeDetailSheet {
     }
     .width('100%')
     .padding(DSSpace.MD)
-    .backgroundColor(DSColor.BG_ELEVATED)
-    .borderRadius(DSRadius.LG)
-    .borderWidth(1)
-    .borderColor(DSColor.STROKE_SOFT)
-    .shadow(DSShadow.CARD)
   }
 
   // ──────────────────────────────────────────────
-  // 底部操作栏：收藏 + 完成
-  // 使用 backdropBlur 实现毛玻璃浮层效果
+  // 营养信息卡片（Feature 8）
+  // ──────────────────────────────────────────────
+  @Builder
+  private NutritionCard() {
+    if (this.nutritionItems.length > 0) {
+      Column({ space: DSSpace.SM }) {
+        Text('营养信息').fontSize(DSType.TITLE).fontColor(DSColor.TEXT_PRIMARY).fontWeight(FontWeight.Medium)
+        Text('（每份参考值）').fontSize(10).fontColor(DSColor.TEXT_TERTIARY).alignSelf(ItemAlign.Start)
+
+        GridRow({ columns: 3, gutter: { x: 8, y: 8 } }) {
+          ForEach(this.nutritionItems, (item: NutritionItem) => {
+            GridCol() {
+              Column({ space: 2 }) {
+                Text(item.value)
+                  .fontSize(14).fontWeight(FontWeight.Bold)
+                  .fontColor(item.color)
+                Text(item.label)
+                  .fontSize(11).fontColor(DSColor.TEXT_TERTIARY)
+              }
+              .padding({ top: 10, bottom: 10 })
+              .width('100%')
+              .alignItems(HorizontalAlign.Center)
+              .backgroundColor(DSColor.BG_SOFT)
+              .borderRadius(DSRadius.SM)
+            }
+          }, (item: NutritionItem) => item.label)
+        }.width('100%')
+      }
+      .width('100%')
+      .padding(DSSpace.MD)
+      .backgroundColor(DSColor.BG_ELEVATED)
+      .borderRadius(DSRadius.LG)
+      .borderWidth(1)
+      .borderColor(DSColor.STROKE_SOFT)
+      .shadow(DSShadow.CARD)
+    }
+  }
+
+  // ──────────────────────────────────────────────
+  // 底部操作栏
   // ──────────────────────────────────────────────
   @Builder
   private BottomBar() {
     Row({ space: DSSpace.MD }) {
-      // 收藏按钮
       Row({ space: 6 }) {
         Text(this.isFavorite ? '★' : '☆')
           .fontSize(18)
@@ -395,12 +605,11 @@ export struct RecipeDetailSheet {
 
       Blank()
 
-      // 完成按钮
       Text('完成')
         .fontSize(DSType.BODY)
         .fontColor(Color.White)
         .fontWeight(FontWeight.Medium)
-        .padding({ left: 30, right: 30, top: 12, bottom: 12 })
+        .padding({ left: 24, right: 24, top: 12, bottom: 12 })
         .backgroundColor(DSColor.BRAND_PRIMARY)
         .borderRadius(DSRadius.MD)
         .shadow({
@@ -421,30 +630,19 @@ export struct RecipeDetailSheet {
   }
 
   build() {
-    // 整体 Stack：内容列 + Toast + 专注模式覆层
     Stack() {
       Column() {
-        // 自定义拖拽条（bindSheet 已设置 dragBar:false，此处为精致替代）
         this.DragHandle()
 
-        // 可滚动内容区 - 包含菜品头部信息、标签和所有内容
-        // nestedScroll 策略：
-        //   - 向下（SELF_FIRST）：列表内容优先滚动，到底后传给父级面板上拉展开
-        //   - 向上（PARENT_FIRST）：顶部拉取时先交给面板处理（吸附收起），再由列表响应
         Scroll(this.contentScroller) {
           Column({ space: DSSpace.MD }) {
-            // 菜品头部信息（现在可以随内容一起滚动）
             this.HeroSection()
-            
-            // 标签组
             this.TagsSection()
-            
-            // 内容卡片
-            this.SectionCard('食材', this.detail.stuff, '暂无食材信息', true)
-            this.SectionCard('烹饪工具', this.detail.tools, '暂无工具信息')
-            this.StepsSection()
-            
-            // 底部留白
+            this.IngredientsCard()
+            this.ToolsCard()
+            this.TodayMenuButtonSection()
+            this.TimelineStepsSection()
+            this.NutritionCard()
             Row().height(DSSpace.SM)
           }
           .padding({ left: DSSpace.LG, right: DSSpace.LG, bottom: DSSpace.SM })
@@ -455,32 +653,29 @@ export struct RecipeDetailSheet {
         .scrollBarColor('#803B4968')
         .scrollBarWidth(3)
         .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: false })
-        // 阻尼系数：0.78 让手指离开后快速减速，避免过度惯性遮挡内容
         .friction(DSSheet.SCROLL_FRICTION)
-        // 核心嵌套滚动配置：解决列表滑动与面板拖拽之间的手势冲突
         .nestedScroll({
           scrollForward: NestedScrollMode.SELF_FIRST,
           scrollBackward: NestedScrollMode.PARENT_FIRST
         })
 
-        // 底部毛玻璃操作栏（固定不随内容滚动）
         this.BottomBar()
       }
       .width('100%')
       .height('100%')
 
-      // Toast 轻提示（浮层，不干扰主内容触控）
       ToastView({ message: this.toastMessage, visible: this.toastVisible })
 
-      // 专注烹饪模式（全屏覆层，步骤卡片轮播）
+      // 专注烹饪模式（支持初始步骤索引）
       CookingFocusView({
         visible: $focusModeVisible,
         recipeName: this.detail.name,
-        steps: this.detail.steps
+        steps: this.detail.steps,
+        initialIndex: this.focusInitIndex
       })
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(AppColors.BG_COLOR) // 使用应用主题背景色，不透明
+    .backgroundColor(AppColors.BG_COLOR)
   }
 }

@@ -61,6 +61,24 @@ export class CookPreferenceKeys {
   static readonly PRIVACY_ACCEPTED: string = 'privacy_accepted'
   static readonly THEME_CHANGE_TIMESTAMP: string = 'theme_change_timestamp'
   static readonly FOLDERS: string = 'folders'
+  /** 搜索关键词历史（string[]，最新在前，最多 20 条） */
+  static readonly SEARCH_HISTORY: string = 'search_history'
+  /** 带日期的浏览历史（Record<YYYY-MM-DD, number[]>） */
+  static readonly HISTORY_DATED: string = 'history_dated'
+  /** 今日餐桌菜谱 ID 列表（number[]） */
+  static readonly TODAY_MENU: string = 'today_menu'
+  /** 每日推荐通知开关 */
+  static readonly DAILY_RECOMMEND_SWITCH: string = 'daily_recommend_switch'
+  /** 每日推荐通知时间 - 小时（0-23） */
+  static readonly DAILY_RECOMMEND_HOUR: string = 'daily_recommend_hour'
+  /** 每日推荐通知时间 - 分钟（0-59） */
+  static readonly DAILY_RECOMMEND_MINUTE: string = 'daily_recommend_minute'
+  /** 每日推荐偏好（'fridge_first' | 'random_quality'） */
+  static readonly DAILY_RECOMMEND_PREFERENCE: string = 'daily_recommend_preference'
+  /** 最近推荐过的菜谱 ID 列表（number[]，最多 7 条） */
+  static readonly RECOMMEND_HISTORY: string = 'recommend_history'
+  /** reminderAgentManager 保存的提醒 ID（用于取消旧提醒） */
+  static readonly DAILY_REMINDER_AGENT_ID: string = 'daily_reminder_agent_id'
 }
 
 /**
@@ -72,6 +90,7 @@ export class CookPreferences {
   private static opening: Promise<preferences.Preferences> | null = null;
   private static readonly HISTORY_MAX: number = 50;
   private static readonly FAVORITE_MAX: number = 500;
+  private static readonly SEARCH_HISTORY_MAX: number = 20;
 
   private static async getStore(context: common.Context): Promise<preferences.Preferences> {
     if (CookPreferences.store !== null) {
@@ -341,7 +360,7 @@ export class CookPreferences {
     await p.flush();
   }
 
-  /** 记录一次打开视频：去重后插到队首，最多保留 HISTORY_MAX 条 */
+  /** 记录一次浏览菜谱：去重后插到队首，最多保留 HISTORY_MAX 条；同时写入带日期的历史 */
   static async recordHistoryVisit(context: common.Context, recipeId: number): Promise<void> {
     if (recipeId < 0 || Math.floor(recipeId) !== recipeId) {
       return;
@@ -363,6 +382,8 @@ export class CookPreferences {
     }
     await p.put(CookPreferenceKeys.HISTORY, JSON.stringify(capped));
     await p.flush();
+    // 同时写入带日期的历史（用于热力图，不阻塞主流程）
+    void CookPreferences.recordDatedHistoryVisit(context, recipeId);
   }
 
   private static parseStringArray(raw: string): string[] {
@@ -526,6 +547,206 @@ export class CookPreferences {
     if (changed) {
       await CookPreferences.setFolders(context, folders);
     }
+  }
+
+  // ─── 搜索历史 ─────────────────────────────────────────────
+
+  static async getSearchHistory(context: common.Context): Promise<string[]> {
+    const p = await CookPreferences.getStore(context);
+    const raw = CookPreferences.getSettingsString(await p.get(CookPreferenceKeys.SEARCH_HISTORY, ''));
+    return CookPreferences.parseStringArray(raw);
+  }
+
+  /**
+   * 将关键词插到历史队首（去重），最多保留 SEARCH_HISTORY_MAX 条。
+   * 空字符串不记录。
+   */
+  static async addSearchHistory(context: common.Context, keyword: string): Promise<void> {
+    const trimmed = keyword.trim();
+    if (trimmed.length === 0) return;
+    const p = await CookPreferences.getStore(context);
+    const prev = await CookPreferences.getSearchHistory(context);
+    const next: string[] = [trimmed];
+    for (let i = 0; i < prev.length; i++) {
+      if (prev[i] !== trimmed) {
+        next.push(prev[i]);
+      }
+    }
+    const capped: string[] = next.slice(0, CookPreferences.SEARCH_HISTORY_MAX);
+    await p.put(CookPreferenceKeys.SEARCH_HISTORY, JSON.stringify(capped));
+    await p.flush();
+  }
+
+  static async clearSearchHistory(context: common.Context): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.SEARCH_HISTORY, '[]');
+    await p.flush();
+  }
+
+  // ─── 带日期的浏览历史 ─────────────────────────────────────
+
+  private static todayDateString(): string {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  static async getDatedHistory(context: common.Context): Promise<Record<string, number[]>> {
+    const p = await CookPreferences.getStore(context);
+    const raw = CookPreferences.getSettingsString(await p.get(CookPreferenceKeys.HISTORY_DATED, ''));
+    if (raw.length === 0) {
+      return {};
+    }
+    try {
+      const parsed = JSON.parse(raw) as Record<string, number[]>;
+      if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return {};
+      }
+      return parsed;
+    } catch {
+      return {};
+    }
+  }
+
+  /**
+   * 向带日期的历史中追加一次记录（同一天同一菜谱只记一次）。
+   * 同时兼容保存到旧格式 HISTORY key。
+   */
+  static async recordDatedHistoryVisit(context: common.Context, recipeId: number): Promise<void> {
+    if (recipeId < 0 || Math.floor(recipeId) !== recipeId) return;
+    const p = await CookPreferences.getStore(context);
+    const dated = await CookPreferences.getDatedHistory(context);
+    const today = CookPreferences.todayDateString();
+    const todayList: number[] = dated[today] ?? [];
+    let alreadyIn = false;
+    for (let i = 0; i < todayList.length; i++) {
+      if (todayList[i] === recipeId) { alreadyIn = true; break; }
+    }
+    if (!alreadyIn) {
+      const newList: number[] = [recipeId];
+      for (let i = 0; i < todayList.length; i++) { newList.push(todayList[i]); }
+      dated[today] = newList;
+      await p.put(CookPreferenceKeys.HISTORY_DATED, JSON.stringify(dated));
+      await p.flush();
+    }
+  }
+
+  // ─── 今日餐桌 ─────────────────────────────────────────────
+
+  static async getTodayMenuIds(context: common.Context): Promise<number[]> {
+    const p = await CookPreferences.getStore(context);
+    const raw = CookPreferences.getSettingsString(await p.get(CookPreferenceKeys.TODAY_MENU, ''));
+    return CookPreferences.parseRecipeIdArray(raw);
+  }
+
+  static async setTodayMenuIds(context: common.Context, ids: number[]): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.TODAY_MENU, JSON.stringify(ids));
+    await p.flush();
+  }
+
+  static async toggleTodayMenuItem(context: common.Context, recipeId: number): Promise<boolean> {
+    const prev = await CookPreferences.getTodayMenuIds(context);
+    let found = false;
+    const next: number[] = [];
+    for (let i = 0; i < prev.length; i++) {
+      if (prev[i] === recipeId) { found = true; } else { next.push(prev[i]); }
+    }
+    if (!found) { next.unshift(recipeId); }
+    await CookPreferences.setTodayMenuIds(context, next);
+    return !found; // true = 已加入，false = 已移除
+  }
+
+  static async clearTodayMenu(context: common.Context): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.TODAY_MENU, '[]');
+    await p.flush();
+  }
+
+  // ─── 每日推荐通知设置 ──────────────────────────────────────
+
+  static async getDailyRecommendSwitch(context: common.Context): Promise<boolean> {
+    const p = await CookPreferences.getStore(context);
+    const raw = await p.get(CookPreferenceKeys.DAILY_RECOMMEND_SWITCH, false);
+    return raw === true;
+  }
+
+  static async setDailyRecommendSwitch(context: common.Context, enabled: boolean): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.DAILY_RECOMMEND_SWITCH, enabled);
+    await p.flush();
+  }
+
+  static async getDailyRecommendHour(context: common.Context): Promise<number> {
+    const p = await CookPreferences.getStore(context);
+    const raw = await p.get(CookPreferenceKeys.DAILY_RECOMMEND_HOUR, 8);
+    return typeof raw === 'number' ? Math.max(0, Math.min(23, Math.floor(raw))) : 8;
+  }
+
+  static async setDailyRecommendHour(context: common.Context, hour: number): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.DAILY_RECOMMEND_HOUR, Math.max(0, Math.min(23, Math.floor(hour))));
+    await p.flush();
+  }
+
+  static async getDailyRecommendMinute(context: common.Context): Promise<number> {
+    const p = await CookPreferences.getStore(context);
+    const raw = await p.get(CookPreferenceKeys.DAILY_RECOMMEND_MINUTE, 0);
+    return typeof raw === 'number' ? Math.max(0, Math.min(59, Math.floor(raw))) : 0;
+  }
+
+  static async setDailyRecommendMinute(context: common.Context, minute: number): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.DAILY_RECOMMEND_MINUTE, Math.max(0, Math.min(59, Math.floor(minute))));
+    await p.flush();
+  }
+
+  static async getDailyRecommendPreference(context: common.Context): Promise<string> {
+    const p = await CookPreferences.getStore(context);
+    const raw = CookPreferences.getSettingsString(await p.get(CookPreferenceKeys.DAILY_RECOMMEND_PREFERENCE, ''));
+    return raw === 'random_quality' ? 'random_quality' : 'fridge_first';
+  }
+
+  static async setDailyRecommendPreference(context: common.Context, preference: string): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.DAILY_RECOMMEND_PREFERENCE, preference);
+    await p.flush();
+  }
+
+  static async getRecommendHistory(context: common.Context): Promise<number[]> {
+    const p = await CookPreferences.getStore(context);
+    const raw = CookPreferences.getSettingsString(await p.get(CookPreferenceKeys.RECOMMEND_HISTORY, ''));
+    return CookPreferences.parseRecipeIdArray(raw);
+  }
+
+  /** 将 recipeId 插到推荐历史队首，最多保留 7 条 */
+  static async addToRecommendHistory(context: common.Context, recipeId: number): Promise<void> {
+    if (recipeId < 0 || Math.floor(recipeId) !== recipeId) return;
+    const p = await CookPreferences.getStore(context);
+    const prev = await CookPreferences.getRecommendHistory(context);
+    const next: number[] = [recipeId];
+    for (let i = 0; i < prev.length; i++) {
+      if (prev[i] !== recipeId) {
+        next.push(prev[i]);
+      }
+    }
+    const capped: number[] = next.slice(0, 7);
+    await p.put(CookPreferenceKeys.RECOMMEND_HISTORY, JSON.stringify(capped));
+    await p.flush();
+  }
+
+  static async getDailyReminderAgentId(context: common.Context): Promise<number> {
+    const p = await CookPreferences.getStore(context);
+    const raw = await p.get(CookPreferenceKeys.DAILY_REMINDER_AGENT_ID, 0);
+    return typeof raw === 'number' ? raw : 0;
+  }
+
+  static async setDailyReminderAgentId(context: common.Context, reminderId: number): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.DAILY_REMINDER_AGENT_ID, reminderId);
+    await p.flush();
   }
 
   static async deleteFolder(context: common.Context, folderId: string): Promise<void> {

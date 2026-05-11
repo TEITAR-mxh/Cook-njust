@@ -2,6 +2,7 @@ import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want 
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 import { CookPreferences } from '../store/CookPreferences';
+import { ReminderService } from '../service/ReminderService';
 
 const DOMAIN = 0x0000;
 
@@ -28,9 +29,39 @@ export default class EntryAbility extends UIAbility {
 
     hilog.info(DOMAIN, 'testTag', 'Ability onCreate, isDark=%{public}s', String(isDark));
 
-    void CookPreferences.warmUp(this.context).catch(() => {
-      hilog.error(DOMAIN, 'testTag', 'CookPreferences warmUp failed');
+    // 处理通知点击携带的推荐菜谱 ID
+    this.handleRecommendIntent(want);
+
+    void CookPreferences.warmUp(this.context).then(() => {
+      return CookPreferences.getDailyRecommendSwitch(this.context);
+    }).then((enabled: boolean) => {
+      if (enabled) {
+        return ReminderService.scheduleOrUpdate(this.context);
+      }
+      return Promise.resolve();
+    }).catch(() => {
+      hilog.error(DOMAIN, 'testTag', 'EntryAbility init sequence failed');
     });
+  }
+
+  /**
+   * 通知点击后若 App 已在前台则通过 onNewWant 接收新的 Want。
+   */
+  onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    this.handleRecommendIntent(want);
+  }
+
+  /** 从 want 中提取推荐标记并写入 AppStorage，供 IndexV2 读取 */
+  private handleRecommendIntent(want: Want): void {
+    const params = want.parameters;
+    if (params === undefined || params === null) {
+      return;
+    }
+    // 每日提醒通知点击：由系统闹钟携带的标记
+    const fromReminder: Object = params['openFromDailyReminder'];
+    if (fromReminder !== undefined && fromReminder !== null) {
+      AppStorage.setOrCreate<boolean>('pendingDailyReminder', true);
+    }
   }
 
   /**

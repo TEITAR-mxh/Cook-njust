@@ -3,6 +3,7 @@ import { router } from '@kit.ArkUI';
 import { RecipeRepository } from '../data/RecipeRepository';
 import { CookPreferences } from '../store/CookPreferences';
 import { getSystemSafeTopVp } from '../util/StatusBarInset';
+import { HistoryHeatmap } from '../components/HistoryHeatmap';
 
 @Entry
 @Component
@@ -11,6 +12,7 @@ struct HistoryPage {
   @State favoriteIds: number[] = []
   @State keepLocalData: boolean = true
   @State navTopInsetVp: number = 48
+  @State datedHistoryJson: string = '{}'
 
   aboutToAppear(): void {
     void this.load();
@@ -48,6 +50,8 @@ struct HistoryPage {
         this.favoriteIds = [];
         return;
       }
+      const dated = await CookPreferences.getDatedHistory(host);
+      this.datedHistoryJson = JSON.stringify(dated);
       const rawH = await CookPreferences.getHistoryIds(host);
       const n = RecipeRepository.getInstance().getCount();
       const h: number[] = [];
@@ -196,6 +200,13 @@ struct HistoryPage {
 
       Scroll() {
         Column({ space: 0 }) {
+          // 热力图
+          if (this.keepLocalData) {
+            Column() {
+              HistoryHeatmap({ datedHistory: this.datedHistoryJson })
+            }.width('100%').padding({ left: 12, right: 12, top: 16, bottom: 8 })
+          }
+
           if (this.keepLocalData && this.historyIds.length > 0) {
             Text(`共 ${this.historyIds.length} 条（新→旧）`)
               .fontSize(12)

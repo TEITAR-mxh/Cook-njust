@@ -13,6 +13,7 @@ import { CookPreferences, type UserProfile, type ThemeSettings } from '../store/
 import { getSystemSafeTopVp } from '../util/StatusBarInset'
 import { ToastView } from '../components/ToastView'
 import { PRIVACY_DOC, AGREEMENT_DOC, type LegalDocConfig, type LegalSection } from '../pages/LegalDocPage'
+import { ReminderService } from '../service/ReminderService'
 
 const AVATAR_OPTIONS: string[] = ['👨', '👩', '🧑', '👦', '👧', '🍳', '🥘', '🍲', '🥗', '🍕', '🍔', '🍟', '🥐', '🥪', '🥙', '🍣']
 
@@ -61,6 +62,10 @@ struct SettingsPage {
   @State themeMode: string = '系统默认'
   @State showThemeSheet: boolean = false
   @State enableDailyPush: boolean = false
+  @State dailyPushHour: number = 8
+  @State dailyPushMinute: number = 0
+  @State dailyPushPreference: string = 'fridge_first'
+  @State showTimePicker: boolean = false
   @State cacheSize: string = '计算中...'
   @State toastMessage: string = ''
   @State toastVisible: boolean = false
@@ -79,6 +84,12 @@ struct SettingsPage {
   }
 
   onPageShow(): void {
+    // 同步读取 AppStorage 避免 loadData 异步期间显示初始值 '系统默认'
+    const liveMode = AppStorage.get<string>('currentThemeMode')
+    if (liveMode !== undefined && liveMode.length > 0) {
+      this.themeMode = liveMode
+      this.updateThemeColors()
+    }
     void this.loadData()
   }
 
@@ -90,6 +101,10 @@ struct SettingsPage {
   onBackPress(): boolean {
     if (this.showLegalOverlay) {
       this.showLegalOverlay = false
+      return true
+    }
+    if (this.showTimePicker) {
+      this.showTimePicker = false
       return true
     }
     if (this.showThemeSheet) {
@@ -184,6 +199,13 @@ struct SettingsPage {
       this.favoriteCount = favoriteIds.length
       this.historyCount = historyIds.length
       this.userProfile = profile
+
+      // 每日推荐通知设置
+      this.enableDailyPush = await CookPreferences.getDailyRecommendSwitch(host)
+      this.dailyPushHour = await CookPreferences.getDailyRecommendHour(host)
+      this.dailyPushMinute = await CookPreferences.getDailyRecommendMinute(host)
+      this.dailyPushPreference = await CookPreferences.getDailyRecommendPreference(host)
+
       // 主题来源优先级：
       //   1. AppStorage（当次会话中 changeThemeMode 会实时写入，最新）
       //   2. Preferences（冷启动恢复，AppStorage 尚无值时使用）
@@ -232,10 +254,8 @@ struct SettingsPage {
 
   /** @Watch 回调：跨页面主题模式变化（IndexV2 等页面修改后推送过来） */
   private onStoredThemeModeChange(): void {
-    if (this.storedThemeMode !== this.themeMode) {
-      this.themeMode = this.storedThemeMode;
-      this.updateThemeColors();
-    }
+    this.themeMode = this.storedThemeMode;
+    this.updateThemeColors();
   }
 
   private updateThemeColors(): void {
@@ -650,11 +670,84 @@ struct SettingsPage {
             this.buildSectionHeader('通用设置')
             Column() {
               this.buildSettingCard('颜色模式', '', false, false, this.themeMode, () => { this.showThemeSheet = true })
-              Divider().color(this.currentBorderColor).margin({ left: 20, right: 20 })
-              this.buildSettingCard('每日菜谱灵感', '每天为您推送精选菜品推荐', true, this.enableDailyPush, '', () => {
-                this.enableDailyPush = !this.enableDailyPush
-                this.showToast(this.enableDailyPush ? '已开启菜谱灵感推送' : '已关闭推送')
-              })
+            }.margin({ left: 16, right: 16 }).backgroundColor(this.currentCardBgColor).borderRadius(20)
+
+            // --- 每日推荐通知 ---
+            this.buildSectionHeader('🔔 每日推荐通知')
+            Column() {
+              // 开关行
+              Row({ space: 16 }) {
+                Column({ space: 4 }) {
+                  Text('每日菜谱灵感').fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.currentTextColor)
+                  Text('在您设定的时间推送今日精选菜谱').fontSize(13).fontColor(this.currentSecondaryTextColor)
+                }
+                .alignItems(HorizontalAlign.Start).layoutWeight(1)
+
+                Toggle({ type: ToggleType.Switch, isOn: this.enableDailyPush })
+                  .selectedColor(AppColors.BRAND_COLOR)
+                  .switchPointColor(Color.White)
+                  .onChange((val: boolean) => {
+                    this.enableDailyPush = val
+                    const host = this.getHostContext()
+                    if (!host) return
+                    void CookPreferences.setDailyRecommendSwitch(host, val).then(() => {
+                      if (val) {
+                        return ReminderService.scheduleOrUpdate(host)
+                      } else {
+                        return ReminderService.cancel(host)
+                      }
+                    }).then(() => {
+                      this.showToast(val ? '✅ 每日推荐已开启' : '🔕 每日推荐已关闭')
+                    }).catch(() => {
+                      this.showToast('设置失败，请重试')
+                    })
+                  })
+              }
+              .width('100%')
+              .padding({ left: 20, right: 20, top: 16, bottom: 16 })
+
+              if (this.enableDailyPush) {
+                Divider().color(this.currentBorderColor).margin({ left: 20, right: 20 })
+
+                // 推送时间
+                Row({ space: 16 }) {
+                  Text('推送时间').fontSize(16).fontColor(this.currentTextColor).layoutWeight(1)
+                  Row({ space: 6 }) {
+                    Text(`${this.dailyPushHour.toString().padStart(2, '0')}:${this.dailyPushMinute.toString().padStart(2, '0')}`)
+                      .fontSize(16).fontWeight(FontWeight.Bold).fontColor(AppColors.BRAND_COLOR)
+                    SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([this.currentSecondaryTextColor])
+                  }
+                }
+                .width('100%')
+                .padding({ left: 20, right: 20, top: 14, bottom: 14 })
+                .onClick(() => { this.showTimePicker = true })
+
+                Divider().color(this.currentBorderColor).margin({ left: 20, right: 20 })
+
+                // 推荐偏好
+                Row({ space: 16 }) {
+                  Column({ space: 4 }) {
+                    Text('推荐偏好').fontSize(16).fontColor(this.currentTextColor)
+                    Text(this.dailyPushPreference === 'fridge_first' ? '优先使用冰箱食材' : '精选质量菜谱随机')
+                      .fontSize(13).fontColor(this.currentSecondaryTextColor)
+                  }
+                  .alignItems(HorizontalAlign.Start).layoutWeight(1)
+
+                  SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([this.currentSecondaryTextColor])
+                }
+                .width('100%')
+                .padding({ left: 20, right: 20, top: 14, bottom: 14 })
+                .onClick(() => {
+                  const newPref = this.dailyPushPreference === 'fridge_first' ? 'random_quality' : 'fridge_first'
+                  this.dailyPushPreference = newPref
+                  const host = this.getHostContext()
+                  if (!host) return
+                  void CookPreferences.setDailyRecommendPreference(host, newPref).then(() => {
+                    const label = newPref === 'fridge_first' ? '冰箱优先' : '随机精选'
+                    this.showToast(`推荐偏好已切换为：${label}`)
+                  })
+                })
+              }
             }.margin({ left: 16, right: 16 }).backgroundColor(this.currentCardBgColor).borderRadius(20)
 
             // --- 数据管理 ---
@@ -691,6 +784,62 @@ struct SettingsPage {
           }.width('100%').constraintSize({ minHeight: '100%' })
         }.layoutWeight(1).scrollBar(BarState.Off)
       }.width('100%').height('100%').backgroundColor(this.currentBgColor)
+
+      // 时间选择面板（页面内覆盖层）
+      if (this.showTimePicker) {
+        Column()
+          .width('100%').height('100%')
+          .backgroundColor('rgba(0,0,0,0.45)')
+          .onClick(() => { this.showTimePicker = false })
+
+        Column({ space: 0 }) {
+          Column()
+            .width(36).height(4)
+            .backgroundColor(this.currentBorderColor)
+            .borderRadius(2)
+            .margin({ top: 10, bottom: 8 })
+
+          Text('推送时间')
+            .fontSize(18).fontWeight(FontWeight.Bold)
+            .fontColor(this.currentTextColor)
+            .margin({ bottom: 4 })
+
+          TimePicker({ selected: new Date(2000, 0, 1, this.dailyPushHour, this.dailyPushMinute) })
+            .useMilitaryTime(true)
+            .onChange((val: TimePickerResult) => {
+              this.dailyPushHour = val.hour
+              this.dailyPushMinute = val.minute
+            })
+            .width('100%')
+
+          Button('确定')
+            .width('100%').height(48)
+            .fontSize(16).fontWeight(FontWeight.Medium)
+            .backgroundColor(AppColors.BRAND_COLOR).fontColor(Color.White)
+            .borderRadius(12)
+            .margin({ top: 8, left: 20, right: 20, bottom: 32 })
+            .onClick(() => {
+              this.showTimePicker = false
+              const host = this.getHostContext()
+              if (!host) return
+              void CookPreferences.setDailyRecommendHour(host, this.dailyPushHour).then(() => {
+                return CookPreferences.setDailyRecommendMinute(host, this.dailyPushMinute)
+              }).then(() => {
+                return ReminderService.scheduleOrUpdate(host)
+              }).then(() => {
+                const h = this.dailyPushHour.toString().padStart(2, '0')
+                const m = this.dailyPushMinute.toString().padStart(2, '0')
+                this.showToast(`推送时间已设为 ${h}:${m}`)
+              }).catch(() => {
+                this.showToast('保存失败，请重试')
+              })
+            })
+        }
+        .width('100%')
+        .backgroundColor(this.currentCardBgColor)
+        .borderRadius({ topLeft: 24, topRight: 24 })
+        .alignSelf(ItemAlign.End)
+      }
 
       // 颜色模式选择面板（页面内覆盖层，不使用 bindSheet）
       if (this.showThemeSheet) {

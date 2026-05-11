@@ -8,6 +8,7 @@ export class AppColors {
   static readonly BRAND_COLOR_LIGHT: string = '#FFE4E6'
   static readonly BRAND_GRADIENT_START: string = '#FF6B6B'
   static readonly BRAND_GRADIENT_END: string = '#FF4757'
+  static readonly FAVORITE_ACTIVE: string = '#FF6B6B'
 
   // 背景色
   static readonly BG_COLOR: string = '#F4F5F7'

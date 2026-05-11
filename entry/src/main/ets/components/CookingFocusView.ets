@@ -6,6 +6,8 @@ export struct CookingFocusView {
   @Link @Watch('onVisibleChange') visible: boolean
   @Prop recipeName: string = ''
   @Prop steps: string[] = []
+  /** 进入专注模式时的初始步骤索引（点击时间轴节点时传入） */
+  @Prop initialIndex: number = 0
 
   @State private activeIndex: number = 0
   private screenLock: runningLock.RunningLock | null = null
@@ -54,7 +56,10 @@ export struct CookingFocusView {
 
   onVisibleChange(): void {
     if (this.visible) {
-      this.activeIndex = 0
+      // 使用调用方传入的 initialIndex（点击时间轴某步骤时直接跳到该步）
+      const safeIdx = (this.initialIndex >= 0 && this.initialIndex < this.steps.length)
+        ? this.initialIndex : 0
+      this.activeIndex = safeIdx
       void this.acquireScreenLock()
     } else {
       void this.releaseScreenLock()

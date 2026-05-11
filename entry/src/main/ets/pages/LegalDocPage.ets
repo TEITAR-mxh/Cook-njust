@@ -72,7 +72,7 @@ export const PRIVACY_DOC: LegalDocConfig = {
     },
     {
       heading: '九、联系我们',
-      body: '开发与运营方：“AUV 您吃了么”开发团队 \n\n• GitHub Issues：https://github.com/Ruheluobixieqing/Cook.git\n• 开发团队：南京理工大学 AUV 项目组\n\n我们承诺在收到请求后 15 个工作日内回复。'
+      body: '开发与运营方：“AUV 您吃了么”开发团队 \n\n• GitHub Issues：https://github.com/TEITAR-mxh/Cook-njust.git\n• 开发团队：南京理工大学 AUV 项目组\n\n我们承诺在收到请求后 15 个工作日内回复。'
     }
   ],
   footer: '© 2026 AUV 项目组 · 南京理工大学　保留所有权利'
@@ -125,7 +125,7 @@ export const AGREEMENT_DOC: LegalDocConfig = {
     },
     {
       heading: '十、联系我们',
-      body: '如您对本用户协议有任何疑问或需要行使相关权利：\n\n• GitHub Issues：https://github.com/Ruheluobixieqing/Cook.git\n• 开发团队：南京理工大学 AUV 项目组\n\n我们将在 15 个工作日内予以回复。'
+      body: '如您对本用户协议有任何疑问或需要行使相关权利：\n\n• GitHub Issues：https://github.com/TEITAR-mxh/Cook-njust.git\n• 开发团队：南京理工大学 AUV 项目组\n\n我们将在 15 个工作日内予以回复。'
     }
   ],
   footer: '© 2026 AUV 项目组 · 南京理工大学　保留所有权利'

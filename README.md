@@ -268,10 +268,22 @@ node ./hvigor/hvigor-wrapper.js --mode module \
 
 ---
 
+## 贡献者与更新历史
+
+| 贡献者 | 主要贡献 |
+|---|---|
+| Ruheluobixieqing | 初始化项目与 `.gitignore`；整理基础菜谱数据；实现 Preferences 本地存储、主界面骨架、导航栏、发现页、菜谱页、收藏与浏览历史；接入 RDB 数据库并处理应用名、包名、构建配置与滑动交互优化。 |
+| TEITAR-mxh | 重构 `IndexV2` 主界面与核心组件；切换应用入口；完善设置架构、详情弹窗、DB 接入、启动页、隐私合规、深色模式、饮食结构建议页、餐桌页与审核问题修复；个人分支曾开发热量识别模块，团队主线已回撤。 |
+| TTong | 升级 `RecipeCard`，接入 `difficulty` 与 `methods` 字段；完善首页食材全量展示、厨具筛选、标签与难度筛选；实现收藏夹完整功能。 |
+| Gaoxuan | 生成并补充最终菜谱数据；完善菜谱步骤内容，提升菜谱数据完整性。 |
+| Fanbo0419 | 更新 `bundleName`；修订隐私政策和开发者联系方式；绑定生成证书并完成 `.app` 软件包生成相关工作。 |
+
+---
+
 ## 开源协议
 
 本项目代码以学习交流为目的开源，菜谱内容整理自公开烹饪知识。
 
-仓库地址：[https://github.com/Ruheluobixieqing/Cook.git](https://github.com/Ruheluobixieqing/Cook.git)
+仓库地址：[https://github.com/TEITAR-mxh/Cook-njust.git](https://github.com/TEITAR-mxh/Cook-njust.git)
 
 © 2026 AUV 项目组 · 南京理工大学

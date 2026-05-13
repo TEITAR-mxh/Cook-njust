@@ -456,7 +456,9 @@ struct CalorieScanPage {
         }
       }
     }
-    .width('100%').height('52%')
+    .width('100%')
+    // RESULT 状态：收起取景框，食物图内嵌到 ResultCard 随内容滚动
+    .height(this.scanState === ScanState.RESULT ? 0 : '52%')
     .borderRadius({ bottomLeft: 28, bottomRight: 28 })
     .clip(true)
   }
@@ -537,6 +539,28 @@ struct CalorieScanPage {
   @Builder
   ResultCard() {
     Column({ space: 0 }) {
+      // 食物图（全宽卡头，随 Scroll 滚动）
+      if (this.capturedUri.length > 0) {
+        Stack({ alignContent: Alignment.BottomStart }) {
+          Image(this.capturedUri)
+            .width('100%').height(220)
+            .objectFit(ImageFit.Cover)
+          // 返回重拍按钮（右上角）
+          Row({ space: 5 }) {
+            SymbolGlyph($r('sys.symbol.camera')).fontSize(12).fontColor(['#FFFFFF'])
+            Text('重新拍摄').fontSize(11).fontColor('#FFFFFF')
+          }
+          .padding({ left: 12, right: 12, top: 7, bottom: 7 })
+          .backgroundColor('#60000000').borderRadius(20)
+          .position({ right: 14, top: 14 })
+          .onClick(() => {
+            this.recognitionResult = null
+            this.capturedUri = ''
+            this.scanState = ScanState.IDLE
+          })
+        }.width('100%')
+      }
+
       // 食物名 + 来源标签
       Row({ space: 10 }) {
         Text(this.resultName)
@@ -586,19 +610,9 @@ struct CalorieScanPage {
       Divider().color(this.divColor).margin({ left: 20, right: 20 })
 
       // 操作按钮
-      Row({ space: 12 }) {
-        Button('重新识别')
-          .layoutWeight(1).height(52)
-          .backgroundColor(this.isDark ? AppColors.DARK_GRAY_100 : AppColors.GRAY_100)
-          .fontColor(this.textColor).fontSize(14).borderRadius(26)
-          .onClick(() => {
-            this.recognitionResult = null
-            this.capturedUri = ''
-            this.scanState = ScanState.IDLE
-          })
-
+      Column({ space: 10 }) {
         Button(this.saving ? '保存中…' : '✓ 记录今日饮食')
-          .layoutWeight(2).height(52)
+          .width('100%').height(52)
           .backgroundColor(AppColors.BRAND_COLOR)
           .fontColor(Color.White).fontWeight(FontWeight.Bold).fontSize(15)
           .borderRadius(26)
@@ -606,7 +620,16 @@ struct CalorieScanPage {
           .shadow({ radius: 12, color: AppColors.BRAND_COLOR + '44', offsetX: 0, offsetY: 4 })
           .enabled(!this.saving)
           .onClick(() => { void this.save() })
-      }.padding({ left: 20, right: 20, top: 14, bottom: 28 })
+        Button('重新识别')
+          .width('100%').height(44)
+          .backgroundColor('transparent')
+          .fontColor(this.secondColor).fontSize(14)
+          .onClick(() => {
+            this.recognitionResult = null
+            this.capturedUri = ''
+            this.scanState = ScanState.IDLE
+          })
+      }.padding({ left: 20, right: 20, top: 14, bottom: 32 })
     }
     .width('100%')
     .backgroundColor(this.cardBg)

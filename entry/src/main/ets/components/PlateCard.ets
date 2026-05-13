@@ -5,6 +5,9 @@
  */
 import { AppColors } from '../constants/AppColors'
 
+// Task4: 滑动距离阈值，超过此值视为滑动而非点击
+const PLATE_TAP_SLOP_VP: number = 5
+
 @Component
 export struct PlateCard {
   @Prop dishName: string = ''
@@ -15,6 +18,12 @@ export struct PlateCard {
 
   @State scaleValue: number = 1.0
   @State translateY: number = 0
+
+  // Task4: 触摸位置记录，用于判断滑动 vs 点击
+  private pointerDownX: number = 0
+  private pointerDownY: number = 0
+  private pointerDownValid: boolean = false
+  private slopExceeded: boolean = false
 
   build() {
     Column({ space: 10 }) {
@@ -70,14 +79,44 @@ export struct PlateCard {
     .alignItems(HorizontalAlign.Center)
     .onTouch((event) => {
       if (event.type === TouchType.Down) {
+        // Task4: 记录按下位置
+        this.pointerDownValid = event.touches.length > 0
+        if (this.pointerDownValid) {
+          this.pointerDownX = event.touches[0].x
+          this.pointerDownY = event.touches[0].y
+        }
+        this.slopExceeded = false
         this.scaleValue = 0.93
         this.translateY = 3
+      } else if (event.type === TouchType.Move) {
+        // Task4: 检测滑动距离，超过阈值标记为滑动
+        if (this.pointerDownValid && event.touches.length > 0) {
+          const dx = event.touches[0].x - this.pointerDownX
+          const dy = event.touches[0].y - this.pointerDownY
+          if (dx * dx + dy * dy > PLATE_TAP_SLOP_VP * PLATE_TAP_SLOP_VP) {
+            this.slopExceeded = true
+          }
+        }
       } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
         this.scaleValue = 1.0
         this.translateY = 0
-        if (event.type === TouchType.Up && this.onPlateClick) {
-          this.onPlateClick()
+        // Task4: 仅当未超过滑动阈值且松开时触发点击
+        if (event.type === TouchType.Up && this.onPlateClick && this.pointerDownValid) {
+          let treatAsTap = !this.slopExceeded
+          if (treatAsTap && event.changedTouches.length > 0) {
+            const t = event.changedTouches[0]
+            const dx = t.x - this.pointerDownX
+            const dy = t.y - this.pointerDownY
+            if (dx * dx + dy * dy > PLATE_TAP_SLOP_VP * PLATE_TAP_SLOP_VP) {
+              treatAsTap = false
+            }
+          }
+          if (treatAsTap) {
+            this.onPlateClick()
+          }
         }
+        this.pointerDownValid = false
+        this.slopExceeded = false
       }
     })
   }

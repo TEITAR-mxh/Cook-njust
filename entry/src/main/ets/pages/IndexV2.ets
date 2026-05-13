@@ -95,6 +95,11 @@ struct IndexV2 {
   @State pendingDeleteFolderId: string = ''
   @State pendingDeleteFolderName: string = ''
 
+  // Task4: 收藏夹网格触摸位置记录（非响应式，仅用于判断滑动 vs 点击）
+  private folderTouchDownX: number = 0
+  private folderTouchDownY: number = 0
+  private folderSlopExceeded: boolean = false
+
   /** 每次 onPageShow 递增，触发 DailyDietCircleCard 刷新今日饮食数据 */
   @State dietRefreshKey: number = 0
   /** 主题切换时递增，触发圆环重绘 */
@@ -745,16 +750,15 @@ struct IndexV2 {
     this.nextRecommendIndex = 3;
   }
 
-  /** 换掉 displayedRecommends[slotIndex]，若候选池还有剩余则替入新卡，否则直接移除 */
-  private swapRecommend(slotIndex: number): void {
-    const list = this.displayedRecommends.slice();
+  /** 一键刷新全部 3 张推荐卡片；候选池耗尽时重新生成 */
+  private refreshAllRecommends(): void {
     if (this.nextRecommendIndex < this.recommendedRecipes.length) {
-      list[slotIndex] = this.recommendedRecipes[this.nextRecommendIndex];
-      this.nextRecommendIndex++;
+      const end = Math.min(this.nextRecommendIndex + 3, this.recommendedRecipes.length);
+      this.displayedRecommends = this.recommendedRecipes.slice(this.nextRecommendIndex, end);
+      this.nextRecommendIndex = end;
     } else {
-      list.splice(slotIndex, 1);
+      this.refreshRecommendations();
     }
-    this.displayedRecommends = list;
   }
 
   // ── 历史热力图 ────────────────────────────────────────────────────────
@@ -1221,6 +1225,20 @@ struct IndexV2 {
                 .backgroundColor(AppColors.BRAND_COLOR_LIGHT)
                 .borderRadius(100)
                 .visibility(this.displayedRecommends.length > 0 ? Visibility.Visible : Visibility.Hidden)
+                .margin({ right: 8 })
+              // 一键刷新全部推荐
+              Column() {
+                SymbolGlyph($r('sys.symbol.arrow_clockwise'))
+                  .fontSize(16)
+                  .fontColor([this.currentSecondaryTextColor])
+              }
+              .width(28).height(28)
+              .borderRadius(14)
+              .backgroundColor(this.currentCardBgColor)
+              .justifyContent(FlexAlign.Center)
+              .hitTestBehavior(HitTestMode.Block)
+              .visibility(this.displayedRecommends.length > 0 ? Visibility.Visible : Visibility.Hidden)
+              .onClick(() => { this.refreshAllRecommends() })
             }.width('100%').alignItems(VerticalAlign.Center)
 
             if (this.displayedRecommends.length === 0) {
@@ -1233,35 +1251,15 @@ struct IndexV2 {
               .padding({ top: 4, bottom: 8 })
             } else {
               Column({ space: 10 }) {
-                ForEach(this.displayedRecommends, (r: RecipeWithId, idx: number) => {
-                  // 用 Stack 在卡片右上角叠加换一道按钮
-                  Stack({ alignContent: Alignment.TopEnd }) {
-                    RecipeCard({
+                ForEach(this.displayedRecommends, (r: RecipeWithId) => {
+                  RecipeCard({
                       recipe: r,
                       mode: RecipeCardMode.SMALL,
                       isFavorite: this.isRecipeFavorite(r.id),
                       onCardClick: () => this.openDetailSheet(r),
                       onFavoriteClick: () => this.onTapFavorite(r.id)
-                    })
-
-                    // 换一道按钮：右上角小圆圈
-                    Column() {
-                      SymbolGlyph($r('sys.symbol.arrow_clockwise'))
-                        .fontSize(13)
-                        .fontColor([this.currentSecondaryTextColor])
-                    }
-                    .width(28)
-                    .height(28)
-                    .borderRadius(14)
-                    .backgroundColor(this.currentCardBgColor)
-                    .justifyContent(FlexAlign.Center)
-                    .margin({ top: 6, right: 6 })
-                    .shadow({ radius: 3, color: '#10000000', offsetX: 0, offsetY: 1 })
-                    .hitTestBehavior(HitTestMode.Block)
-                    .onClick(() => { this.swapRecommend(idx) })
-                  }
+                  })
                   .width('100%')
-                  .clip(false)
                   // 入场：从右侧滑入 + 淡入；出场：向左滑出 + 淡出 + 轻微缩小
                   .transition(
                     TransitionEffect.asymmetric(
@@ -1578,10 +1576,23 @@ struct IndexV2 {
                   .padding(12)
                   .backgroundColor(this.currentCardBgColor)
                   .borderRadius(16)
-                  .onClick(() => {
-                    router.pushUrl({ url: 'pages/FolderDetailPage', params: { folderId: folder.id } }).catch((e: Error) => {
-                      console.error(`FolderDetailPage: ${e.message}`)
-                    })
+                  // Task4: 使用 onTouch + 滑动阈值检测替换 onClick，避免 Scroll 内轻微滑动误触打开文件夹
+                  .onTouch((event: TouchEvent) => {
+                    if (event.type === TouchType.Down) {
+                      this.folderTouchDownX = event.touches[0].x
+                      this.folderTouchDownY = event.touches[0].y
+                      this.folderSlopExceeded = false
+                    } else if (event.type === TouchType.Move) {
+                      const dx = event.touches[0].x - this.folderTouchDownX
+                      const dy = event.touches[0].y - this.folderTouchDownY
+                      if (dx * dx + dy * dy > 25) { // 5vp² = 25
+                        this.folderSlopExceeded = true
+                      }
+                    } else if (event.type === TouchType.Up && !this.folderSlopExceeded) {
+                      router.pushUrl({ url: 'pages/FolderDetailPage', params: { folderId: folder.id } }).catch((e: Error) => {
+                        console.error(`FolderDetailPage: ${e.message}`)
+                      })
+                    }
                   })
                 }
               }, (f: FolderItem) => `folder-${f.id}`)

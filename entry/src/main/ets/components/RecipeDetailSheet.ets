@@ -1,9 +1,9 @@
-import { pasteboard } from '@kit.BasicServicesKit'
 import type { RecipeWithId } from '../model/recipe'
 import { RecipeDBManager } from '../data/RecipeDBManager'
 import { ShoppingListService } from '../service/ShoppingListService'
 import { CookingFocusView } from './CookingFocusView'
 import { ToastView } from './ToastView'
+import { ExportShoppingListDialog } from './ExportShoppingListDialog'
 import { DSColor, DSRadius, DSSpace, DSType, DSShadow, DSSheet, pickTagTone } from '../constants/DesignSystem'
 import { AppColors } from '../constants/AppColors'
 import { scaleIngredientAmount } from '../service/IngredientAmountService'
@@ -59,6 +59,9 @@ export struct RecipeDetailSheet {
   @State private focusInitIndex: number = 0
   @State private toastMessage: string = ''
   @State private toastVisible: boolean = false
+  // Task3: 图片导出弹窗状态
+  @State private exportDialogVisible: boolean = false
+  @State private exportMissingItems: string[] = []
   @State private servingCount: number = 1
   @State private nutriScore: string = ''
   @State private nutriScoreBgColor: string = '#9CA3AF'
@@ -152,28 +155,15 @@ export struct RecipeDetailSheet {
     }, 0)
   }
 
-  private copyMissingIngredients(): void {
+  /** 打开图片导出弹窗（先计算缺料 diff） */
+  private openExportDialog(): void {
     const diffResult = ShoppingListService.diff(this.selectedStuff, this.detail.stuff)
     if (diffResult.missingItems.length === 0) {
-      this.showToast('所有食材均已备好')
+      this.showToast('所有食材均已备好，无需导出')
       return
     }
-
-    const text = ShoppingListService.toClipboardText(
-      this.detail.name,
-      diffResult.missingItems,
-      diffResult.matchedItems
-    )
-
-    try {
-      const systemPasteboard = pasteboard.getSystemPasteboard()
-      const pasteData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, text)
-      systemPasteboard.setDataSync(pasteData)
-      this.showToast('缺失食材已复制到剪贴板')
-    } catch (err) {
-      console.error('复制到剪贴板失败', JSON.stringify(err))
-      this.showToast('复制失败，请重试')
-    }
+    this.exportMissingItems = diffResult.missingItems
+    this.exportDialogVisible = true
   }
 
   private getStepDuration(step: string): string {
@@ -332,15 +322,16 @@ export struct RecipeDetailSheet {
               })
           }
 
-          Text('缺失食材')
+          // 导出图片按钮（取代原复制到剪贴板）
+          Text('导出图片')
             .fontSize(DSType.CAPTION)
-            .fontColor(DSColor.BRAND_PRIMARY)
-            .padding({ left: 8, right: 8, top: 5, bottom: 5 })
-            .backgroundColor('#FFF2F0')
+            .fontColor('#2EC4B6')
+            .padding({ left: 14, right: 14, top: 6, bottom: 6 })
+            .backgroundColor('#E8F8F5')
             .borderRadius(DSRadius.SM)
             .borderWidth(1)
-            .borderColor('#FFD6D1')
-            .onClick(() => this.copyMissingIngredients())
+            .borderColor('#B7E4DD')
+            .onClick(() => this.openExportDialog())
         }
       }
       .width('100%')
@@ -643,7 +634,8 @@ export struct RecipeDetailSheet {
             this.TodayMenuButtonSection()
             this.TimelineStepsSection()
             this.NutritionCard()
-            Row().height(DSSpace.SM)
+            // Task1: 增加底部留白，避免 BottomBar 遮挡最后一张卡片内容
+            Row().height(80)
           }
           .padding({ left: DSSpace.LG, right: DSSpace.LG, bottom: DSSpace.SM })
           .width('100%')
@@ -656,7 +648,7 @@ export struct RecipeDetailSheet {
         .friction(DSSheet.SCROLL_FRICTION)
         .nestedScroll({
           scrollForward: NestedScrollMode.SELF_FIRST,
-          scrollBackward: NestedScrollMode.PARENT_FIRST
+          scrollBackward: NestedScrollMode.SELF_FIRST
         })
 
         this.BottomBar()
@@ -672,6 +664,14 @@ export struct RecipeDetailSheet {
         recipeName: this.detail.name,
         steps: this.detail.steps,
         initialIndex: this.focusInitIndex
+      })
+
+      // Task3: 图片导出弹窗
+      ExportShoppingListDialog({
+        missingItems: this.exportMissingItems,
+        recipeName: this.detail.name,
+        visible: this.exportDialogVisible,
+        onClose: () => { this.exportDialogVisible = false }
       })
     }
     .width('100%')

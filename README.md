@@ -39,13 +39,14 @@
 - 右上角「?」快捷入口，跳转**饮食结构建议页**
 
 ### 餐桌 Tab — 个人中心
-- **今日饮食卡片**：圆环进度展示今日热量 / 蛋白质 / 脂肪 / 碳水摄入；下方内联今日菜单列表（加入餐桌的菜谱、营养汇总、个性化饮食建议），替代原独立的「今日餐桌」区块
+- **今日饮食卡片**：横排紧凑布局，圆环（100vp）左侧实时显示热量进度（绿 < 60% / 品牌红 60–90% / 橙 > 90%），右侧展示已摄入千卡、目标剩余与记录数；圆环下方三行进度条（蛋白质 / 脂肪 / 碳水，含「已摄入 / 目标」数值）；内嵌「记录一餐」胶囊按钮直达热量识别页；下方内联今日菜单列表（加入餐桌的菜谱、营养汇总、个性化饮食建议），替代原独立的「今日餐桌」区块
 - 收藏网格（最多 500 条，按收藏时间排序）
 - 浏览历史（最近 50 条）
 - **历史足迹热力图**：Canvas 绘制近 12 周浏览热力格子，点击格子查看当天浏览的菜谱列表
 - 用户资料（昵称 / 头像 Emoji / 相册图片）
 - 主题切换（浅色 / 深色 / 跟随系统）
 - 数据管理（保留本地数据开关 / 缓存清理）
+- **防误触优化**：珍藏菜品横向滚动区（PlateCard）与收藏夹网格（GridCol）均加入滑动距离阈值检测（5vp），轻触打开详情、滑动不触发跳转
 
 ### 详情弹窗
 - **步骤卡片**：编号气泡（品牌色圆形）+ 步骤文本，交替底色区分行；点击任一步骤直接跳入对应步骤的专注模式
@@ -55,6 +56,7 @@
 - **Nutri-Score 营养评级**（A–E 五档，参考 Ofcom 模型）
 - **营养成分卡片**：热量 / 蛋白质 / 脂肪 / 碳水 / 膳食纤维 / 钠 六项数据
 - 收藏切换（即时同步，使用 `FAVORITE_ACTIVE` 色）
+- **采购清单图片导出**：在详情弹窗食材卡片中，除复制到剪贴板外，支持一键生成精美清单图片（3 种样式：**唯美便签**暖米色双分隔线绿色圆点 / **极简白卡**左侧品牌红竖条圆角卡片 / **牛皮纸温暖**仿纸质随机点纹），画布 1080×1920vp（9:16），字体放大（标题 130px / 食材 72px），顶部含 "AUV 您吃了么" 应用名称，底部含日期与数量，Canvas 绘制后保存至系统相册
 
 ### 专注烹饪模式
 - 全屏 Swiper 分步骤浏览，支持从详情弹窗任意步骤直接跳入
@@ -64,6 +66,7 @@
 - **拍照 / 图库识别**：调用相机或系统图库选取食物照片，本地初步识别 + 云端 AI 二次分析
 - **每日饮食记录**：本地 RDB 持久化，按日期分组查询
 - **饮食结构建议页**：中国居民平衡膳食宝塔、三大营养素供能比可视化、11 类食物推荐摄入量（依据《中国居民膳食指南（2022）》，纯静态展示）
+- **识别结果可滚动布局**：结果展示时取景框完全收起（height 0），食物大图内嵌在结果卡片顶部（全宽 220vp），随页面整体上下滚动；右上角浮层"重新拍摄"按钮可直接重拍；操作区改为主按钮（全宽"记录今日饮食"）+ 次级文字按钮（"重新识别"）竖排，视觉层级清晰
 
 ### 每日推荐通知
 - **系统级定时推送**：通过 `reminderAgentManager` 设置每日闹钟，在用户设定时间触发后台服务
@@ -111,6 +114,8 @@
 | 沉浸式底栏 | `setWindowLayoutFullScreen(true)` + 透明导航栏 + 安全区适配 |
 | 每日推荐调度 | `reminderAgentManager.publishReminder(ReminderRequestAlarm)` 系统级闹钟，`wantAgent` 指向 `EntryAbility`，不依赖应用进程 |
 | 通知跳转菜谱 | 系统通知点击后 `EntryAbility.handleRecommendIntent` 写 `AppStorage('pendingDailyReminder')`，`IndexV2.onPageShow` 读取后调用 `DailyRecommendService` 选菜并打开详情 |
+| 图片清单导出 | `Canvas` 720px 宽自适应高度绘制 3 种样式，`componentSnapshot.get()` 截取 PixelMap，`image.createImagePacker()` 编码 JPEG，`photoAccessHelper.createAsset()` 写入系统相册，深色模式双套色值 |
+| 防误触机制 | `PlateCard` / 收藏夹 `GridCol` 在 `onTouch` 中记录按下坐标，`TouchMove` 超过 5vp 阈值即标记为滑动，`TouchUp` 仅未超阈值时触发详情跳转 |
 
 ---
 
@@ -129,6 +134,7 @@ entry/src/main/ets/
 │   ├── PlateCard.ets               # 3D 盘子效果卡片
 │   ├── FavoriteToast.ets           # 收藏成功提示
 │   ├── FolderPickerSheet.ets       # 收藏夹选择弹窗
+│   ├── ExportShoppingListDialog.ets # 采购清单图片导出弹窗（Canvas 绘制 + 相册保存）
 │   └── RandomPickerButton.ets      # 随机食材抽取触发器
 │
 ├── constants/
@@ -317,7 +323,7 @@ node ./hvigor/hvigor-wrapper.js --mode module \
 | 贡献者 | 主要贡献 |
 |---|---|
 | Ruheluobixieqing | 初始化项目与 `.gitignore`；整理基础菜谱数据；实现 Preferences 本地存储、主界面骨架、导航栏、发现页、菜谱页、收藏与浏览历史；接入 RDB 数据库并处理应用名、包名、构建配置与滑动交互优化。 |
-| TEITAR-mxh | 重构 `IndexV2` 主界面与核心组件；切换应用入口；完善设置架构、详情弹窗、DB 接入、启动页、隐私合规、深色模式、饮食结构建议页、餐桌页与审核问题修复；实现热量识别模块（`CalorieScanPage` / `DailyDietCircleCard` / `DietDatabaseHelper` / `CloudFoodAnalyzer`）；实现搜索历史联想、食材同义词库、步骤编号气泡卡片、食材用量归一化、历史热力图、个性化推荐引擎（Jaccard CF）与营养评价系统（Nutri-Score）；实现每日菜谱推荐通知系统（`ReminderService` / `DailyRecommendService`）；优化猜你喜欢布局与 RecipeCard 小卡片文字遮挡；修复颜色模式显示 bug。 |
+| TEITAR-mxh | 重构 `IndexV2` 主界面与核心组件；切换应用入口；完善设置架构、详情弹窗、DB 接入、启动页、隐私合规、深色模式、饮食结构建议页、餐桌页与审核问题修复；实现热量识别模块（`CalorieScanPage` / `DailyDietCircleCard` / `DietDatabaseHelper` / `CloudFoodAnalyzer`）；实现搜索历史联想、食材同义词库、步骤编号气泡卡片、食材用量归一化、历史热力图、个性化推荐引擎（Jaccard CF）与营养评价系统（Nutri-Score）；实现每日菜谱推荐通知系统（`ReminderService` / `DailyRecommendService`）；优化猜你喜欢布局与 RecipeCard 小卡片文字遮挡；修复颜色模式显示 bug；实现采购清单图片导出功能（Canvas 1080×1920vp + 3 种样式 + 相册保存 + 应用名称 + 大字体适配）；修复详情弹窗滑到底后上滑误收起问题（`nestedScroll` `scrollBackward` 改为 `SELF_FIRST`）；重设计 `DailyDietCircleCard` 为紧凑横排布局（圆环 100vp + 内联记录按钮 + 宏量三行进度条含目标数值）；优化热量识别结果页：RESULT 状态取景框收起，食物图嵌入结果卡随页面滚动。 |
 | TTong | 升级 `RecipeCard`，接入 `difficulty` 与 `methods` 字段；完善首页食材全量展示、厨具筛选、标签与难度筛选；实现收藏夹完整功能。 |
 | Gaoxuan | 生成并补充最终菜谱数据；完善菜谱步骤内容，提升菜谱数据完整性。 |
 | Fanbo0419 | 更新 `bundleName`；修订隐私政策和开发者联系方式；绑定生成证书并完成 `.app` 软件包生成相关工作。 |

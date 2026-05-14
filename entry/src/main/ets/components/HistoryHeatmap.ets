@@ -1,237 +1,333 @@
 /**
- * 历史足迹日历热力图组件
- * 展示最近 12 周（7行 × 12列）的浏览热力格子。
- * 颜色深浅按当天浏览菜谱数量映射。
+ * 历史足迹热力图组件（Native ArkUI 重构版）
+ *
+ * 展示最近 26 周的浏览热力格子，横向滚动，自动定位到最新一周。
  * 支持点击格子查看当天浏览的菜谱列表。
+ * 深色模式通过内部 @StorageProp 自动切换。
  */
 import { RecipeRepository } from '../data/RecipeRepository'
 import type { RecipeWithId } from '../model/recipe'
+import { AppColors } from '../constants/AppColors'
 
-interface DayCell {
-  dateStr: string    // YYYY-MM-DD
-  count: number
-  ids: number[]
+// ─── 数据结构 ─────────────────────────────────────────────────────────────────
+
+interface WeekDay {
+  dateStr:  string   // YYYY-MM-DD
+  count:    number
+  ids:      number[]
+  isFuture: boolean
+  isToday:  boolean
 }
 
-/** 将颜色等级（0~4）映射到十六进制颜色字符串 */
-function heatColor(level: number): string {
-  switch (level) {
-    case 0: return '#EBEDF0'
-    case 1: return '#A8D8C4'
-    case 2: return '#3DD6B5'
-    case 3: return '#FF9100'
-    case 4: return '#E85D04'
-    default: return '#EBEDF0'
-  }
+interface WeekData {
+  weekIndex:   number   // 0 = 最旧的一周
+  days:        WeekDay[]
+  monthLabel:  string   // 仅当该周包含月份第1天时非空，如 "5月"
 }
 
-function countToLevel(count: number): number {
-  if (count === 0) return 0
-  if (count <= 2) return 1
-  if (count <= 4) return 2
-  if (count <= 7) return 3
-  return 4
-}
+// ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
 function formatDateStr(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const y   = d.getFullYear()
+  const m   = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
 }
 
+function countToLevel(count: number): number {
+  if (count === 0) return 0
+  if (count <= 2)  return 1
+  if (count <= 4)  return 2
+  if (count <= 7)  return 3
+  return 4
+}
+
+// 5 级颜色：0=未浏览  1-4=由浅到深
+const HEAT_COLORS_LIGHT: string[] = ['#EBEDF0', '#B3E5C4', '#4CD07D', '#1E8A3C', '#145228']
+const HEAT_COLORS_DARK:  string[] = ['#1E1E1E', '#1A3D2B', '#1E6B40', '#22A85A', '#2ECC71']
+
+// 星期标签（行）：只显示一/三/五
+const DOW_LABELS: string[] = ['一', '', '三', '', '五', '', '日']
+
+const WEEKS = 26   // 展示最近 26 周
+
+// ─── 组件 ─────────────────────────────────────────────────────────────────────
 
 @Component
 export struct HistoryHeatmap {
-  /** 带日期的浏览历史，由父组件传入（来自 CookPreferences.getDatedHistory） */
-  @Prop datedHistory: string = '{}'
-  /** 文字颜色（适配主题） */
-  @Prop textColor: string = '#111827'
+  /**
+   * 带日期的浏览历史（JSON string），父组件异步加载后写入。
+   * @Watch 回调不能声明为 private。
+   */
+  @Prop @Watch('onDatedHistoryChange') datedHistory: string = '{}'
+
+  // 颜色 prop（向后兼容）
+  @Prop textColor:      string = '#111827'
   @Prop secondaryColor: string = '#6B7280'
-  @Prop cardBgColor: string = '#FFFFFF'
+  @Prop cardBgColor:    string = '#FFFFFF'
 
-  /** 当点击格子时的回调，传入当天菜谱 ID 数组 */
-  onDayCellClick?: (dateStr: string, ids: number[]) => void
+  // 内部深色模式感知
+  @StorageProp('currentThemeMode')
+  @Watch('onInternalThemeChange')
+  private storedThemeMode: string = '系统默认'
 
-  @State private cells: DayCell[] = []
-  @State private selectedDay: string = ''
-  @State private dayRecipes: RecipeWithId[] = []
+  @StorageProp('isSystemDarkMode')
+  @Watch('onInternalThemeChange')
+  private isSystemDark: boolean = false
 
-  private settings: RenderingContextSettings = new RenderingContextSettings(true)
-  private context2d: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings)
+  @State private isDark: boolean = false
 
-  private readonly COLS: number = 12    // 12周
-  private readonly ROWS: number = 7     // 7天/周
-  private readonly GAP: number = 3
-  private readonly PADDING: number = 4
+  @State private weeks:       WeekData[]   = []
+  @State private selectedDay: string       = ''
+  @State private dayRecipes:  RecipeWithId[] = []
+
+  private scroller: Scroller = new Scroller()
+
+  // ── 生命周期 ──────────────────────────────────────────────────────────────
 
   aboutToAppear(): void {
-    this.buildCells()
+    this.isDark = this.calcIsDark()
+    this.buildWeeks()
   }
 
-  /** @Watch 不适用于 @Prop string，在 onDateHistoryChange 中手动调用 */
-  private buildCells(): void {
+  onDatedHistoryChange(): void {
+    this.buildWeeks()
+  }
+
+  onInternalThemeChange(): void {
+    this.isDark = this.calcIsDark()
+  }
+
+  private calcIsDark(): boolean {
+    if (this.storedThemeMode === '深色模式') return true
+    if (this.storedThemeMode === '浅色模式') return false
+    return this.isSystemDark
+  }
+
+  // ── 颜色 Token ────────────────────────────────────────────────────────────
+
+  private get bg(): string       { return this.isDark ? '#1C1C1E' : '#F5F5F7'    }
+  private get surface(): string  { return this.isDark ? '#2C2C2E' : '#FFFFFF'     }
+  private get t1(): string       { return this.isDark ? '#F2F2F7' : '#111827'     }
+  private get t2(): string       { return this.isDark ? '#8E8E93' : '#6B7280'     }
+  private get bdColor(): string  { return this.isDark ? '#3A3A3C' : '#E5E7EB'     }
+
+  private heatColor(level: number): string {
+    return this.isDark ? HEAT_COLORS_DARK[level] : HEAT_COLORS_LIGHT[level]
+  }
+
+  // ── 数据构建 ──────────────────────────────────────────────────────────────
+
+  private buildWeeks(): void {
     let parsed: Record<string, number[]> = {}
     try {
       parsed = JSON.parse(this.datedHistory) as Record<string, number[]>
-    } catch { }
+    } catch { /* 解析失败保持空对象 */ }
 
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+    const todayStr = formatDateStr(today)
 
-    // 从 (12*7 - 1) 天前到今天，共 84 天
-    const totalDays = this.COLS * this.ROWS
-    const cells: DayCell[] = []
-    for (let i = totalDays - 1; i >= 0; i--) {
-      const d = new Date(today)
-      d.setDate(d.getDate() - i)
-      const ds = formatDateStr(d)
-      const ids: number[] = parsed[ds] ?? []
-      cells.push({ dateStr: ds, count: ids.length, ids })
-    }
-    this.cells = cells
-  }
+    // 起始日：今天所在周的周一，再往前 (WEEKS-1) 周
+    const todayDow = today.getDay() === 0 ? 6 : today.getDay() - 1  // 0=周一
+    const weekStart = new Date(today)
+    weekStart.setDate(weekStart.getDate() - todayDow - (WEEKS - 1) * 7)
 
-  private drawHeatmap(): void {
-    if (this.cells.length === 0) return
+    const result: WeekData[] = []
+    let prevLabelMonth = -1
 
-    const ctx = this.context2d
-    const totalW = ctx.width
-    const cellSize = Math.floor((totalW - this.PADDING * 2 - this.GAP * (this.COLS - 1)) / this.COLS)
-    const totalH = cellSize * this.ROWS + this.GAP * (this.ROWS - 1) + this.PADDING * 2
+    for (let w = 0; w < WEEKS; w++) {
+      const days: WeekDay[] = []
 
-    ctx.clearRect(0, 0, totalW, totalH)
-
-    for (let col = 0; col < this.COLS; col++) {
-      for (let row = 0; row < this.ROWS; row++) {
-        const idx = col * this.ROWS + row
-        if (idx >= this.cells.length) continue
-
-        const cell = this.cells[idx]
-        const x = this.PADDING + col * (cellSize + this.GAP)
-        const y = this.PADDING + row * (cellSize + this.GAP)
-        const level = countToLevel(cell.count)
-        const color = heatColor(level)
-
-        ctx.fillStyle = color
-
-        // 圆角矩形（手动绘制）
-        const r = 3
-        ctx.beginPath()
-        ctx.moveTo(x + r, y)
-        ctx.lineTo(x + cellSize - r, y)
-        ctx.arcTo(x + cellSize, y, x + cellSize, y + r, r)
-        ctx.lineTo(x + cellSize, y + cellSize - r)
-        ctx.arcTo(x + cellSize, y + cellSize, x + cellSize - r, y + cellSize, r)
-        ctx.lineTo(x + r, y + cellSize)
-        ctx.arcTo(x, y + cellSize, x, y + cellSize - r, r)
-        ctx.lineTo(x, y + r)
-        ctx.arcTo(x, y, x + r, y, r)
-        ctx.closePath()
-        ctx.fill()
-
-        // 选中高亮边框
-        if (cell.dateStr === this.selectedDay) {
-          ctx.strokeStyle = '#FC4C52'
-          ctx.lineWidth = 1.5
-          ctx.stroke()
-        }
+      for (let d = 0; d < 7; d++) {
+        const cur = new Date(weekStart)
+        cur.setDate(cur.getDate() + w * 7 + d)
+        const ds  = formatDateStr(cur)
+        const ids = parsed[ds] ?? []
+        days.push({
+          dateStr:  ds,
+          count:    ids.length,
+          ids,
+          isFuture: cur > today,
+          isToday:  ds === todayStr,
+        })
       }
+
+      // 月份标签：当本周首日的月份与上一次标注的月份不同时显示
+      // 这样每个月只在最早出现的列头标注一次
+      const weekFirstDate = new Date(weekStart)
+      weekFirstDate.setDate(weekFirstDate.getDate() + w * 7)
+      const colMonth = weekFirstDate.getMonth()
+      let monthLabel = ''
+      if (colMonth !== prevLabelMonth) {
+        monthLabel    = `${colMonth + 1}月`
+        prevLabelMonth = colMonth
+      }
+
+      result.push({ weekIndex: w, days, monthLabel })
+    }
+
+    this.weeks = result
+  }
+
+  // ── 点击格子 ──────────────────────────────────────────────────────────────
+
+  private handleCellTap(day: WeekDay): void {
+    if (day.isFuture) return
+    this.selectedDay = day.dateStr === this.selectedDay ? '' : day.dateStr
+
+    if (this.selectedDay.length > 0) {
+      const repo = RecipeRepository.getInstance()
+      const list: RecipeWithId[] = []
+      for (let i = 0; i < day.ids.length; i++) {
+        const r = repo.getById(day.ids[i])
+        if (r !== null) list.push(r)
+      }
+      this.dayRecipes = list
+    } else {
+      this.dayRecipes = []
     }
   }
 
-  /** 将点击坐标映射到 cell，返回对应 DayCell 或 null */
-  private hitTest(x: number, y: number): DayCell | null {
-    const totalW = this.context2d.width
-    const cellSize = Math.floor((totalW - this.PADDING * 2 - this.GAP * (this.COLS - 1)) / this.COLS)
+  // ── 格子 ─────────────────────────────────────────────────────────────────
 
-    const col = Math.floor((x - this.PADDING) / (cellSize + this.GAP))
-    const row = Math.floor((y - this.PADDING) / (cellSize + this.GAP))
-
-    if (col < 0 || col >= this.COLS || row < 0 || row >= this.ROWS) return null
-
-    const idx = col * this.ROWS + row
-    if (idx >= this.cells.length) return null
-    return this.cells[idx]
+  @Builder
+  private Cell(day: WeekDay) {
+    Column()
+      .width(14).height(14)
+      .borderRadius(3)
+      .backgroundColor(day.isFuture ? 'transparent' : this.heatColor(countToLevel(day.count)))
+      .border({
+        width: (day.dateStr === this.selectedDay || day.isToday) ? 1.5 : 0,
+        color: day.dateStr === this.selectedDay ? '#FC4C52' : AppColors.BRAND_COLOR,
+      })
+      .opacity(day.isFuture ? 0.0 : 1.0)
+      .onClick(() => { this.handleCellTap(day) })
   }
+
+  // ── 构建 ─────────────────────────────────────────────────────────────────
 
   build() {
     Column({ space: 12 }) {
-      // 图例
+
+      // ── 图例 ────────────────────────────────────────────────────────────
       Row({ space: 6 }) {
-        Text('少').fontSize(11).fontColor(this.secondaryColor)
-        ForEach([0, 1, 2, 3, 4], (level: number) => {
+        Text('少').fontSize(11).fontColor(this.t2)
+        ForEach([0, 1, 2, 3, 4], (lv: number) => {
           Column()
             .width(12).height(12)
-            .backgroundColor(heatColor(level))
-            .borderRadius(2)
-        }, (level: number) => `legend-${level}`)
-        Text('多').fontSize(11).fontColor(this.secondaryColor)
+            .backgroundColor(this.heatColor(lv))
+            .borderRadius(2.5)
+        }, (lv: number) => `leg-${lv}`)
+        Text('多').fontSize(11).fontColor(this.t2)
         Blank()
-        Text('近12周浏览热力').fontSize(11).fontColor(this.secondaryColor)
+        Text('近6个月').fontSize(11).fontColor(this.t2)
       }.width('100%')
 
-      // 热力图 Canvas
-      Canvas(this.context2d)
-        .width('100%')
-        .height(120)
-        .onReady(() => {
-          this.buildCells()
-          this.drawHeatmap()
-        })
-        .onClick((event: ClickEvent) => {
-          const cell = this.hitTest(event.x, event.y)
-          if (cell === null) return
-          this.selectedDay = cell.dateStr
-          // 刷新画布（高亮选中）
-          this.drawHeatmap()
-          // 加载当天菜谱
-          if (cell.ids.length > 0) {
-            const repo = RecipeRepository.getInstance()
-            const recipes: RecipeWithId[] = []
-            for (let i = 0; i < cell.ids.length; i++) {
-              const r = repo.getById(cell.ids[i])
-              if (r !== null) recipes.push(r)
-            }
-            this.dayRecipes = recipes
-          } else {
-            this.dayRecipes = []
-          }
-          if (this.onDayCellClick !== undefined) {
-            this.onDayCellClick(cell.dateStr, cell.ids)
-          }
-        })
+      // ── 热力图主体 ───────────────────────────────────────────────────────
+      Row({ space: 0 }) {
 
-      // 选中日详情
+        // 左侧星期标签列（固定，不滚动）
+        Column({ space: 2 }) {
+          // 月份标签占位（与右侧对齐）
+          Text('').height(16)
+          // 7 行星期标签
+          ForEach(DOW_LABELS, (label: string, idx: number) => {
+            Text(label)
+              .fontSize(10)
+              .fontColor(this.t2)
+              .width(16)
+              .height(14)
+              .textAlign(TextAlign.Center)
+              .opacity(label.length > 0 ? 1.0 : 0.0)
+          }, (label: string, idx: number) => `dow-${idx}`)
+        }
+        .justifyContent(FlexAlign.Start)
+        .alignItems(HorizontalAlign.Center)
+        .flexShrink(0)
+        .margin({ right: 4 })
+
+        // 右侧：横向滚动的周列
+        Scroll(this.scroller) {
+          Row({ space: 3 }) {
+            ForEach(this.weeks, (week: WeekData) => {
+              Column({ space: 2 }) {
+                // 月份标签行（不设宽度，允许向右自然溢出，避免竖排）
+                Text(week.monthLabel)
+                  .fontSize(10)
+                  .fontColor(this.t2)
+                  .height(16)
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Clip })
+                  .fontWeight(week.monthLabel.length > 0 ? FontWeight.Bold : FontWeight.Normal)
+
+                // 7 天格子列
+                ForEach(week.days, (day: WeekDay) => {
+                  this.Cell(day)
+                }, (day: WeekDay) => `cell-${day.dateStr}`)
+              }
+              .alignItems(HorizontalAlign.Center)
+              .justifyContent(FlexAlign.Start)
+              .width(14)
+            }, (week: WeekData) => `week-${week.weekIndex}`)
+          }
+          .padding({ right: 4 })
+        }
+        .scrollable(ScrollDirection.Horizontal)
+        .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.Spring)
+        .layoutWeight(1)
+        .onAppear(() => {
+          // 自动滚动到最右（最新一周）
+          this.scroller.scrollEdge(Edge.End)
+        })
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Top)
+
+      // ── 选中日详情面板 ───────────────────────────────────────────────────
       if (this.selectedDay.length > 0) {
-        Column({ space: 6 }) {
-          Text(this.selectedDay)
-            .fontSize(13).fontWeight(FontWeight.Bold).fontColor(this.textColor)
+        Column({ space: 8 }) {
+          Row({ space: 8 }) {
+            Text(this.selectedDay)
+              .fontSize(13)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.t1)
+            Text(this.dayRecipes.length > 0
+              ? `浏览了 ${this.dayRecipes.length} 道菜`
+              : '当天无记录')
+              .fontSize(11)
+              .fontColor(this.t2)
+              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+              .backgroundColor(this.bg)
+              .borderRadius(100)
+              .border({ width: 0.5, color: this.bdColor })
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Center)
+
           if (this.dayRecipes.length > 0) {
             Flex({ wrap: FlexWrap.Wrap }) {
               ForEach(this.dayRecipes, (r: RecipeWithId) => {
                 Text(r.name)
-                  .fontSize(12).fontColor(this.secondaryColor)
+                  .fontSize(12)
+                  .fontColor(this.t2)
                   .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-                  .backgroundColor(this.cardBgColor)
+                  .backgroundColor(this.bg)
                   .borderRadius(8)
-                  .borderWidth(0.5)
-                  .borderColor('#E5E7EB')
+                  .border({ width: 0.5, color: this.bdColor })
                   .margin({ right: 6, bottom: 6 })
-              }, (r: RecipeWithId) => `day-${r.id}`)
+              }, (r: RecipeWithId) => `dr-${r.id}`)
             }.width('100%')
-          } else {
-            Text('当天暂无浏览记录')
-              .fontSize(12).fontColor(this.secondaryColor)
           }
         }
         .width('100%')
         .padding(12)
-        .backgroundColor(this.cardBgColor)
+        .backgroundColor(this.surface)
         .borderRadius(12)
-        .borderWidth(0.5)
-        .borderColor('#E5E7EB')
+        .border({ width: 0.5, color: this.bdColor })
       }
+
     }.width('100%')
   }
 }

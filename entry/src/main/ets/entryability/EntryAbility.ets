@@ -2,7 +2,6 @@ import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want 
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 import { CookPreferences } from '../store/CookPreferences';
-import { ReminderService } from '../service/ReminderService';
 
 const DOMAIN = 0x0000;
 
@@ -32,15 +31,12 @@ export default class EntryAbility extends UIAbility {
     // 处理通知点击携带的推荐菜谱 ID
     this.handleRecommendIntent(want);
 
-    void CookPreferences.warmUp(this.context).then(() => {
-      return CookPreferences.getDailyRecommendSwitch(this.context);
-    }).then((enabled: boolean) => {
-      if (enabled) {
-        return ReminderService.scheduleOrUpdate(this.context);
-      }
-      return Promise.resolve();
-    }).catch(() => {
-      hilog.error(DOMAIN, 'testTag', 'EntryAbility init sequence failed');
+    // Preferences 预热（主题等数据依赖），不再在启动时重排提醒。
+    // 每日推荐提醒是"daysOfWeek 每天重复"的闹钟，调度一次后无需重排；
+    // 只有用户在设置页开关/改时间时才需要重新调度，否则每次冷启动都调用
+    // scheduleOrUpdate 会导致旧提醒未被取消就累积，触发系统 exceed limit 错误。
+    void CookPreferences.warmUp(this.context).catch(() => {
+      hilog.error(DOMAIN, 'testTag', 'EntryAbility warmUp failed');
     });
   }
 

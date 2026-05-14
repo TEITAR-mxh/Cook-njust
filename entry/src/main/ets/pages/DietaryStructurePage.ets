@@ -363,7 +363,7 @@ struct DietaryStructurePage {
           this.Footer()
         }
         .width('100%')
-        .padding({ top: 6, bottom: 0 })
+        .padding({ top: 0, bottom: 0 })
       }
       .layoutWeight(1)
       .scrollBar(BarState.Off)
@@ -372,5 +372,7 @@ struct DietaryStructurePage {
     .width('100%')
     .height('100%')
     .backgroundColor(this.bg)
+    // 与 CalorieScanPage 统一：TOP 让导航栏延伸至状态栏，BOTTOM 填满底部手势区
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
   }
 }

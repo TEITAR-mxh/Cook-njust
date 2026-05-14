@@ -212,10 +212,18 @@ export class CloudFoodAnalyzer {
     try {
       const stat = await fileIo.stat(uri)
       const buf  = new ArrayBuffer(stat.size)
-      await fileIo.read(file.fd, buf)
+      try {
+        await fileIo.read(file.fd, buf)
+      } catch {
+        throw new Error('读取文件内容失败')
+      }
       return CloudFoodAnalyzer.arrayBufferToBase64(buf)
     } finally {
-      await fileIo.close(file.fd)
+      try {
+        await fileIo.close(file.fd)
+      } catch {
+        // 关闭失败时静默忽略，避免掩盖 try 块中的原始异常
+      }
     }
   }
 

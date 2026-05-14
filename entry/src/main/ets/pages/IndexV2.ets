@@ -153,6 +153,16 @@ struct IndexV2 {
   @Watch('onStoredThemeModeChange')
   storedThemeMode: string = '系统默认';
 
+  /**
+   * 每日推荐通知点击标记：EntryAbility.onNewWant 将其置为 true。
+   * 使用 @StorageProp @Watch 而非仅在 onPageShow 读取，解决"App 在后台时
+   * onPageShow 可能早于 onNewWant 执行"的竞态问题——AppStorage 变更会
+   * 立即唤醒 @Watch 回调，无需等待下一次页面生命周期。
+   */
+  @StorageProp('pendingDailyReminder')
+  @Watch('onPendingDailyReminderChange')
+  pendingDailyReminder: boolean = false;
+
   // 利用外部 foodCatalog.ets 的数据进行装配
   private readonly ingredientCategories: IngredientCategory[] = [
     { title: '🥩 肉蛋水产', data: meatItems, type: TagType.MEAT },
@@ -208,21 +218,49 @@ struct IndexV2 {
     }
   }
 
-  /** 检查并处理来自每日推荐通知的打开请求 */
+  /**
+   * 检查并处理来自每日推荐通知的打开请求。
+   * 同时在 onPageShow（冷启动兜底）和 onPendingDailyReminderChange（后台唤醒）
+   * 两处调用，保证所有启动路径均能触发。
+   */
   private handlePendingRecommendRecipe(): void {
-    // 每日提醒通知点击：动态选一道菜推荐给用户
-    const pendingReminder = AppStorage.get<boolean>('pendingDailyReminder');
-    if (pendingReminder === true) {
-      AppStorage.setOrCreate<boolean>('pendingDailyReminder', false);
-      const allRecipes = RecipeRepository.getInstance().getAll();
-      if (allRecipes.length > 0) {
-        const result = DailyRecommendService.pickRecipe(allRecipes, [], []);
-        if (result !== null) {
-          this.mainTabIndex = 1;
-          this.openDetailSheet(result.recipe);
-        }
-      }
+    if (!this.pendingDailyReminder) return
+
+    const allRecipes = RecipeRepository.getInstance().getAll()
+    // 菜谱尚未加载完成时不重置 flag，等 bootstrapData 结束后再次触发
+    if (allRecipes.length === 0) return
+
+    // 确认菜谱已就绪后再重置，防止冷启动时 onPageShow 先于数据加载执行
+    AppStorage.setOrCreate<boolean>('pendingDailyReminder', false)
+
+    const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined
+    if (ctx === undefined) {
+      // 无 context 时退化为随机推荐
+      const r = DailyRecommendService.pickRecipe(allRecipes, [], [])
+      if (r !== null) { this.mainTabIndex = 1; this.openDetailSheet(r.recipe) }
+      return
     }
+
+    // 读取用户推荐偏好与冰箱食材，按偏好选菜后写入推荐历史
+    void Promise.all([
+      CookPreferences.getDailyRecommendPreference(ctx),
+      CookPreferences.getSelectedStuff(ctx),
+      CookPreferences.getRecommendHistory(ctx),
+    ]).then((vals: [string, string[], number[]]) => {
+      const preference: string   = vals[0]
+      const selectedStuff: string[] = vals[1]
+      const historyIds: number[] = vals[2]
+      const stuffForPick: string[] = preference === 'fridge_first' ? selectedStuff : []
+      const result = DailyRecommendService.pickRecipe(allRecipes, stuffForPick, historyIds)
+      if (result === null) return
+      this.mainTabIndex = 1
+      this.openDetailSheet(result.recipe)
+      void CookPreferences.addToRecommendHistory(ctx, result.recipe.id)
+    }).catch(() => {
+      // 偏好读取失败时退化为随机推荐
+      const r = DailyRecommendService.pickRecipe(allRecipes, [], [])
+      if (r !== null) { this.mainTabIndex = 1; this.openDetailSheet(r.recipe) }
+    })
   }
 
   aboutToDisappear(): void {
@@ -243,6 +281,9 @@ struct IndexV2 {
       this.recipeCount = RecipeRepository.getInstance().getCount();
       this.status = '菜谱已加载';
       this.errHint = '';
+      // 菜谱就绪后补充触发：处理冷启动时通知点击携带的推荐请求
+      // （onPageShow 在此之前已调用但因菜谱未加载而跳过，flag 此时仍为 true）
+      this.handlePendingRecommendRecipe();
     } catch {
       this.status = '加载失败';
       this.recipeCount = 0;
@@ -462,6 +503,17 @@ struct IndexV2 {
   /** @Watch 回调：用户在 SettingsPage 选择了新主题（AppStorage 广播） */
   private onStoredThemeModeChange(): void {
     this.applyThemeColors(this.storedThemeMode);
+  }
+
+  /**
+   * @Watch 回调：每日推荐通知点击（EntryAbility.onNewWant 写入 AppStorage）。
+   * 无论 App 是冷启动还是从后台唤醒，此回调均可靠触发；
+   * 冷启动时 onPageShow 也会调用 handlePendingRecommendRecipe 做一次兜底。
+   */
+  onPendingDailyReminderChange(): void {
+    if (this.pendingDailyReminder) {
+      this.handlePendingRecommendRecipe()
+    }
   }
 
   /** 同步计算并写入所有主题颜色 @State，保证同帧完成无闪烁 */

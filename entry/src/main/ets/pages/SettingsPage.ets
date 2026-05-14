@@ -7,6 +7,7 @@ import { router } from '@kit.ArkUI'
 import { deviceInfo } from '@kit.BasicServicesKit'
 import { photoAccessHelper } from '@kit.MediaLibraryKit'
 import { fileIo } from '@kit.CoreFileKit'
+import { notificationManager } from '@kit.NotificationKit'
 import { AppColors, ThemeManager } from '../constants/AppColors'
 import { RecipeRepository } from '../data/RecipeRepository'
 import { CookPreferences, type UserProfile, type ThemeSettings } from '../store/CookPreferences'
@@ -205,6 +206,18 @@ struct SettingsPage {
       this.dailyPushHour = await CookPreferences.getDailyRecommendHour(host)
       this.dailyPushMinute = await CookPreferences.getDailyRecommendMinute(host)
       this.dailyPushPreference = await CookPreferences.getDailyRecommendPreference(host)
+
+      // 兜底：若开关已开但从未成功调度（id=0，如重装后），自动补一次调度。
+      // 正常流程中调度只在用户操作时发生（开关/改时间），不在冷启动时重排，
+      // 避免每次启动累积提醒触发 exceed limit 错误。
+      if (this.enableDailyPush) {
+        const agentId = await CookPreferences.getDailyReminderAgentId(host)
+        if (agentId <= 0) {
+          void ReminderService.scheduleOrUpdate(host).catch((e: Error) => {
+            console.error('[SettingsPage] auto-schedule on load failed:', e.message)
+          })
+        }
+      }
 
       // 主题来源优先级：
       //   1. AppStorage（当次会话中 changeThemeMode 会实时写入，最新）
@@ -690,17 +703,43 @@ struct SettingsPage {
                     this.enableDailyPush = val
                     const host = this.getHostContext()
                     if (!host) return
-                    void CookPreferences.setDailyRecommendSwitch(host, val).then(() => {
-                      if (val) {
-                        return ReminderService.scheduleOrUpdate(host)
-                      } else {
-                        return ReminderService.cancel(host)
-                      }
-                    }).then(() => {
-                      this.showToast(val ? '✅ 每日推荐已开启' : '🔕 每日推荐已关闭')
-                    }).catch(() => {
-                      this.showToast('设置失败，请重试')
-                    })
+
+                    if (!val) {
+                      // 关闭：直接取消提醒，无需检查权限
+                      void CookPreferences.setDailyRecommendSwitch(host, false)
+                        .then(() => ReminderService.cancel(host))
+                        .then(() => { this.showToast('🔕 每日推荐已关闭') })
+                        .catch(() => { this.showToast('设置失败，请重试') })
+                      return
+                    }
+
+                    // 开启：先申请系统通知权限，再持久化开关，最后 fire-and-forget 调度提醒。
+                    // 关键设计：scheduleOrUpdate 与权限链隔离，
+                    // 其失败（publishReminder 限额、bundle 名不符等）不会触发外层 catch，
+                    // 避免开关被错误回滚。
+                    void notificationManager.isNotificationEnabled()
+                      .then((enabled: boolean) => {
+                        if (!enabled) {
+                          // 弹出系统授权弹窗；用户拒绝时此 Promise reject → 进入外层 catch
+                          return notificationManager.requestEnableNotification(host)
+                        }
+                        return Promise.resolve()
+                      })
+                      .then(() => CookPreferences.setDailyRecommendSwitch(host, true))
+                      .then(() => {
+                        this.showToast('✅ 每日推荐已开启')
+                        // 独立 fire-and-forget：调度失败不影响开关状态，但将错误提示给用户
+                        void ReminderService.scheduleOrUpdate(host).catch((e: Error) => {
+                          console.error('[SettingsPage] reminder schedule failed:', e.message)
+                          this.showToast(`提醒设置失败 ${e.message}`)
+                        })
+                      })
+                      .catch(() => {
+                        // 只有通知权限被拒时才回滚开关
+                        this.enableDailyPush = false
+                        void CookPreferences.setDailyRecommendSwitch(host, false)
+                        this.showToast('请在系统设置中开启通知权限')
+                      })
                   })
               }
               .width('100%')
@@ -747,6 +786,7 @@ struct SettingsPage {
                     this.showToast(`推荐偏好已切换为：${label}`)
                   })
                 })
+
               }
             }.margin({ left: 16, right: 16 }).backgroundColor(this.currentCardBgColor).borderRadius(20)
 
@@ -756,12 +796,29 @@ struct SettingsPage {
               this.buildSettingCard('保留本地数据', '关闭后将清空历史记录与收藏内容', true, this.keepLocalData, '', () => { void this.onKeepLocalChange(!this.keepLocalData) })
               Divider().color(this.currentBorderColor).margin({ left: 20, right: 20 })
               this.buildSettingCard('清理缓存', '清除应用运行产生的图片和临时文件', false, false, this.cacheSize, () => {
-                const host = this.getHostContext()
-                if (!host) return
-                this.cacheSize = '清理中...'
-                void this.clearCacheDir(host.cacheDir).then(async () => {
-                  await this.loadCacheSize()
-                  this.showToast('✨ 缓存已清理完毕')
+                this.getUIContext().showAlertDialog({
+                  title: '清理缓存',
+                  message: `当前缓存 ${this.cacheSize}，清理后临时文件将被删除，不影响收藏和历史记录。`,
+                  primaryButton: { value: '取消', action: () => {} },
+                  secondaryButton: {
+                    value: '立即清理',
+                    fontColor: AppColors.BRAND_COLOR,
+                    action: () => {
+                      const host = this.getHostContext()
+                      if (!host) return
+                      this.cacheSize = '清理中...'
+                      void this.clearCacheDir(host.cacheDir)
+                        .then(async () => {
+                          await this.loadCacheSize()
+                          this.showToast('✨ 缓存已清理完毕')
+                        })
+                        .catch(async () => {
+                          await this.loadCacheSize()
+                          this.showToast('清理失败，请重试')
+                        })
+                    }
+                  },
+                  autoCancel: true
                 })
               })
             }.margin({ left: 16, right: 16 }).backgroundColor(this.currentCardBgColor).borderRadius(20)
@@ -822,17 +879,22 @@ struct SettingsPage {
               this.showTimePicker = false
               const host = this.getHostContext()
               if (!host) return
-              void CookPreferences.setDailyRecommendHour(host, this.dailyPushHour).then(() => {
-                return CookPreferences.setDailyRecommendMinute(host, this.dailyPushMinute)
-              }).then(() => {
-                return ReminderService.scheduleOrUpdate(host)
-              }).then(() => {
-                const h = this.dailyPushHour.toString().padStart(2, '0')
-                const m = this.dailyPushMinute.toString().padStart(2, '0')
-                this.showToast(`推送时间已设为 ${h}:${m}`)
-              }).catch(() => {
-                this.showToast('保存失败，请重试')
-              })
+              // 保存时间偏好（核心操作）与重新调度提醒（fire-and-forget）分离：
+              // scheduleOrUpdate 失败不影响时间保存的成功提示。
+              void CookPreferences.setDailyRecommendHour(host, this.dailyPushHour)
+                .then(() => CookPreferences.setDailyRecommendMinute(host, this.dailyPushMinute))
+                .then(() => {
+                  const h = this.dailyPushHour.toString().padStart(2, '0')
+                  const m = this.dailyPushMinute.toString().padStart(2, '0')
+                  this.showToast(`推送时间已设为 ${h}:${m}`)
+                  void ReminderService.scheduleOrUpdate(host).catch((e: Error) => {
+                    console.error('[SettingsPage] reschedule after time change failed:', e.message)
+                    this.showToast(`提醒更新失败 ${e.message}`)
+                  })
+                })
+                .catch(() => {
+                  this.showToast('保存失败，请重试')
+                })
             })
         }
         .width('100%')

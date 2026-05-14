@@ -302,7 +302,7 @@ struct CalorieScanPage {
   }
 
   private showPermDenied(): void {
-    AlertDialog.show({
+    this.getUIContext().showAlertDialog({
       title: '需要相机权限',
       message: '请在系统设置 → 应用管理 → 您吃了么 → 权限 中开启相机权限。',
       primaryButton: { value: '知道了', action: () => {} },
@@ -545,7 +545,7 @@ struct CalorieScanPage {
           Image(this.capturedUri)
             .width('100%').height(220)
             .objectFit(ImageFit.Cover)
-          // 返回重拍按钮（右上角）
+          // 重拍按钮：内联导航栏已在上方，此处 top:14 即图片右上角
           Row({ space: 5 }) {
             SymbolGlyph($r('sys.symbol.camera')).fontSize(12).fontColor(['#FFFFFF'])
             Text('重新拍摄').fontSize(11).fontColor('#FFFFFF')
@@ -677,26 +677,60 @@ struct CalorieScanPage {
     .alignItems(HorizontalAlign.Center)
   }
 
+  // ── 内联导航栏（RESULT / MANUAL 状态专用，参与布局流） ────────────────
+
+  @Builder
+  InlineNav(title: string) {
+    Row() {
+      Row() {
+        SymbolGlyph($r('sys.symbol.chevron_left'))
+          .fontSize(20)
+          .fontColor([this.textColor])
+      }
+      .width(44).height(44).justifyContent(FlexAlign.Center)
+      .onClick(() => {
+        this.recognitionResult = null
+        this.capturedUri = ''
+        this.scanState = ScanState.IDLE
+      })
+
+      Text(title)
+        .fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.textColor)
+        .layoutWeight(1).textAlign(TextAlign.Center)
+
+      Blank().width(44)
+    }
+    .width('100%')
+    .height(this.safeTopVp + 48)
+    .padding({ top: this.safeTopVp, left: 4, right: 4 })
+    .backgroundColor(this.cardBg)
+    .border({ width: { bottom: 0.5 }, color: this.divColor })
+  }
+
   // ── build ─────────────────────────────────────────────────────────────
   //
   // 布局结构：
   //   Stack（全屏）
-  //     ├─ Column（主流）opacity=pageOpacity
-  //     │    ├─ CameraFrame  height='52%'
+  //     ├─ Column（主流）
+  //     │    ├─ [RESULT/MANUAL] InlineNav — 参与布局，把内容推到导航栏下方
+  //     │    ├─ CameraFrame  height='52%'（RESULT 时 height=0，收起）
   //     │    └─ 内容区       layoutWeight(1)
-  //     ├─ FloatNav（悬浮在 CameraFrame 顶部）
+  //     ├─ [IDLE/PREVIEW/RECOGNIZING] FloatNav — 悬浮在 CameraFrame 顶部
   //     └─ ToastView
-  //
-  // CameraFrame 与 内容区 在同一 Column 中，绝对不重叠。
-  // FloatNav 是 Stack 上层，只视觉覆盖 CameraFrame 顶部，L 形角标已让开导航栏高度。
 
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
       Column() {
-        // 取景框区
+
+        // RESULT / MANUAL 使用内联导航栏，内容从导航栏正下方开始，零遮挡
+        if (this.scanState === ScanState.RESULT || this.scanState === ScanState.MANUAL) {
+          this.InlineNav('热量识别')
+        }
+
+        // 取景框区（RESULT 时 height=0 自动收起）
         this.CameraFrame()
 
-        // 内容区，随状态切换，用 layoutWeight(1) 填满剩余 48%
+        // 内容区，随状态切换，用 layoutWeight(1) 填满剩余空间
         if (this.scanState === ScanState.IDLE) {
           Column({ space: 16 }) {
             Button() {
@@ -766,11 +800,15 @@ struct CalorieScanPage {
       .backgroundColor(this.bgColor)
       .opacity(this.pageOpacity)
 
-      // 悬浮导航栏（在 CameraFrame 上方，内容区不受影响）
-      this.FloatNav()
+      // 悬浮导航栏仅用于拍摄类状态（取景框可见时），RESULT/MANUAL 已改用内联导航栏
+      if (this.scanState !== ScanState.RESULT && this.scanState !== ScanState.MANUAL) {
+        this.FloatNav()
+      }
 
       ToastView({ message: this.toastMsg, visible: this.toastVisible })
     }
+    // 全屏沉浸：TOP 让取景框延伸至状态栏下方，BOTTOM 填满底部手势区
     .width('100%').height('100%')
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
   }
 }

@@ -60,12 +60,12 @@ export const stapleItems: StuffItem[] = [
 ];
 
 export const toolItems: StuffItem[] = [
-  { name: '一口大锅', emoji: '🍳' },
-  { name: '平底锅', emoji: '🍳' },
-  { name: '电饭煲', emoji: '🍲' },
-  { name: '空气炸锅', emoji: '🌪️' },
+  { name: '炒锅', emoji: '🍳' },
+  { name: '炖锅', emoji: '🥘' },
+  { name: '煮锅', emoji: '🫕' },
+  { name: '蒸锅', emoji: '♨️' },
+  { name: '平底锅', emoji: '🥞' },
+  { name: '砂锅', emoji: '🏺' },
   { name: '烤箱', emoji: '🕋' },
-  { name: '微波炉', emoji: '🎛️' },
-  { name: '砂锅', emoji: '🥘' },
-  { name: '蒸锅', emoji: '♨️' }
+  { name: '电饭煲', emoji: '🍲' }
 ];

@@ -10,7 +10,7 @@
 |---|---|
 | 平台 | HarmonyOS NEXT — API 22 (HarmonyOS 6.0.2) |
 | 语言 | ArkTS 严格模式（零 `any`，强类型规范） |
-| 包名 | `com.example.cook` |
+| 包名 | `com.example.cook_njust_project` |
 | 版本 | 1.0.0 |
 | 构建工具 | Hvigor |
 | 设备类型 | Phone |

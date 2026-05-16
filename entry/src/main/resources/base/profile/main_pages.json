@@ -2,7 +2,6 @@
   "src": [
     "pages/StartupPage",
     "pages/IndexV2",
-    "pages/Index",
     "pages/HistoryPage",
     "pages/FavoritesPage",
     "pages/SettingsPage",

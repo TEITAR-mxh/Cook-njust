@@ -34,8 +34,12 @@ import {
 } from '../service/NutritionCalculator';
 import type { RecipeNutrition } from '../model/recipe';
 
-// 引入统一管理的食材与厨具全库
-import { meatItems, stapleItems, toolItems, vegetableItems } from '../data/foodCatalog';
+// 引入统一管理的食材与厨具全库（含细分子分类）
+import {
+  toolItems, stapleItems,
+  mushroomItems, leafyVegItems, rootVegItems, gourdItems, beanItems, otherVegItems,
+  eggItems, porkItems, beefLambItems, poultryItems, fishItems, shrimpCrabItems, shellfishItems
+} from '../data/foodCatalog';
 
 interface IngredientCategory {
   title: string;
@@ -109,6 +113,9 @@ struct IndexV2 {
   @State currentRandomIndex: number = 0
   @State showRandomAnimation: boolean = false
 
+  // 分类折叠状态（默认全部折叠以减少滚动距离）
+  @State expandedCategoryTitles: string[] = []
+
   // 搜索历史
   @State searchHistory: string[] = []
   @State searchHistoryVisible: boolean = false
@@ -163,11 +170,25 @@ struct IndexV2 {
   @Watch('onPendingDailyReminderChange')
   pendingDailyReminder: boolean = false;
 
-  // 利用外部 foodCatalog.ets 的数据进行装配
+  // 利用外部 foodCatalog.ets 的细分子分类数据进行装配
   private readonly ingredientCategories: IngredientCategory[] = [
-    { title: '🥩 肉蛋水产', data: meatItems, type: TagType.MEAT },
-    { title: '🥬 新鲜蔬菜', data: vegetableItems, type: TagType.VEG },
-    { title: '🍚 碳水辅料', data: stapleItems, type: TagType.CARB }
+    // 荤菜细分
+    { title: '🥚 蛋类', data: eggItems, type: TagType.MEAT },
+    { title: '🐷 猪肉类', data: porkItems, type: TagType.MEAT },
+    { title: '🥩 牛羊类', data: beefLambItems, type: TagType.MEAT },
+    { title: '🍗 禽类', data: poultryItems, type: TagType.MEAT },
+    { title: '🐟 鱼类', data: fishItems, type: TagType.MEAT },
+    { title: '🦐 虾蟹头足', data: shrimpCrabItems, type: TagType.MEAT },
+    { title: '🐚 贝类', data: shellfishItems, type: TagType.MEAT },
+    // 素菜细分
+    { title: '🍄 菌菇类', data: mushroomItems, type: TagType.VEG },
+    { title: '🥬 叶菜类', data: leafyVegItems, type: TagType.VEG },
+    { title: '🥕 根茎笋类', data: rootVegItems, type: TagType.VEG },
+    { title: '🫑 瓜茄类', data: gourdItems, type: TagType.VEG },
+    { title: '🫘 豆类及制品', data: beanItems, type: TagType.VEG },
+    { title: '🌊 其他', data: otherVegItems, type: TagType.VEG },
+    // 碳水
+    { title: '🍚 碳水辅料', data: stapleItems, type: TagType.CARB },
   ];
 
   private readonly navItems: NavItem[] = [
@@ -651,6 +672,28 @@ struct IndexV2 {
     }
   }
 
+  private isCategoryExpanded(title: string): boolean {
+    return this.expandedCategoryTitles.includes(title);
+  }
+
+  private toggleCategory(title: string): void {
+    if (this.expandedCategoryTitles.includes(title)) {
+      this.expandedCategoryTitles = this.expandedCategoryTitles.filter(t => t !== title);
+    } else {
+      this.expandedCategoryTitles = this.expandedCategoryTitles.concat([title]);
+    }
+  }
+
+  private selectedCountInCategory(cat: IngredientCategory): number {
+    let count = 0;
+    for (let i = 0; i < cat.data.length; i++) {
+      if (this.selectedStuff.includes(cat.data[i].name)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
   private showToast(message: string): void {
     this.toastMessage = message;
     this.toastVisible = true;
@@ -991,45 +1034,141 @@ struct IndexV2 {
             }.width('100%')
           }.width('100%').padding({ left: 20, right: 20 })
 
-          // --- 模块 4：食材与厨具分类 (缩小间距让整体更聚拢) ---
-          Column({ space: 20 }) { // 模块间距从 24 缩小到 20
+          // --- 模块 4：食材与厨具分类（可折叠，减少滚动） ---
+          Column({ space: 8 }) {
             ForEach(this.ingredientCategories, (cat: IngredientCategory) => {
-              Column({ space: 8 }) { // 标题与标签间距从 10 缩小到 8
-                Text(cat.title)
-                  .fontSize(15).fontColor(this.currentTextColor).fontWeight(FontWeight.Bold).alignSelf(ItemAlign.Center)
+              Column() {
+                // 标题行：始终显示，点击展开/折叠
+                Row() {
+                  Text(cat.title)
+                    .fontSize(15)
+                    .fontColor(this.currentTextColor)
+                    .fontWeight(FontWeight.Bold)
+                  if (this.selectedCountInCategory(cat) > 0) {
+                    Text(`${this.selectedCountInCategory(cat)}`)
+                      .fontSize(11)
+                      .fontColor(AppColors.BRAND_COLOR)
+                      .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+                      .backgroundColor(AppColors.BRAND_COLOR_LIGHT)
+                      .borderRadius(100)
+                      .margin({ left: 6 })
+                  }
+                  Blank()
+                  SymbolGlyph(this.isCategoryExpanded(cat.title)
+                    ? $r('sys.symbol.chevron_up')
+                    : $r('sys.symbol.chevron_down'))
+                    .fontSize(14)
+                    .fontColor([this.currentSecondaryTextColor])
+                }
+                .width('100%')
+                .padding({ left: 14, right: 14, top: 12, bottom: 12 })
+                .onClick(() => this.toggleCategory(cat.title))
 
-                Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Center, alignItems: ItemAlign.Center }) {
-                  ForEach(cat.data, (item: StuffItem) => {
-                    IngredientTag({
-                      label: item.name, emoji: item.emoji, tagType: cat.type,
-                      isActive: this.selectedStuff.includes(item.name),
-                      isHighlighted: this.highlightedTags.has(item.name),
-                      onTagClick: () => this.toggleStuff(item.name)
-                    }).margin({ left: 5, right: 5, bottom: 10 })
-                  }, (item: StuffItem) => item.name)
-                }.width('100%')
+                // 折叠时：仅展示已选中的 chip 预览
+                if (!this.isCategoryExpanded(cat.title) && this.selectedCountInCategory(cat) > 0) {
+                  Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start, alignItems: ItemAlign.Center }) {
+                    ForEach(cat.data, (item: StuffItem) => {
+                      if (this.selectedStuff.includes(item.name)) {
+                        IngredientTag({
+                          label: item.name, emoji: item.emoji, tagType: cat.type,
+                          isActive: true, isHighlighted: false,
+                          onTagClick: () => this.toggleStuff(item.name)
+                        }).margin({ left: 5, right: 5, bottom: 8 })
+                      }
+                    }, (item: StuffItem) => item.name)
+                  }
+                  .width('100%')
+                  .padding({ left: 14, right: 14, bottom: 12 })
+                }
+
+                // 展开时：显示全部 chip
+                if (this.isCategoryExpanded(cat.title)) {
+                  Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Center, alignItems: ItemAlign.Center }) {
+                    ForEach(cat.data, (item: StuffItem) => {
+                      IngredientTag({
+                        label: item.name, emoji: item.emoji, tagType: cat.type,
+                        isActive: this.selectedStuff.includes(item.name),
+                        isHighlighted: this.highlightedTags.has(item.name),
+                        onTagClick: () => this.toggleStuff(item.name)
+                      }).margin({ left: 5, right: 5, bottom: 10 })
+                    }, (item: StuffItem) => item.name)
+                  }
+                  .width('100%')
+                  .padding({ left: 14, right: 14, bottom: 12 })
+                }
               }
+              .backgroundColor(this.currentCardBgColor)
+              .borderRadius(12)
+              .borderWidth(0.5)
+              .borderColor(this.currentBorderColor)
+              .clip(true)
             }, (cat: IngredientCategory) => cat.title)
 
-            // 厨具区
-            Column({ space: 8 }) {
-              Text('🍳 厨具')
-                .fontSize(15).fontColor(this.currentTextColor).fontWeight(FontWeight.Bold).alignSelf(ItemAlign.Center)
+            // 厨具区（同样可折叠）
+            Column() {
+              Row() {
+                Text('🍳 厨具')
+                  .fontSize(15)
+                  .fontColor(this.currentTextColor)
+                  .fontWeight(FontWeight.Bold)
+                if (this.curTool.length > 0) {
+                  Text('1')
+                    .fontSize(11)
+                    .fontColor(AppColors.BRAND_COLOR)
+                    .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+                    .backgroundColor(AppColors.BRAND_COLOR_LIGHT)
+                    .borderRadius(100)
+                    .margin({ left: 6 })
+                }
+                Blank()
+                SymbolGlyph(this.isCategoryExpanded('__tool__')
+                  ? $r('sys.symbol.chevron_up')
+                  : $r('sys.symbol.chevron_down'))
+                  .fontSize(14)
+                  .fontColor([this.currentSecondaryTextColor])
+              }
+              .width('100%')
+              .padding({ left: 14, right: 14, top: 12, bottom: 12 })
+              .onClick(() => this.toggleCategory('__tool__'))
 
-              Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Center, alignItems: ItemAlign.Center }) {
-                ForEach(toolItems, (item: StuffItem) => {
-                  IngredientTag({
-                    label: item.label ?? item.name, emoji: item.emoji, tagType: TagType.TOOL,
-                    isActive: this.curTool === item.name,
-                    isHighlighted: false,
-                    onTagClick: () => this.toggleTool(item.name)
-                  }).margin({ left: 5, right: 5, bottom: 10 })
-                }, (item: StuffItem) => item.name)
-              }.width('100%')
+              if (!this.isCategoryExpanded('__tool__') && this.curTool.length > 0) {
+                Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
+                  ForEach(toolItems, (item: StuffItem) => {
+                    if (item.name === this.curTool) {
+                      IngredientTag({
+                        label: item.name, emoji: item.emoji, tagType: TagType.TOOL,
+                        isActive: true, isHighlighted: false,
+                        onTagClick: () => this.toggleTool(item.name)
+                      }).margin({ left: 5, right: 5, bottom: 8 })
+                    }
+                  }, (item: StuffItem) => item.name)
+                }
+                .width('100%')
+                .padding({ left: 14, right: 14, bottom: 12 })
+              }
+
+              if (this.isCategoryExpanded('__tool__')) {
+                Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Center, alignItems: ItemAlign.Center }) {
+                  ForEach(toolItems, (item: StuffItem) => {
+                    IngredientTag({
+                      label: item.label ?? item.name, emoji: item.emoji, tagType: TagType.TOOL,
+                      isActive: this.curTool === item.name, isHighlighted: false,
+                      onTagClick: () => this.toggleTool(item.name)
+                    }).margin({ left: 5, right: 5, bottom: 10 })
+                  }, (item: StuffItem) => item.name)
+                }
+                .width('100%')
+                .padding({ left: 14, right: 14, bottom: 12 })
+              }
             }
+            .backgroundColor(this.currentCardBgColor)
+            .borderRadius(12)
+            .borderWidth(0.5)
+            .borderColor(this.currentBorderColor)
+            .clip(true)
           }
           .width('100%')
-          .padding({ left: 20, right: 20, bottom: 140 }) // 底部留白确保不被遮挡
+          .padding({ left: 20, right: 20, bottom: 140 })
 
         }.width('100%')
       }

@@ -85,6 +85,10 @@ export class ReminderService {
     } catch (e) {
       const err = e as BusinessError;
       console.error(`[ReminderService] publishReminder failed: code=${err.code}, msg=${err.message}`);
+      // 常见错误码友好提示
+      if (err.code === 1700002) {
+        throw new Error('提醒数量已达系统上限，请先清理其他应用的提醒后重试')
+      }
       throw new Error(`[${err.code}] ${err.message}`);
     }
   }

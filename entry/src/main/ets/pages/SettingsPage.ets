@@ -317,13 +317,23 @@ struct SettingsPage {
   private async onKeepLocalChange(isOn: boolean): Promise<void> {
     const host = this.getHostContext()
     if (!host) return
+
+    const previousValue: boolean = this.keepLocalData
     this.keepLocalData = isOn
-    await CookPreferences.setKeepLocalData(host, isOn)
-    if (!isOn) {
-      await CookPreferences.clearFavorites(host)
-      await CookPreferences.clearHistory(host)
-      this.favoriteCount = 0
-      this.historyCount = 0
+
+    try {
+      await CookPreferences.setKeepLocalData(host, isOn)
+      if (!isOn) {
+        await CookPreferences.clearFavorites(host)
+        await CookPreferences.clearHistory(host)
+        this.favoriteCount = 0
+        this.historyCount = 0
+      }
+    } catch (e) {
+      // 保存失败时回滚 UI 状态，避免开关显示与实际存储不一致
+      this.keepLocalData = previousValue
+      console.error('[SettingsPage] onKeepLocalChange failed:', JSON.stringify(e))
+      this.showToast('设置保存失败，请重试')
     }
   }
 

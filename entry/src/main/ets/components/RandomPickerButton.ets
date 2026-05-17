@@ -106,6 +106,6 @@ export struct RandomPickerButton {
         .markAnchor({ x: '50%', y: '50%' })
     }
     .width('100%')
-    .margin({ bottom: 32 })
+    .margin({ bottom: 6 })
   }
 }

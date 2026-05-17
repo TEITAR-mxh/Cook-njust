@@ -274,7 +274,7 @@ struct CalorieScanPage {
 
   private applyResult(r: FoodRecognitionResult): void {
     this.resultName  = r.foodName
-    this.resultTag   = r.source === 'cloud' ? '云端' : r.source === 'local' ? '本地库' : '手动'
+    this.resultTag   = this.sourceToTag(r.source)
     this.rawCal      = r.nutrient.calories
     this.rawPro      = r.nutrient.protein
     this.rawFat      = r.nutrient.fat
@@ -292,6 +292,28 @@ struct CalorieScanPage {
   }
 
   private onQtyChange(): void { this.recalc() }
+
+  /** 推理来源 → 展示标签 */
+  private sourceToTag(source: string): string {
+    switch (source) {
+      case 'local_npu': return '本地NPU'
+      case 'local_cpu': return '本地CPU'
+      case 'cloud':     return '云端'
+      case 'manual':    return '手动'
+      default:          return '未识别'
+    }
+  }
+
+  /** 推理来源 → 展示颜色 */
+  private sourceColor(source: string): string {
+    switch (source) {
+      case 'local_npu': return '#34D399'  // 绿色：本地NPU最高效
+      case 'local_cpu': return '#FBBF24'  // 琥珀：本地CPU
+      case 'cloud':     return '#60A5FA'  // 蓝色：云端
+      case 'manual':    return '#9CA3AF'  // 灰色：手动
+      default:          return '#EF4444'  // 红色：未识别
+    }
+  }
 
   // ── Toast & Dialog ────────────────────────────────────────────────────
 
@@ -561,15 +583,17 @@ struct CalorieScanPage {
         }.width('100%')
       }
 
-      // 食物名 + 来源标签
+      // 食物名 + 来源标签（颜色随推理来源动态变化）
       Row({ space: 10 }) {
         Text(this.resultName)
           .fontSize(20).fontWeight(FontWeight.Bold).fontColor(this.textColor)
           .layoutWeight(1).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
         Text(this.resultTag)
-          .fontSize(11).fontColor(AppColors.BRAND_COLOR)
+          .fontSize(11).fontColor(this.sourceColor(this.recognitionResult?.source ?? 'none'))
           .padding({ left: 9, right: 9, top: 4, bottom: 4 })
-          .backgroundColor(this.isDark ? '#2A1215' : AppColors.BRAND_COLOR_LIGHT)
+          .backgroundColor(this.isDark
+            ? this.sourceColor(this.recognitionResult?.source ?? 'none') + '20'
+            : this.sourceColor(this.recognitionResult?.source ?? 'none') + '18')
           .borderRadius(12)
       }.padding({ left: 20, right: 20, top: 20, bottom: 6 })
 

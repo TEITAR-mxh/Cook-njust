@@ -1,4 +1,4 @@
-import { AppColors } from '../constants/AppColors'
+import { AppColors, ThemeManager } from '../constants/AppColors'
 import { FolderItem } from '../store/CookPreferences'
 
 @Component
@@ -11,6 +11,35 @@ export struct FolderPickerSheet {
   @State showCreateInput: boolean = false
   @State newFolderName: string = ''
 
+  /** 主题响应式订阅 */
+  @StorageProp('currentThemeMode')
+  themeMode: string = '系统默认'
+  @StorageProp('isSystemDarkMode')
+  isSystemDark: boolean = false
+
+  /** 获取当前主题下的自适应背景色 */
+  private getSheetBg(): string {
+    return ThemeManager.getColor(AppColors.CARD_BG, AppColors.DARK_CARD_BG, this.themeMode)
+  }
+  private getTextColor(): string {
+    return ThemeManager.getColor(AppColors.GRAY_800, AppColors.DARK_GRAY_900, this.themeMode)
+  }
+  private getSecondaryText(): string {
+    return ThemeManager.getColor(AppColors.GRAY_400, AppColors.DARK_GRAY_500, this.themeMode)
+  }
+  private getInputBg(): string {
+    return ThemeManager.getColor(AppColors.GRAY_50, AppColors.DARK_GRAY_50, this.themeMode)
+  }
+  private getDividerColor(): string {
+    return ThemeManager.getColor(AppColors.GRAY_100, AppColors.DARK_GRAY_100, this.themeMode)
+  }
+  private getCancelBg(): string {
+    return ThemeManager.getColor(AppColors.GRAY_100, AppColors.DARK_GRAY_200, this.themeMode)
+  }
+  private getCancelText(): string {
+    return ThemeManager.getColor(AppColors.GRAY_500, AppColors.DARK_GRAY_500, this.themeMode)
+  }
+
   build() {
     Column({ space: 0 }) {
       // 标题栏
@@ -18,19 +47,19 @@ export struct FolderPickerSheet {
         Text('加入收藏夹')
           .fontSize(17)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#1F2937')
+          .fontColor(this.getTextColor())
           .layoutWeight(1)
           .textAlign(TextAlign.Center)
         Text('✕')
           .fontSize(18)
-          .fontColor('#9CA3AF')
+          .fontColor(this.getSecondaryText())
           .padding(8)
           .onClick(() => { if (this.onClose) this.onClose() })
       }
       .width('100%')
       .padding({ left: 16, right: 8, top: 20, bottom: 12 })
 
-      Divider().color('#F3F4F6').strokeWidth(1)
+      Divider().color(this.getDividerColor()).strokeWidth(1)
 
       // 收藏夹列表
       Scroll() {
@@ -38,7 +67,7 @@ export struct FolderPickerSheet {
           if (this.folders.length === 0 && !this.showCreateInput) {
             Column({ space: 8 }) {
               Text('📂').fontSize(40)
-              Text('还没有收藏夹').fontSize(14).fontColor('#9CA3AF')
+              Text('还没有收藏夹').fontSize(14).fontColor(this.getSecondaryText())
             }
             .width('100%')
             .padding({ top: 32, bottom: 32 })
@@ -51,16 +80,16 @@ export struct FolderPickerSheet {
               Column({ space: 2 }) {
                 Text(folder.name)
                   .fontSize(15)
-                  .fontColor('#1F2937')
+                  .fontColor(this.getTextColor())
                   .fontWeight(FontWeight.Medium)
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
                 Text(`${folder.recipeIds.length} 道菜`)
                   .fontSize(12)
-                  .fontColor('#9CA3AF')
+                  .fontColor(this.getSecondaryText())
               }.layoutWeight(1).alignItems(HorizontalAlign.Start)
 
-              Text('›').fontSize(18).fontColor('#D1D5DB')
+              Text('›').fontSize(18).fontColor(this.getSecondaryText())
             }
             .width('100%')
             .padding({ left: 20, right: 20, top: 14, bottom: 14 })
@@ -68,7 +97,7 @@ export struct FolderPickerSheet {
               if (this.onAddToFolder) this.onAddToFolder(folder.id)
             })
 
-            Divider().color('#F9FAFB').strokeWidth(1).margin({ left: 72 })
+            Divider().color(this.getDividerColor()).strokeWidth(1).margin({ left: 72 })
           }, (f: FolderItem) => f.id)
 
           // 新建收藏夹输入区
@@ -78,7 +107,8 @@ export struct FolderPickerSheet {
                 TextInput({ placeholder: '收藏夹名称', text: this.newFolderName })
                   .layoutWeight(1)
                   .fontSize(15)
-                  .backgroundColor('#F9FAFB')
+                  .fontColor(this.getTextColor())
+                  .backgroundColor(this.getInputBg())
                   .borderRadius(10)
                   .padding({ left: 14, right: 14, top: 10, bottom: 10 })
                   .onChange((v: string) => { this.newFolderName = v })
@@ -87,11 +117,11 @@ export struct FolderPickerSheet {
               Row({ space: 12 }) {
                 Text('取消')
                   .fontSize(15)
-                  .fontColor('#6B7280')
+                  .fontColor(this.getCancelText())
                   .layoutWeight(1)
                   .textAlign(TextAlign.Center)
                   .padding({ top: 12, bottom: 12 })
-                  .backgroundColor('#F3F4F6')
+                  .backgroundColor(this.getCancelBg())
                   .borderRadius(10)
                   .onClick(() => {
                     this.showCreateInput = false
@@ -124,7 +154,7 @@ export struct FolderPickerSheet {
       // 底部：新建收藏夹按钮
       if (!this.showCreateInput) {
         Column() {
-          Divider().color('#F3F4F6').strokeWidth(1)
+          Divider().color(this.getDividerColor()).strokeWidth(1)
           Row({ space: 8 }) {
             Text('+').fontSize(18).fontColor(AppColors.BRAND_COLOR).fontWeight(FontWeight.Bold)
             Text('新建收藏夹').fontSize(15).fontColor(AppColors.BRAND_COLOR).fontWeight(FontWeight.Medium)
@@ -142,7 +172,7 @@ export struct FolderPickerSheet {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(Color.White)
+    .backgroundColor(this.getSheetBg())
     .borderRadius({ topLeft: 20, topRight: 20 })
   }
 }

@@ -1,129 +1,123 @@
 # AUV 您吃了么
 
-> 基于 HarmonyOS NEXT (API 22) ArkTS 开发的本地菜谱助手应用。用户从冰箱已有食材出发，智能匹配可做菜谱，支持热量识别、营养评价、个性化推荐与专注烹饪模式。
+HarmonyOS NEXT (API 22) 本地菜谱助手应用。从冰箱已有食材出发，智能匹配可做菜谱，支持热量识别、营养评估、个性化推荐与专注烹饪模式。
 
 ---
 
-## 项目概览
+## 项目信息
 
 | 项 | 值 |
 |---|---|
-| 平台 | HarmonyOS NEXT — API 22 (HarmonyOS 6.0.2) |
-| 语言 | ArkTS 严格模式（零 `any`，强类型规范） |
+| 平台 | HarmonyOS NEXT API 22 (HarmonyOS 6.0.2) |
+| 语言 | ArkTS（零 `any`，全类型推断） |
 | 包名 | `com.example.cook_njust_project` |
 | 版本 | 1.0.1 |
 | 构建工具 | Hvigor |
-| 设备类型 | Phone |
-| 入口页面 | `StartupPage` → `IndexV2` |
+| 入口 | `StartupPage` → `IndexV2` |
+| 菜谱规模 | 996 道（去重后） |
 
 ---
 
-## 功能特性
+## 功能
 
-### 冰箱 Tab — 智能匹配
-- 食材多选标签（肉蛋水产 / 新鲜蔬菜 / 碳水辅料三类颜色编码）
-- 厨具筛选（炒锅 / 蒸锅 / 烤箱等）
-- 三种搜索模式：**严格**（全部食材都有）/ **模糊**（任一食材匹配）/ **生存**（仅用所选食材）
-- **食材同义词库**：24 组同义词（番茄↔西红柿、土豆↔马铃薯等），三种模式均自动扩展，告别因叫法差异搜不到菜
-- 随机食材抽取 + **加权随机算法 v2**：按分类均匀随机保证多样性，类内按菜谱频次加权，解决旧算法食材分布不均
-- **冰箱食材搜索**：输入关键词实时过滤食材分类，快速定位目标食材
+### 冰箱 Tab
 
-### 菜谱 Tab — 浏览探索
-- 全量菜谱列表，RecipeCard 大/小双模式
-- 关键词全文搜索，含**搜索历史联想**（最多 20 条，TextInput 聚焦时弹出，支持一键清空）
-- 标签筛选（今日推荐 / 减脂餐 / 快手早餐 / 广式 / 川香 / 烘焙 / 汤羹）
-- **烹饪方式分组筛选**（8 类：炒 / 炖烧 / 蒸 / 煮 / 凉拌 / 煎炸 / 烤 / 卤），method→分类自动映射
-- 点击卡片打开系统原生半模态详情弹窗（`bindSheet`）
+- 食材多选标签（三类：肉蛋水产红 / 蔬菜绿 / 碳水辅料黄，共 37 种食材）
+- 厨具筛选（炒锅 / 炖锅 / 煮锅 / 蒸锅 / 烤箱 / 电饭煲）
+- 三种搜索模式：严格（全匹配）、模糊（任选其一）、生存（菜谱食材 ⊆ 已选食材）
+- 24 组食材同义词双向映射（番茄↔西红柿、土豆↔马铃薯 等），三种模式均自动扩展
+- 加权随机食材抽取：分类均匀随机 + 类内按菜谱频次加权
+- 食材搜索过滤
 
-### 发现 Tab — 随机推荐
-- 随机抽取菜谱，淡入淡出切换动画
-- **猜你喜欢**：基于 Jaccard 协同过滤算法，对比历史浏览 + 收藏记录推荐相似菜谱，单列展示 Top 3，标题行显示推荐数量角标
-- 右上角「?」快捷入口，跳转**饮食结构建议页**
+### 菜谱 Tab
 
-### 餐桌 Tab — 个人中心
-- **今日饮食卡片**：横排紧凑布局，圆环（100vp）左侧实时显示热量进度（绿 < 60% / 品牌红 60–90% / 橙 > 90%），右侧展示已摄入千卡、目标剩余与记录数；圆环下方三行进度条（蛋白质 / 脂肪 / 碳水，含「已摄入 / 目标」数值）；内嵌「记录一餐」胶囊按钮直达热量识别页；下方内联今日菜单列表（加入餐桌的菜谱、营养汇总、个性化饮食建议），替代原独立的「今日餐桌」区块
-- 收藏网格（最多 500 条，按收藏时间排序）
-- 浏览历史（最近 50 条）
-- **历史足迹热力图**：Canvas 绘制近 12 周浏览热力格子，点击格子查看当天浏览的菜谱列表
-- 用户资料（昵称 / 头像 Emoji / 相册图片）
-- 主题切换（浅色 / 深色 / 跟随系统）
-- 数据管理（保留本地数据开关 / 缓存清理）
+- 全量菜谱列表，大图卡 + 列表小卡双模式
+- 关键词全文搜索，搜索历史联想（最多 20 条，聚焦 TextInput 时弹出，支持一键清空）
+- 标签筛选（今日推荐 / 减脂餐 / 快手早餐 / 广式 / 川香 / 烘焙 / 汤羹 / 下饭神器 / 宵夜小食）
+- 烹饪方式分组筛选（8 类：炒 / 炖烧 / 蒸 / 煮 / 凉拌 / 煎炸 / 烤 / 卤），30+ method 自动映射
+- 系统原生半模态详情弹窗（bindSheet）
+
+### 发现 Tab
+
+- 随机推荐 + 浅入淡出动画
+- 猜你喜欢：Jaccard 协同过滤（tag + 食材 + 烹饪方式 构建特征集），排除已交互菜谱后 Top 3 推荐
+- 右上角「?」快捷入口 → 饮食结构建议页
+
+### 餐桌 Tab
+
+- 今日饮食卡片：100vp 圆环（绿 < 60% / 品牌红 60–90% / 橙 > 90%）+ 三大营养素进度条（蛋白质 / 脂肪 / 碳水，含已摄入/目标数值）+ 内联记录按钮
+- 收藏网格（最多 500 条）+ 浏览历史（最近 50 条）
+- 历史足迹热力图：Canvas 绘制 12 周 × 7 天，点击格子查看当天菜谱
+- 用户资料（昵称 / 头像）
+- 主题切换（浅色 / 深色 / 跟随系统）+ 数据管理 + 缓存清理
 
 ### 详情弹窗
-- **步骤卡片**：编号气泡（品牌色圆形）+ 步骤文本，交替底色区分行；点击任一步骤直接跳入对应步骤的专注模式
-- **内容顺序**：食材用量 → 烹饪工具 → 加入餐桌按钮 → 步骤卡片 → 营养信息
-- **加入今日餐桌**：通栏按钮，居中显示；已加入时变为品牌色填充态（"已加入今日餐桌"）
-- **食材用量归一化**：人数调节器（1–6 人），食材用量实时等比换算（支持克 / 毫升 / 个 / 勺 / 块等 20+ 中英文单位）
-- **Nutri-Score 营养评级**（A–E 五档，参考 Ofcom 模型）
-- **营养成分卡片**：热量 / 蛋白质 / 脂肪 / 碳水 / 膳食纤维 / 钠 六项数据
-- 收藏切换（即时同步，使用 `FAVORITE_ACTIVE` 色）
-- **采购清单图片导出**：在详情弹窗食材卡片中，除复制到剪贴板外，支持一键生成精美清单图片（3 种样式：**唯美便签**暖米色双分隔线绿色圆点 / **极简白卡**左侧品牌红竖条圆角卡片 / **牛皮纸温暖**仿纸质随机点纹），画布 1080×1920vp（9:16），字体放大（标题 130px / 食材 72px），顶部含 "AUV 您吃了么" 应用名称，底部含日期与数量，Canvas 绘制后保存至系统相册
+
+- 食材用量 → 厨具 → 加入餐桌 → 步骤卡片（编号气泡） → 营养信息
+- 人数调节（1–6 人），食材用量实时等比换算（覆盖 20+ 计量单位，支持分数）
+- Nutri-Score 营养评级（A–E 五档，Ofcom 简化模型，六项指标）
+- 采购清单图片导出：Canvas 绘制 1080×1920vp，三种风格（唯美便签 / 极简白卡 / 牛皮纸），保存至系统相册
 
 ### 专注烹饪模式
-- 全屏 Swiper 分步骤浏览，支持从详情弹窗任意步骤直接跳入
-- 屏幕常亮锁（`runningLock`），防止操作中途熄屏
 
-### 热量识别与饮食记录
-- **智能混合识别引擎**：HiAI NPU（麒麟芯片本地加速，置信度 ≥ 0.55）→ MindSpore Lite CPU（纯 CPU 兜底，置信度 ≥ 0.20）→ 百度云端 API（远程兜底），三级智能降级，模型文件缺失自动跳过
-- **识别来源可视化**：结果标签颜色按来源动态变化（本地NPU 绿 / 本地CPU 琥珀 / 云端蓝 / 手动灰）
-- **MindSpore Lite 模型**：内置 food_model.ms（MobileNet 类 CNN，224×224 输入），food_labels.txt 中文标签表
-- **每日饮食记录**：本地 RDB 持久化，按日期分组查询
-- **饮食结构建议页**：中国居民平衡膳食宝塔、三大营养素供能比可视化、11 类食物推荐摄入量（依据《中国居民膳食指南（2022）》，纯静态展示）
-- **识别结果可滚动布局**：结果展示时取景框完全收起（height 0），食物大图内嵌在结果卡片顶部（全宽 220vp），随页面整体上下滚动；右上角浮层"重新拍摄"按钮可直接重拍；操作区改为主按钮（全宽"记录今日饮食"）+ 次级文字按钮（"重新识别"）竖排，视觉层级清晰
+- 全屏 Swiper 分步浏览，支持从详情弹窗任意步骤直接跳入
+- 屏幕常亮锁（`setKeepScreenOn`）
+
+### 热量识别
+
+- **混合识别引擎**：HiAI NPU（麒麟芯片本地加速，置信度 ≥ 0.55） → MindSpore Lite CPU（纯 CPU 兜底，置信度 ≥ 0.20） → 百度云端 API（远程兜底），三级智能降级，模型缺失自动跳过
+- MindSpore Lite：内置 MobileNet 类 CNN 模型（224×224 输入），中文标签表
+- 识别来源可视化：标签颜色动态变化（本地 NPU 绿 / 本地 CPU 琥珀 / 云端蓝 / 手动灰）
+- 饮食记录本地 RDB 持久化，按日期分组查询
+- 饮食结构建议页：膳食宝塔 + 三大营养素供能比 + 11 类食物推荐量（《中国居民膳食指南 2022》）
 
 ### 每日推荐通知
-- **系统级定时推送**：通过 `reminderAgentManager` 设置每日闹钟，在用户设定时间触发后台服务
-- **动态选菜算法**：冰箱食材全匹配 → 冰箱食材任意匹配 → 精选标签 → 全局随机，自动排除近 7 天已推荐菜谱
-- **两种推荐偏好**：「冰箱优先」（结合用户已选食材）/ 「随机精选」（从有标签菜谱中随机）
-- **点击通知直达**：通知携带菜谱 ID，点击后跳转主界面并自动打开对应菜谱详情
-- **设置入口**：SettingsPage 新增推送开关、时间选择器（TimePickerDialog）、偏好切换
 
-### 合规
-- 首次启动隐私同意弹窗（拒绝退出 / 同意进入）
-- 独立隐私政策页面（符合《个人信息保护法》）
-- 独立用户协议页面（具备合同效力条款）
+- 系统级定时推送（`reminderAgentManager`），进程无关
+- 动态选菜算法（四级优先级）：
+  1. 冰箱食材全匹配
+  2. 冰箱食材任意匹配
+  3. 精选标签
+  4. 全局随机
+- 自动排除近 7 天已推荐菜谱
+- 点击通知直达菜谱详情（`EntryAbility.onNewWant` → `AppStorage` → `IndexV2`）
 
 ---
 
 ## 技术架构
 
-### 分层设计
-
 ```
-┌─────────────────────────────────────────┐
-│               Pages / UI                │  ArkUI 声明式 UI
-├─────────────────────────────────────────┤
-│             Components                  │  可复用 UI 组件
-├────────────────────┬────────────────────┤
-│      Service       │      Store         │  业务逻辑 / 持久化
-├────────────────────┼────────────────────┤
-│        Data        │      Model         │  数据加载 / 类型定义
-└─────────────────────────────────────────┘
+Pages（10 页）
+        ↕
+Components（12 个可复用组件）
+        ↕
+Service（14 个业务模块）     Store（CookPreferences 单例）
+        ↕
+Data（4 个数据层）           Model（类型定义）
 ```
 
-### 核心设计决策
+### 关键设计决策
 
 | 问题 | 方案 |
-|------|------|
-| 菜谱 ID 稳定性 | 数组下标作为稳定 ID（与 Web 端 Dexie 对齐） |
-| 跨页面主题同步 | `AppStorage` + `@StorageProp` / `@Watch`，零轮询；`onPageShow` 同步读取 AppStorage 消除异步闪烁 |
-| 系统主题监听 | `EntryAbility.onConfigurationUpdate` 写入 `AppStorage('isSystemDarkMode')` |
-| 收藏/历史并发安全 | `CookPreferences` Promise 链式单例，防止竞态写入 |
-| ArkUI 响应性 | `@State` 赋值使用深拷贝，避免引用未变导致 UI 不刷新 |
-| 同义词搜索 | `IngredientSynonyms` 24 组双向映射，搜索前扩展为等价词集合 |
-| 协同过滤推荐 | 基于 tag + stuff + methods 构建特征集，Jaccard 相似度排序 |
-| 营养评分 | 简化版 Ofcom Nutri-Score：负分（热量/饱和脂肪/糖/钠）减正分（蛋白质/膳食纤维/蔬菜标签） |
-| Builder 限制规避 | ArkTS Builder lambda 内禁止 `const`，改用 `@State` 预计算或直接调用方法 |
-| 沉浸式底栏 | `setWindowLayoutFullScreen(true)` + 透明导航栏 + 安全区适配 |
-| 每日推荐调度 | `reminderAgentManager.publishReminder(ReminderRequestAlarm)` 系统级闹钟，`wantAgent` 指向 `EntryAbility`，不依赖应用进程 |
-| 通知跳转菜谱 | 系统通知点击后 `EntryAbility.handleRecommendIntent` 写 `AppStorage('pendingDailyReminder')`，`IndexV2.onPageShow` 读取后调用 `DailyRecommendService` 选菜并打开详情 |
-| 图片清单导出 | `Canvas` 720px 宽自适应高度绘制 3 种样式，`componentSnapshot.get()` 截取 PixelMap，`image.createImagePacker()` 编码 JPEG，`photoAccessHelper.createAsset()` 写入系统相册，深色模式双套色值 |
-| 防误触机制 | `PlateCard` / 收藏夹 `GridCol` 在 `onTouch` 中记录按下坐标，`TouchMove` 超过 5vp 阈值即标记为滑动，`TouchUp` 仅未超阈值时触发详情跳转 |
-| 食物识别降级链路 | `HybridRecognizer` 编排三级降级（HiAI NPU → MindSpore CPU → 云端），每级失败或置信度不足自动降级，模型缺失跳过本地直接云端 |
-| 烹饪方式分组 | `CategoryGroupingService` 将 30+ 种 method 自动映射到 8 个用户友好分类，支持筛选和分区展示 |
-| 随机算法优化 | 加权随机 v2：先按分类均匀随机（每类等概率），类内按菜谱覆盖频次加权，解决旧算法「几乎每次都选蛋类+菌菇」 |
-| 组件主题适配 | `@StorageProp` + `ThemeManager` 动态颜色，替代硬编码色值，支持浅色/深色/跟随系统实时切换 |
-| 设置异常回滚 | `SettingsPage` 本地数据开关保存失败时自动回滚 UI 状态，避免开关显示与实际存储不一致 |
+|---|---|
+| 菜谱 ID 稳定性 | 数组下标作稳定 ID（与 Web 端 Dexie 对齐） |
+| 跨页面状态同步 | AppStorage + @StorageProp / @Watch，零轮询 |
+| 系统主题监听 | EntryAbility.onConfigurationUpdate → AppStorage('isSystemDarkMode') |
+| 收藏/历史并发安全 | CookPreferences Promise 链式单例 |
+| 同义词搜索 | 24 组双向映射表，搜索前展开查询词集 |
+| 协同过滤推荐 | tag + stuff + methods 特征集 → Jaccard 相似度 |
+| 营养评分 | Ofcom Nutri-Score 简化模型：负分（热量/饱和脂肪/糖/钠）− 正分（蛋白质/膳食纤维/蔬菜标签） |
+| Builder const 限制 | @State 预计算结果，Builder 内只做取值 |
+| 沉浸式适配 | setWindowLayoutFullScreen(true) + StatusBarInset 动态计算 + 底部安全区域占位 |
+| 通知跳转桥接 | AppStorage('pendingDailyReminder') 作为系统层→应用层桥接 |
+| 图片清单导出 | Canvas 绘制 → componentSnapshot.get() → PixelMap → JPEG → photoAccessHelper.createAsset() |
+| 防误触 | TouchDown 记坐标，TouchUp 时位移 > 5vp 则拦截点击 |
+| 食物识别降级 | HybridRecognizer 编排三级降级，每级失败/置信度不足自动降落 |
+| 烹饪方式分组 | METHOD_TO_GROUP 映射表，30+ method → 8 类用户友好分类 |
+| 随机算法 v2 | 分类均匀随机 + 类内菜谱频次加权 |
+| 主题颜色 | @StorageProp + ThemeManager 动态颜色，替换硬编码色值 |
+| 设置异常回滚 | 开关保存失败回滚 UI；清理数据失败不回滚开关 |
+| 详情弹窗卡顿优化 | 打开详情时延迟 300ms 写入历史/刷新推荐，优先保证弹窗渲染 |
 
 ---
 
@@ -133,105 +127,107 @@
 entry/src/main/
 ├── ets/
 │   ├── components/
-│   │   ├── RecipeCard.ets              # 菜谱卡片（大/小双模式；小卡片收藏按钮 in-flow，不遮挡文字）
-│   │   ├── RecipeDetailSheet.ets       # 底部详情弹窗（编号气泡步骤卡片 / 通栏餐桌按钮 / 用量换算 / 营养卡片）
-│   │   ├── CookingFocusView.ets        # 全屏专注烹饪覆盖层（Swiper + 屏幕常亮锁，支持 initialIndex）
-│   │   ├── DailyDietCircleCard.ets     # 今日饮食圆环卡片（热量 + 三大营养素进度）
-│   │   ├── HistoryHeatmap.ets          # 历史足迹热力图（Canvas 12×7，点击格子查看当日菜谱）
-│   │   ├── IngredientTag.ets           # 颜色编码食材标签
-│   │   ├── ToastView.ets               # 毛玻璃 Toast 通知
-│   │   ├── PlateCard.ets               # 3D 盘子效果卡片
-│   │   ├── FavoriteToast.ets           # 收藏成功提示
-│   │   ├── FolderPickerSheet.ets       # 收藏夹选择弹窗（深色主题适配）
-│   │   ├── ExportShoppingListDialog.ets # 采购清单图片导出弹窗（Canvas 绘制 + 相册保存）
-│   │   └── RandomPickerButton.ets      # 随机食材抽取触发器
+│   │   ├── RecipeCard.ets              # 菜谱卡片（大/小双模式）
+│   │   ├── RecipeDetailSheet.ets       # 详情弹窗
+│   │   ├── CookingFocusView.ets        # 专注烹饪全屏覆盖层
+│   │   ├── DailyDietCircleCard.ets     # 今日饮食圆环卡片
+│   │   ├── HistoryHeatmap.ets          # 历史热力图（Canvas）
+│   │   ├── IngredientTag.ets           # 食材标签
+│   │   ├── ToastView.ets               # Toast 通知
+│   │   ├── PlateCard.ets               # 菜品卡片
+│   │   ├── FavoriteToast.ets           # 收藏提示
+│   │   ├── FolderPickerSheet.ets       # 收藏夹选择弹窗
+│   │   ├── ExportShoppingListDialog.ets # 采购清单导出（Canvas + 相册）
+│   │   └── RandomPickerButton.ets      # 随机食材抽取
 │   │
 │   ├── constants/
-│   │   └── AppColors.ets               # 品牌色 + 深色适配色 + FAVORITE_ACTIVE + ThemeManager 工具类
+│   │   ├── AppColors.ets               # 品牌色 + 语义色
+│   │   └── DesignSystem.ets            # 设计系统常量
+│   │
+│   ├── config/
+│   │   └── CloudApiConfig.ets          # 云端 API 配置
 │   │
 │   ├── data/
-│   │   ├── RecipeRepository.ets        # 菜谱数据单例（rawfile JSON 索引化加载）
-│   │   ├── IngredientSynonyms.ets      # 食材同义词库（24 组，双向查找）
-│   │   ├── DietDatabaseHelper.ets      # 每日饮食记录 RDB 封装
-│   │   └── foodCatalog.ets             # 食材 / 厨具目录（含 emoji 映射）
+│   │   ├── RecipeRepository.ets        # 菜谱数据单例（rawfile JSON → 内存索引）
+│   │   ├── IngredientSynonyms.ets      # 食材同义词库（24 组双向映射）
+│   │   ├── DietDatabaseHelper.ets      # 饮食记录 RDB 封装
+│   │   ├── RecipeDBManager.ets         # 菜谱 RDB 管理
+│   │   └── foodCatalog.ets             # 食材/厨具目录（含 emoji）
 │   │
 │   ├── model/
-│   │   └── recipe.ets                  # RecipeItem / RecipeWithId / RecipeNutrition / NutriScore 等类型定义
+│   │   └── recipe.ets                  # 类型定义（RecipeItem / Nutrition / NutriScore 等）
 │   │
 │   ├── pages/
-│   │   ├── StartupPage.ets             # 启动页（品牌动画 + 隐私同意对话框）
-│   │   ├── IndexV2.ets                 # 主入口（四 Tab 导航；通知跳转；烹饪方式分组；加权随机算法v2）
-│   │   ├── CalorieScanPage.ets         # 热量识别页（识别来源标签颜色动态变化）
-│   │   ├── DietaryStructurePage.ets    # 饮食结构建议（膳食宝塔 + 营养素 + 推荐量，纯静态）
-│   │   ├── LegalDocPage.ets            # 隐私政策 & 用户协议阅读页
-│   │   ├── SettingsPage.ets            # 设置与管理（含每日推荐通知配置 + 异常回滚）
+│   │   ├── StartupPage.ets             # 启动页 + 隐私同意
+│   │   ├── IndexV2.ets                 # 主入口（四 Tab 导航）
+│   │   ├── CalorieScanPage.ets         # 热量识别页
+│   │   ├── DietaryStructurePage.ets    # 饮食结构建议
+│   │   ├── LegalDocPage.ets            # 隐私政策 & 用户协议
+│   │   ├── SettingsPage.ets            # 设置 & 推荐通知配置
 │   │   ├── FavoritesPage.ets           # 收藏列表
-│   │   ├── FolderDetailPage.ets        # 收藏夹详情页
-│   │   ├── CreateFolderPage.ets        # 新建收藏夹页
-│   │   ├── HistoryPage.ets             # 浏览历史（含热力图）
-│   │   └── Index.ets                   # 旧版入口（保留兼容）
+│   │   ├── FolderDetailPage.ets        # 收藏夹详情
+│   │   ├── CreateFolderPage.ets        # 新建收藏夹
+│   │   └── HistoryPage.ets             # 浏览历史 + 热力图
 │   │
 │   ├── service/
-│   │   ├── RecipeSearchService.ets     # 纯函数搜索（严格 / 模糊 / 生存，含同义词扩展）
-│   │   ├── RecipeRecommendationService.ets  # 个性化推荐（Jaccard CF）
-│   │   ├── NutritionCalculator.ets     # 营养评价（Nutri-Score A-E / DRI 进度 / 建议文本）
-│   │   ├── IngredientAmountService.ets # 食材用量换算（20+ 单位，支持分数）
-│   │   ├── CloudFoodAnalyzer.ets       # 云端食物识别服务封装
-│   │   ├── FoodRecognitionService.ets  # 混合识别服务入口（编排 HybridRecognizer）
-│   │   ├── HybridRecognizer.ets        # 混合识别编排器（HiAI NPU → MindSpore CPU → Cloud 智能降级）
-│   │   ├── InferenceEngine.ets         # 推理引擎抽象接口（EngineStatus / LocalInferenceResult）
-│   │   ├── HiAIFoodEngine.ets          # HiAI NPU 引擎（麒麟芯片 NPU 本地推理）
-│   │   ├── MindSporeFoodEngine.ets     # MindSpore Lite CPU 引擎（CPU 兜底推理）
-│   │   ├── CategoryGroupingService.ets # 烹饪方式分组服务（8 类 method→group 映射与过滤）
+│   │   ├── RecipeSearchService.ets     # 搜索（严格/模糊/生存 + 同义词扩展）
+│   │   ├── RecipeRecommendationService.ets  # Jaccard 协同过滤推荐
+│   │   ├── NutritionCalculator.ets     # Nutri-Score A-E 评级 + DRI 计算
+│   │   ├── IngredientAmountService.ets # 食材用量换算（20+ 单位）
+│   │   ├── FoodRecognitionService.ets  # 食物识别服务入口
+│   │   ├── HybridRecognizer.ets        # 混合识别编排（HiAI NPU → MindSpore CPU → 云端）
+│   │   ├── InferenceEngine.ets         # 推理引擎抽象接口
+│   │   ├── HiAIFoodEngine.ets          # HiAI NPU 引擎
+│   │   ├── MindSporeFoodEngine.ets     # MindSpore Lite CPU 引擎
+│   │   ├── CloudFoodAnalyzer.ets       # 百度云端识别封装
+│   │   ├── CategoryGroupingService.ets # 烹饪方式分组服务（30+ method → 8 类）
 │   │   ├── ShoppingListService.ets     # 缺料对比 + 剪贴板导出
-│   │   ├── DailyRecommendService.ets   # 每日推荐选菜算法（冰箱优先 / 精选标签 / 随机）
-│   │   └── ReminderService.ets         # reminderAgentManager 封装（调度 / 取消 + 错误码友好提示）
+│   │   ├── DailyRecommendService.ets   # 每日推荐选菜算法
+│   │   └── ReminderService.ets         # reminderAgentManager 封装
 │   │
 │   ├── store/
-│   │   └── CookPreferences.ets         # Preferences 持久化（收藏 / 历史 / 搜索历史 / 今日餐桌 / 推荐通知设置）
+│   │   └── CookPreferences.ets         # Preferences 持久化
 │   │
 │   ├── util/
-│   │   └── StatusBarInset.ets          # 系统安全区顶部高度计算
+│   │   ├── StatusBarInset.ets          # 安全区高度计算
+│   │   └── ThemeManager.ets            # 主题切换管理
 │   │
 │   ├── utils/
-│   │   ├── CalorieCalculator.ets       # 食物热量计算工具
-│   │   ├── PhotoPickerHelper.ets       # 系统图库选图封装
-│   │   └── ImagePreprocessor.ets       # 图片预处理（缩放+归一化 → CHW Float32Array，引擎共用）
+│   │   ├── CalorieCalculator.ets       # 热量计算工具
+│   │   ├── PhotoPickerHelper.ets       # 系统图库选图
+│   │   ├── ImagePreprocessor.ets       # 图片预处理（缩放+归一化 → CHW Float32Array）
+│   │   └── IngredientTypeMapper.ets    # 食材类型映射
 │   │
 │   └── entryability/
-│       └── EntryAbility.ets            # 沉浸式 UI 初始化 + 系统主题监听 + 通知跳转处理
+│       └── EntryAbility.ets            # 入口 + 沉浸式 + 主题监听 + 通知跳转
 │
 └── resources/rawfile/
-    ├── recipe.json                     # 996 道菜谱数据（去重后）
-    ├── food_model.ms                   # MindSpore Lite 食物识别模型（~5 MB）
-    └── food_labels.txt                 # 模型输出标签表（中文）
+    ├── recipe.json                     # 996 道菜谱
+    ├── food_model.ms                   # MindSpore Lite 模型
+    └── food_labels.txt                 # 中文标签表
 ```
 
 ---
 
-## 数据说明
-
-菜谱数据存储于 `entry/src/main/resources/rawfile/recipe.json`，格式与 Web 端共享：
+## 数据结构
 
 ```typescript
 interface RecipeItem {
-  name: string
-  stuff: string[]                    // 所需食材
-  stuffAmount?: Record<string, string> // 食材用量（如 "猪肉": "200克"）
-  tools: string[]                    // 所需厨具
-  steps?: string[]                   // 烹饪步骤
-  emojis?: string[]                  // 菜品 Emoji
+  name: string                         // 菜名
+  stuff: string[]                      // 所需食材
+  stuffAmount?: Record<string, string> // 食材用量
+  tools: string[]                      // 所需厨具
+  steps?: string[]                     // 烹饪步骤
+  emojis?: string[]                    // 菜品 emoji
   difficulty?: '简单' | '普通' | '困难'
-  tags?: string[]
-  methods?: string[]                 // 烹饪方式（炒/蒸/烤等）
-  imageUri?: string
-  nutrition?: RecipeNutrition        // 营养成分（热量/蛋白质/脂肪/碳水/膳食纤维/钠）
+  tags?: string[]                      // 标签
+  methods?: string[]                   // 烹饪方式
+  imageUri?: string                    // 配图
+  nutrition?: RecipeNutrition          // 营养数据
 }
 ```
 
-数组下标为稳定 ID，收藏与历史均以 `number[]` 形式存储于 Preferences。
-
-营养数据通过 `NutritionCalculator.SAMPLE_NUTRITION_DATA`（内置 20 道菜谱）在启动时注入内存，无需修改 JSON 文件。
+数组下标为稳定 ID，收藏与历史以 `number[]` 形式存储于 Preferences。
 
 ---
 
@@ -240,78 +236,15 @@ interface RecipeItem {
 ### 环境要求
 
 - DevEco Studio 5.0+
-- HarmonyOS SDK API 22（HarmonyOS 6.0.2）
+- HarmonyOS SDK API 22
 
-### 首次克隆后必须手动创建 build-profile.json5
+### 构建
 
-根目录的 `build-profile.json5` 包含签名证书路径与密钥，已加入 `.gitignore`，**不在版本库中**。每次克隆项目后需手动在项目根目录创建该文件，否则 Hvigor 会报错 `Cannot find project build file build-profile.json5`。
-
-在项目根目录（与 `hvigor/` 同级）新建 `build-profile.json5`，内容如下，**根据本机实际签名文件路径修改 `material` 字段**：
-
-```json5
-{
-  "app": {
-    "signingConfigs": [
-      {
-        "name": "default",
-        "type": "HarmonyOS",
-        "material": {
-          "storeFile": "你的/keystore.p12路径",
-          "storePassword": "加密后的密钥库密码",
-          "keyAlias": "keystore",
-          "keyPassword": "加密后的密钥密码",
-          "signAlg": "SHA256withECDSA",
-          "profile": "你的/cook_profileRelease.p7b路径",
-          "certpath": "你的/发布证书.cer路径"
-        }
-      }
-    ],
-    "products": [
-      {
-        "name": "default",
-        "signingConfig": "default",
-        "targetSdkVersion": "6.0.2(22)",
-        "compatibleSdkVersion": "6.0.2(22)",
-        "runtimeOS": "HarmonyOS",
-        "buildOption": {
-          "strictMode": {
-            "caseSensitiveCheck": true,
-            "useNormalizedOHMUrl": true
-          }
-        }
-      }
-    ],
-    "buildModeSet": [
-      { "name": "debug" },
-      { "name": "release" }
-    ]
-  },
-  "modules": [
-    {
-      "name": "entry",
-      "srcPath": "./entry",
-      "targets": [
-        {
-          "name": "default",
-          "applyToProducts": ["default"]
-        }
-      ]
-    }
-  ]
-}
-```
-
-> 签名文件（`.p12` / `.p7b` / `.cer`）可在 AppGallery Connect → 证书管理 中下载，密码加密格式由 DevEco Studio 的 **Project Structure → Signing Configs** 自动生成填入。
-
----
-
-### 构建运行
+`build-profile.json5` 包含签名配置，已加入 `.gitignore`，需手动创建。签名文件（`.p12` / `.p7b` / `.cer`）从 AppGallery Connect → 证书管理 下载。
 
 ```bash
-# 方式一：DevEco Studio 直接运行（推荐）
-# 打开项目 → 选择设备/模拟器 → Run
-
-# 方式二：命令行构建 HAP
+# DevEco Studio 直接运行
+# 或命令行构建 HAP
 node ./hvigor/hvigor-wrapper.js --mode module \
   -p module=entry@default \
   -p product=default \
@@ -320,40 +253,39 @@ node ./hvigor/hvigor-wrapper.js --mode module \
 
 ### 模拟器注意事项
 
-- 首次安装前需**卸载旧版本**，避免应用名称缓存为旧值
-- 运行后如应用名称显示异常，执行 **Run → Clean Project** 后重新安装
+- 首次安装前卸载旧版本，避免应用名称缓存
+- 名称显示异常时执行 Run → Clean Project 后重装
 
 ---
 
-## 合规说明
+## 合规
 
-| 合规项 | 状态 |
-|--------|------|
-| 首次启动隐私同意弹窗 | ✅ |
-| 隐私政策页面（独立页） | ✅ |
-| 用户协议页面（独立页） | ✅ |
-| 权限声明（相册读写 / 相机 / 屏幕常亮 / 推送提醒） | ✅ |
-| 应用图标与名称配置 | ✅ |
-| AGC 后台数据安全说明 | ⚠️ 上架前需填报 |
-
----
-
-## 贡献者与更新历史
-
-| 贡献者 | 主要贡献 |
+| 项目 | 状态 |
 |---|---|
-| Ruheluobixieqing | 初始化项目与 `.gitignore`；整理基础菜谱数据；实现 Preferences 本地存储、主界面骨架、导航栏、发现页、菜谱页、收藏与浏览历史；接入 RDB 数据库并处理应用名、包名、构建配置与滑动交互优化。 |
-| TEITAR-mxh | 重构 `IndexV2` 主界面与核心组件；切换应用入口；完善设置架构、详情弹窗、DB 接入、启动页、隐私合规、深色模式、饮食结构建议页、餐桌页与审核问题修复；实现热量识别模块（`CalorieScanPage` / `DailyDietCircleCard` / `DietDatabaseHelper` / `CloudFoodAnalyzer`）；实现搜索历史联想、食材同义词库、步骤编号气泡卡片、食材用量归一化、历史热力图、个性化推荐引擎（Jaccard CF）与营养评价系统（Nutri-Score）；实现每日菜谱推荐通知系统（`ReminderService` / `DailyRecommendService`）；优化猜你喜欢布局与 RecipeCard 小卡片文字遮挡；修复颜色模式显示 bug；实现采购清单图片导出功能（Canvas 1080×1920vp + 3 种样式 + 相册保存 + 应用名称 + 大字体适配）；修复详情弹窗滑到底后上滑误收起问题（`nestedScroll` `scrollBackward` 改为 `SELF_FIRST`）；重设计 `DailyDietCircleCard` 为紧凑横排布局（圆环 100vp + 内联记录按钮 + 宏量三行进度条含目标数值）；优化热量识别结果页（RESULT 状态取景框收起，食物图嵌入结果卡随页面滚动，识别来源标签颜色动态变化）；实现混合识别引擎（`HybridRecognizer` / `HiAIFoodEngine` / `MindSporeFoodEngine` / `InferenceEngine` / `ImagePreprocessor`，HiAI NPU → CPU → Cloud 三级智能降级）；实现烹饪方式分组筛选（`CategoryGroupingService`，8 类 method→group 映射）；优化冰箱随机算法 v2（分类均匀 + 类内频次加权）；新增冰箱食材搜索过滤；修复食材收集 bug（`find` 仅取第一个分类）；完善多组件深色主题适配（`FolderPickerSheet`）；新增设置页异常回滚（`SettingsPage` 本地数据开关）；新增通知错误码友好提示（错误码 1700002 系统上限）。 |
-| TTong | 升级 `RecipeCard`，接入 `difficulty` 与 `methods` 字段；完善首页食材全量展示、厨具筛选、标签与难度筛选；实现收藏夹完整功能。 |
-| Gaoxuan | 生成并补充最终菜谱数据；完善菜谱步骤内容，提升菜谱数据完整性。 |
-| Fanbo0419 | 更新 `bundleName`；修订隐私政策和开发者联系方式；绑定生成证书并完成 `.app` 软件包生成相关工作。 |
+| 首次启动隐私同意弹窗 | 已完成 |
+| 隐私政策页 | 已完成 |
+| 用户协议页 | 已完成 |
+| 权限声明（相册/相机/屏幕常亮/推送） | 已完成 |
+| AGC 数据安全填报 | 上架前需完成 |
 
 ---
 
-## 开源协议
+## 贡献者
 
-本项目代码以学习交流为目的开源，菜谱内容整理自公开烹饪知识。
+| 贡献者 | 职责 |
+|---|---|
+| Ruheluobixieqing | 项目初始化、recipe.json 数据结构、Preferences 存储、主界面骨架、导航框架、收藏/浏览历史 |
+| TEITAR-mxh | IndexV2 重构、详情弹窗、启动页/隐私合规、深色模式/主题系统、餐桌页、热量识别混合引擎（HiAI + MindSpore + 云端三级降级）、热力图、Jaccard 推荐算法、Nutri-Score 营养评级、每日通知系统、购物清单导出、烹饪方式分组、随机算法优化、食材搜索、设置页异常回滚、多组件深色主题适配 |
+| TTong | RecipeCard 升级（难度/烹饪方式标签）、食材展示、厨具筛选、标签筛选、收藏夹完整功能 |
+| Gaoxuan | 菜谱数据录入与补全（996 道去重菜谱）、菜谱步骤内容完善 |
+| Fanbo0419 | 包名确认、隐私/条款修订、证书生成、.app 打包上架 |
+
+---
+
+## 许可证
+
+本项目以学习交流为目的开源，菜谱内容整理自公开烹饪知识。
 
 仓库地址：[https://github.com/TEITAR-mxh/Cook-njust.git](https://github.com/TEITAR-mxh/Cook-njust.git)
 
-© 2026 AUV 项目组 · 南京理工大学
+&copy; 2026 AUV 项目组 · 南京理工大学

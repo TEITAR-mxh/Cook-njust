@@ -286,6 +286,6 @@ node ./hvigor/hvigor-wrapper.js --mode module \
 
 本项目以学习交流为目的开源，菜谱内容整理自公开烹饪知识。
 
-仓库地址：[https://github.com/TEITAR-mxh/Cook-njust.git](https://github.com/TEITAR-mxh/Cook-njust.git)
+仓库地址：[https://github.com/Ruheluobixieqing/Cook.git](https://github.com/Ruheluobixieqing/Cook.git)
 
-&copy; 2026 AUV 项目组 · 南京理工大学
+&copy; 2026 AUV您吃了么 项目组 · 南京理工大学

@@ -1,6 +1,6 @@
 import type { RecipeWithId } from '../model/recipe'
 import { RecipeDBManager } from '../data/RecipeDBManager'
-import { ShoppingListService } from '../service/ShoppingListService'
+import { ShoppingListService, type MissingItem } from '../service/ShoppingListService'
 import { CookingFocusView } from './CookingFocusView'
 import { ToastView } from './ToastView'
 import { ExportShoppingListDialog } from './ExportShoppingListDialog'
@@ -61,7 +61,8 @@ export struct RecipeDetailSheet {
   @State private toastVisible: boolean = false
   // Task3: 图片导出弹窗状态
   @State private exportDialogVisible: boolean = false
-  @State private exportMissingItems: string[] = []
+  @State private exportMissingItems: MissingItem[] = []
+  @State private exportTotalStuff: number = 0
   @State private servingCount: number = 1
   @State private nutriScore: string = ''
   @State private nutriScoreBgColor: string = '#9CA3AF'
@@ -155,14 +156,23 @@ export struct RecipeDetailSheet {
     }, 0)
   }
 
-  /** 打开图片导出弹窗（先计算缺料 diff） */
+  /** 打开图片导出弹窗（先计算缺料 diff，含人数换算后的用量） */
   private openExportDialog(): void {
-    const diffResult = ShoppingListService.diff(this.selectedStuff, this.detail.stuff)
+    // 将 stuffAmount 按当前人数换算后传入 diff
+    const scaledAmounts: Record<string, string> = {}
+    for (const ing of this.detail.stuff) {
+      const scaled = this.getScaledAmount(ing)
+      if (scaled.length > 0) {
+        scaledAmounts[ing] = scaled
+      }
+    }
+    const diffResult = ShoppingListService.diff(this.selectedStuff, this.detail.stuff, scaledAmounts)
     if (diffResult.missingItems.length === 0) {
       this.showToast('所有食材均已备好，无需导出')
       return
     }
     this.exportMissingItems = diffResult.missingItems
+    this.exportTotalStuff = diffResult.totalStuff
     this.exportDialogVisible = true
   }
 
@@ -670,6 +680,7 @@ export struct RecipeDetailSheet {
       ExportShoppingListDialog({
         missingItems: this.exportMissingItems,
         recipeName: this.detail.name,
+        totalStuff: this.exportTotalStuff,
         visible: this.exportDialogVisible,
         onClose: () => { this.exportDialogVisible = false }
       })

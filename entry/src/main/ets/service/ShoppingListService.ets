@@ -1,9 +1,22 @@
-export interface ShoppingListResult {
-  missingItems: string[]
-  matchedItems: string[]
+import { ShoppingCategory, IngredientTypeMapper } from '../utils/IngredientTypeMapper'
+
+// ── 接口定义 ──────────────────────────────────────────────────────────────────
+
+export interface MissingItem {
+  name: string
+  amount: string
+  category: ShoppingCategory
+  emoji: string
 }
 
-// Task3: 食材名称 → emoji 映射表（与 foodCatalog 数据对齐）
+export interface ShoppingListResult {
+  missingItems: MissingItem[]
+  matchedItems: string[]
+  totalStuff: number
+}
+
+// ── 食材名称 → emoji 映射表（与 foodCatalog 数据对齐）──────────────────────────
+
 const INGREDIENT_EMOJI_MAP: Record<string, string> = {
   '土豆': '🥔', '马铃薯': '🥔', '番茄': '🍅', '西红柿': '🍅', '洋葱': '🧅',
   '包菜': '🥗', '白菜': '🥬', '胡萝卜': '🥕', '白萝卜': '🥣', '黄瓜': '🥒',
@@ -53,22 +66,29 @@ export class ShoppingListService {
     return false
   }
 
-  static diff(selectedStuff: string[], recipeStuff: string[]): ShoppingListResult {
-    const missingItems: string[] = []
+  static diff(selectedStuff: string[], recipeStuff: string[], stuffAmount?: Record<string, string>): ShoppingListResult {
+    const missingItems: MissingItem[] = []
     const matchedItems: string[] = []
+    const amountMap = stuffAmount ?? {}
 
     for (let i = 0; i < recipeStuff.length; i++) {
       const item = recipeStuff[i]
       if (ShoppingListService.isMatched(item, selectedStuff)) {
         matchedItems.push(item)
       } else {
-        missingItems.push(item)
+        missingItems.push({
+          name: item,
+          amount: amountMap[item] ?? '',
+          category: IngredientTypeMapper.getShoppingCategory(item),
+          emoji: ShoppingListService.getIngredientEmoji(item)
+        })
       }
     }
 
     return {
       missingItems,
-      matchedItems
+      matchedItems,
+      totalStuff: recipeStuff.length
     }
   }
 }

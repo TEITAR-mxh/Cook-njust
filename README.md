@@ -65,7 +65,8 @@ HarmonyOS NEXT (API 22) 本地菜谱助手应用。从冰箱已有食材出发�
 
 ### 热量识别
 
-- **混合识别引擎**：HiAI NPU（麒麟芯片本地加速，置信度 ≥ 0.55） → MindSpore Lite CPU（纯 CPU 兜底，置信度 ≥ 0.20） → 百度云端 API（远程兜底），三级智能降级，模型缺失自动跳过
+- **混合识别引擎**：HiAI NPU（初始化时试运行验证，置信度 ≥ 0.55） → MindSpore Lite CPU（纯 CPU 兜底，置信度 ≥ 0.20） → 百度云端 API（远程兜底），三级智能降级，模型缺失自动跳过
+- **Nutri-Score 即时评级**：识别成功后自动计算 A–E 营养等级（Ofcom 简化模型），在结果卡中以色标徽章展示
 - MindSpore Lite：内置 MobileNet 类 CNN 模型（224×224 输入），中文标签表
 - 识别来源可视化：标签颜色动态变化（本地 NPU 绿 / 本地 CPU 琥珀 / 云端蓝 / 手动灰）
 - 饮食记录本地 RDB 持久化，按日期分组查询
@@ -106,13 +107,13 @@ Data（4 个数据层）           Model（类型定义）
 | 收藏/历史并发安全 | CookPreferences Promise 链式单例 |
 | 同义词搜索 | 24 组双向映射表，搜索前展开查询词集 |
 | 协同过滤推荐 | tag + stuff + methods 特征集 → Jaccard 相似度 |
-| 营养评分 | Ofcom Nutri-Score 简化模型：负分（热量/饱和脂肪/糖/钠）− 正分（蛋白质/膳食纤维/蔬菜标签） |
+| 营养评分 | Ofcom Nutri-Score 简化模型：负分（热量/饱和脂肪/糖/钠）− 正分（蛋白质/膳食纤维/蔬菜标签），菜谱详情 + 识别结果双场景展示 |
 | Builder const 限制 | @State 预计算结果，Builder 内只做取值 |
 | 沉浸式适配 | setWindowLayoutFullScreen(true) + StatusBarInset 动态计算 + 底部安全区域占位 |
 | 通知跳转桥接 | AppStorage('pendingDailyReminder') 作为系统层→应用层桥接 |
 | 图片清单导出 | Canvas 绘制 → componentSnapshot.get() → PixelMap → JPEG → photoAccessHelper.createAsset() |
 | 防误触 | TouchDown 记坐标，TouchUp 时位移 > 5vp 则拦截点击 |
-| 食物识别降级 | HybridRecognizer 编排三级降级，每级失败/置信度不足自动降落 |
+| 食物识别降级 | HybridRecognizer 编排三级降级，HiAI NPU 通过 `initialize()` 试运行验证，每级失败/置信度不足自动降落 |
 | 烹饪方式分组 | METHOD_TO_GROUP 映射表，30+ method → 8 类用户友好分类 |
 | 随机算法 v2 | 分类均匀随机 + 类内菜谱频次加权 |
 | 主题颜色 | @StorageProp + ThemeManager 动态颜色，替换硬编码色值 |

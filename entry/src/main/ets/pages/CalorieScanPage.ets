@@ -8,6 +8,8 @@ import { PhotoPickerHelper } from '../utils/PhotoPickerHelper'
 import { CalorieCalculator, NutrientData } from '../utils/CalorieCalculator'
 import { DietDatabaseHelper, DietRecord } from '../data/DietDatabaseHelper'
 import { ToastView } from '../components/ToastView'
+import { calcNutriScore, getNutriScoreColors } from '../service/NutritionCalculator'
+import type { RecipeNutrition } from '../model/recipe'
 
 // 取景框专用常量，不随主题变化
 const CAMERA_BG     = AppColors.DARK_BG_COLOR   // '#121212'
@@ -47,6 +49,9 @@ struct CalorieScanPage {
   // 结果展示 — 全部 @State 基本类型，proxy 安全
   @State private resultName:    string = ''
   @State private resultTag:     string = '手动'
+  @State private nutriScore:       string = ''
+  @State private nutriScoreBg:     string = '#9CA3AF'
+  @State private nutriScoreText:   string = '#FFFFFF'
   @State private dispCalories:  number = 0
   @State private dispProtein:   number = 0
   @State private dispFat:       number = 0
@@ -281,6 +286,21 @@ struct CalorieScanPage {
     this.rawCarbs    = r.nutrient.carbs
     this.rawServing  = r.nutrient.servingWeight
     this.recalc()
+
+    // 计算 Nutri-Score（识别结果缺少纤维/钠实测值，默认 0 不影响核心评级）
+    const recipeNutri: RecipeNutrition = {
+      calories: r.nutrient.calories,
+      protein: r.nutrient.protein,
+      fat: r.nutrient.fat,
+      carbs: r.nutrient.carbs,
+      fiber: 0,
+      sodium: 0,
+    }
+    const score = calcNutriScore(recipeNutri, [])
+    const colors = getNutriScoreColors(score)
+    this.nutriScore = score
+    this.nutriScoreBg = colors.bg
+    this.nutriScoreText = colors.text
   }
 
   private recalc(): void {
@@ -595,6 +615,14 @@ struct CalorieScanPage {
             ? this.sourceColor(this.recognitionResult?.source ?? 'none') + '20'
             : this.sourceColor(this.recognitionResult?.source ?? 'none') + '18')
           .borderRadius(12)
+
+        if (this.nutriScore.length > 0) {
+          Text(`Nutri-Score ${this.nutriScore}`)
+            .fontSize(11).fontColor(this.nutriScoreText).fontWeight(FontWeight.Bold)
+            .padding({ left: 9, right: 9, top: 4, bottom: 4 })
+            .backgroundColor(this.nutriScoreBg)
+            .borderRadius(12)
+        }
       }.padding({ left: 20, right: 20, top: 20, bottom: 6 })
 
       // 热量大字

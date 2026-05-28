@@ -8,6 +8,10 @@
  *   - 设备搭载麒麟 SoC (Kirin 9000+)
  *   - MindSpore Lite NPU 后端可用
  *
+ * 引擎验证策略：
+ *   initialize() 加载模型后会执行一次试运行预测，通过实际 infer 路径验证 NPU
+ *   后端可用性。若试运行失败，引擎标记为 UNAVAILABLE，HybridRecognizer 自动降级。
+ *
  * 模型放置路径：entry/src/main/resources/rawfile/food_model.ms
  * 标签文件路径：entry/src/main/resources/rawfile/food_labels.txt
  */
@@ -48,10 +52,8 @@ export class HiAIFoodEngine implements InferenceEngine {
 
   private _status: EngineStatus = EngineStatus.UNINITIALIZED
   private labels: string[] = []
-  /** MindSpore Lite Model 实例 (加载到 NPU) */
+  /** MindSpore Lite Model 实例（运行时自动选择 NPU/CPU 后端） */
   private msModel: Object | null = null
-  /** NPU 后端是否经探测可用 */
-  private npuProbed: boolean = false
 
   get status(): EngineStatus {
     return this._status
@@ -68,14 +70,7 @@ export class HiAIFoodEngine implements InferenceEngine {
     this._status = EngineStatus.INITIALIZING
 
     try {
-      // 1. 探测 NPU 可用性：使用 MindSpore Lite 的 deviceInfo 或直接尝试加载
-      if (!this.probeNPUAvailable()) {
-        console.info('[HiAIFoodEngine] NPU backend not available on this device')
-        this._status = EngineStatus.UNAVAILABLE
-        return false
-      }
-
-      // 2. 检查模型文件
+      // 1. 检查模型文件
       const ctx = getContext()
       const resMgr: resourceManager.ResourceManager = ctx.resourceManager
 
@@ -88,13 +83,20 @@ export class HiAIFoodEngine implements InferenceEngine {
         return false
       }
 
-      // 3. 加载模型（模型格式与 MindSpore CPU 引擎共享同一 .ms 文件）
+      // 2. 加载模型（MindSpore Lite 运行时自动为 .ms 选择 NPU/CPU 后端）
       this.msModel = await mindSporeLite.loadModelFromFd(rawFd.fd)
 
       // 关闭 rawfile fd（模型已加载到内存）
       try { await fileIo.close(rawFd.fd) } catch (_e) { /* ignore */ }
 
       console.info('[HiAIFoodEngine] Model loaded for NPU inference')
+
+      // 3. 引擎试运行：用空输入执行 predict 验证 NPU 后端及模型完整性
+      if (!(await this.verifyEngine())) {
+        console.info('[HiAIFoodEngine] Engine verification failed — NPU unavailable or model incompatible')
+        this._status = EngineStatus.UNAVAILABLE
+        return false
+      }
 
       // 4. 加载标签文件
       try {
@@ -185,23 +187,45 @@ export class HiAIFoodEngine implements InferenceEngine {
   release(): void {
     this.msModel = null
     this.labels = []
-    this.npuProbed = false
     this._status = EngineStatus.UNINITIALIZED
   }
 
-  /** 探测 NPU 后端是否可用 */
-  private probeNPUAvailable(): boolean {
-    if (this.npuProbed) {
-      return true
+  /**
+   * 引擎试运行验证：用全零输入执行一次 predict。
+   * MindSpore Lite 的 .ms 模型在编译时已指定后端设备（NPU/CPU），
+   * 运行时若 NPU 不可用 predict 会抛出异常，由此方法捕获。
+   * 这是 HarmonyOS 上验证 NPU 可用性的最佳实践——通过实际推理路径测试，
+   * 而非依赖不存在的静态查询 API。
+   */
+  private async verifyEngine(): Promise<boolean> {
+    if (this.msModel === null) {
+      return false
     }
-
     try {
-      // 探测 NPU 可用性：直接标记为已探测，实际可用性在首次 predict 时验证
-      // 若 NPU 不可用，predict 会抛出异常 → infer 返回 null → 自动降级到 CPU
-      this.npuProbed = true
-      return true
+      const model = this.msModel as Record<string, Function>
+      const inputs: Object[] = model['getInputs']() as Object[]
+      const outputs: Object[] = model['getOutputs']() as Object[]
+      if (inputs.length === 0 || outputs.length === 0) {
+        console.error('[HiAIFoodEngine] Verification failed: no tensors')
+        return false
+      }
+
+      // 空输入张量（全零 Float32Array，3×224×224）
+      const dummyInput: Float32Array = new Float32Array(3 * MODEL_INPUT_W * MODEL_INPUT_H)
+      const inputBuffer: ArrayBuffer = dummyInput.buffer.slice(
+        dummyInput.byteOffset, dummyInput.byteOffset + dummyInput.byteLength
+      )
+      const inputTensorObj = inputs[0] as Record<string, Function>
+      inputTensorObj['setData'](inputBuffer)
+
+      await model['predict'](inputs, outputs)
+
+      const outputTensorObj = outputs[0] as Record<string, Function>
+      const outputBuffer: ArrayBuffer = outputTensorObj['getData']() as ArrayBuffer
+      console.info(`[HiAIFoodEngine] Engine verified — output size=${outputBuffer.byteLength} bytes`)
+      return outputBuffer.byteLength > 0
     } catch (e) {
-      console.info('[HiAIFoodEngine] NPU probe failed:', JSON.stringify(e))
+      console.info('[HiAIFoodEngine] Engine verification failed:', JSON.stringify(e))
       return false
     }
   }

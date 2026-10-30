@@ -5,7 +5,7 @@ import type { Difficulty, RecipeItem, RecipeWithId } from '../model/recipe';
 
 const DB_NAME = 'cook_recipes.db';
 const RAW_NAME = 'recipe.json';
-const CURRENT_SCHEMA_VERSION = '1';
+const CURRENT_SCHEMA_VERSION = '3';
 const META_SCHEMA = 'schema_version';
 const META_BUNDLE_HASH = 'recipe_bundle_hash';
 
@@ -21,7 +21,9 @@ const SQL_CREATE_RECIPE =
   'methods_json TEXT NOT NULL, ' +
   'tags_json TEXT NOT NULL, ' +
   'emojis_json TEXT NOT NULL, ' +
-  'difficulty TEXT NOT NULL' +
+  'difficulty TEXT NOT NULL, ' +
+  'image_uri TEXT NOT NULL, ' +
+  'cuisine TEXT NOT NULL' +
   ')';
 
 function toUint8Array(raw: Uint8Array | ArrayBuffer): Uint8Array {
@@ -83,6 +85,8 @@ interface RawRecipeRow {
   tags?: string[]
   methods?: string[]
   steps?: string[]
+  imageUri?: string
+  cuisine?: string
 }
 
 
@@ -269,6 +273,8 @@ export class RecipeDBManager {
     tagsJson: string,
     emojisJson: string,
     difficulty: string,
+    imageUri: string,
+    cuisine: string,
   ): RecipeWithId {
     const stuff = parseStringArrayJson(stuffJson);
     const tools = parseStringArrayJson(toolsJson);
@@ -295,6 +301,14 @@ export class RecipeDBManager {
     }
     if (methods.length > 0) {
       r.methods = methods;
+    }
+    const imageKey = imageUri.trim();
+    if (imageKey.length > 0) {
+      r.imageUri = imageKey;
+    }
+    const cuisineKey = cuisine.trim();
+    if (cuisineKey.length > 0) {
+      r.cuisine = cuisineKey;
     }
     return r;
   }
@@ -327,6 +341,8 @@ export class RecipeDBManager {
         }
         const stepsArr = sanitizeStringArray(item.steps);
         const diffStr = row.difficulty !== undefined ? String(row.difficulty) : '';
+        const imageUriStr = item.imageUri !== undefined ? item.imageUri.trim() : '';
+        const cuisineStr = item.cuisine !== undefined ? item.cuisine.trim() : '';
         const bucket: relationalStore.ValuesBucket = {
           id: i,
           name: row.name,
@@ -337,6 +353,8 @@ export class RecipeDBManager {
           tags_json: JSON.stringify(row.tags ?? []),
           emojis_json: JSON.stringify(row.emojis ?? []),
           difficulty: diffStr,
+          image_uri: imageUriStr,
+          cuisine: cuisineStr,
         };
         await store.insert('recipe', bucket);
       }
@@ -381,7 +399,7 @@ export class RecipeDBManager {
       return null;
     }
     const rs = await this.store.querySql(
-      'SELECT id, name, steps, stuff_json, tools_json, methods_json, tags_json, emojis_json, difficulty ' +
+      'SELECT id, name, steps, stuff_json, tools_json, methods_json, tags_json, emojis_json, difficulty, image_uri, cuisine ' +
         'FROM recipe WHERE id = ?',
       [id],
     );
@@ -395,7 +413,9 @@ export class RecipeDBManager {
       const tagsJson = rs.getString(rs.getColumnIndex('tags_json'));
       const emojisJson = rs.getString(rs.getColumnIndex('emojis_json'));
       const difficulty = rs.getString(rs.getColumnIndex('difficulty'));
-      result = this.rowToRecipeWithId(id, name, steps, stuffJson, toolsJson, methodsJson, tagsJson, emojisJson, difficulty);
+      const imageUri = rs.getString(rs.getColumnIndex('image_uri'));
+      const cuisine = rs.getString(rs.getColumnIndex('cuisine'));
+      result = this.rowToRecipeWithId(id, name, steps, stuffJson, toolsJson, methodsJson, tagsJson, emojisJson, difficulty, imageUri, cuisine);
     }
     rs.close();
     return result;
@@ -409,7 +429,7 @@ export class RecipeDBManager {
       return [];
     }
     const rs = await this.store.querySql(
-      'SELECT id, name, steps, stuff_json, tools_json, methods_json, tags_json, emojis_json, difficulty ' +
+      'SELECT id, name, steps, stuff_json, tools_json, methods_json, tags_json, emojis_json, difficulty, image_uri, cuisine ' +
         'FROM recipe ORDER BY id ASC',
     );
     const out: RecipeWithId[] = [];
@@ -423,7 +443,9 @@ export class RecipeDBManager {
       const tagsJson = rs.getString(rs.getColumnIndex('tags_json'));
       const emojisJson = rs.getString(rs.getColumnIndex('emojis_json'));
       const difficulty = rs.getString(rs.getColumnIndex('difficulty'));
-      out.push(this.rowToRecipeWithId(id, name, steps, stuffJson, toolsJson, methodsJson, tagsJson, emojisJson, difficulty));
+      const imageUri = rs.getString(rs.getColumnIndex('image_uri'));
+      const cuisine = rs.getString(rs.getColumnIndex('cuisine'));
+      out.push(this.rowToRecipeWithId(id, name, steps, stuffJson, toolsJson, methodsJson, tagsJson, emojisJson, difficulty, imageUri, cuisine));
     }
     rs.close();
     return out;

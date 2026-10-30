@@ -3,6 +3,8 @@
  * 实现简化版 Nutri-Score（参考 Ofcom 模型）与 DRI 进度计算。
  */
 import type { RecipeNutrition, NutriScore } from '../model/recipe'
+import type { DietProfile } from '../model/dietProfile'
+import { CalorieTargetService } from './CalorieTargetService'
 
 /**
  * 中国居民膳食营养素参考摄入量（18~49 岁轻体力成年男性，每日）
@@ -24,6 +26,23 @@ export const ADULT_MALE_DRI: DailyDRI = {
   carbs: 300,
   fiber: 25,
   sodium: 2000,
+}
+
+/**
+ * 按用户健康目标档案推导每日 DRI。
+ * 热量/蛋白质/脂肪/碳水复用 CalorieTargetService（Mifflin-St Jeor + 活动系数 + 目标增减），
+ * 纤维与钠沿用《中国居民膳食营养素参考摄入量（2023 版）》的成人推荐值。
+ */
+export function getDriForProfile(profile: DietProfile): DailyDRI {
+  const t = CalorieTargetService.calcTargets(profile)
+  return {
+    calories: t.calories,
+    protein: t.protein,
+    fat: t.fat,
+    carbs: t.carbs,
+    fiber: profile.gender === 'male' ? 30 : 25,
+    sodium: 2000,
+  }
 }
 
 /** 营养总和：将多份菜谱的营养数据汇总 */
@@ -90,9 +109,32 @@ export function generateNutritionTip(progress: NutritionProgress): string {
 
 // ─── Nutri-Score 简化版 ───────────────────────────────────────────────────
 
+/** 缺少 totalWeight 时的兜底单份重量（克） */
+const DEFAULT_DISH_WEIGHT_G: number = 400
+
 /**
- * 负面营养点（能量/脂肪/糖/钠），每项 0~10 分。
- * 此处基于整份菜谱热量估算（非严格 per 100g），适用于横向比较。
+ * 将整份菜营养归一化到每 100g。
+ * Ofcom 的评分阈值本就是 per 100g 口径，直接用整份数据评分会让所有菜挤在高分段，
+ * 失去区分度（此前实测全库几乎都是 C/D）。
+ */
+function toPer100g(n: RecipeNutrition): RecipeNutrition {
+  const w: number = (n.totalWeight !== undefined && n.totalWeight > 0)
+    ? n.totalWeight
+    : DEFAULT_DISH_WEIGHT_G
+  const f: number = 100 / w
+  return {
+    calories: n.calories * f,
+    protein: n.protein * f,
+    fat: n.fat * f,
+    carbs: n.carbs * f,
+    fiber: n.fiber * f,
+    sodium: n.sodium * f,
+    totalWeight: 100,
+  }
+}
+
+/**
+ * 负面营养点（能量/脂肪/糖/钠），每项 0~10 分，按每 100g 口径计算。
  */
 function calcNegativePoints(n: RecipeNutrition, hasVegetableTag: boolean): number {
   // 能量：以 kcal 计，每 225kcal 1 分，最高 10
@@ -139,8 +181,9 @@ export function calcNutriScore(n: RecipeNutrition, tags: string[]): NutriScore {
     if (hasVegTag) break
   }
 
-  const neg = calcNegativePoints(n, hasVegTag)
-  const pos = calcPositivePoints(n, hasVegTag)
+  const per100 = toPer100g(n)
+  const neg = calcNegativePoints(per100, hasVegTag)
+  const pos = calcPositivePoints(per100, hasVegTag)
   const score = neg - pos
 
   if (score <= -1) return 'A'
@@ -166,31 +209,3 @@ export function getNutriScoreColors(score: NutriScore): NutriScoreColors {
     default: return { bg: '#9CA3AF', text: '#FFFFFF' }
   }
 }
-
-/**
- * 内置的示例营养数据（约 20 道常见菜）。
- * 键为菜谱名称，值为 RecipeNutrition。
- * RecipeRepository 加载后由外部按名称注入。
- */
-export const SAMPLE_NUTRITION_DATA: Map<string, RecipeNutrition> = new Map<string, RecipeNutrition>([
-  ['番茄炒蛋', { calories: 280, protein: 14, fat: 18, carbs: 12, fiber: 2, sodium: 680 }],
-  ['红烧肉', { calories: 560, protein: 22, fat: 42, carbs: 18, fiber: 0.5, sodium: 1200 }],
-  ['清炒土豆丝', { calories: 210, protein: 4, fat: 8, carbs: 32, fiber: 3, sodium: 520 }],
-  ['麻婆豆腐', { calories: 320, protein: 18, fat: 20, carbs: 14, fiber: 2, sodium: 1100 }],
-  ['宫保鸡丁', { calories: 400, protein: 28, fat: 22, carbs: 20, fiber: 2, sodium: 900 }],
-  ['蒜蓉炒青菜', { calories: 120, protein: 4, fat: 7, carbs: 12, fiber: 4, sodium: 480 }],
-  ['糖醋排骨', { calories: 480, protein: 20, fat: 28, carbs: 36, fiber: 0, sodium: 800 }],
-  ['鸡蛋炒饭', { calories: 420, protein: 16, fat: 14, carbs: 58, fiber: 1, sodium: 750 }],
-  ['酸辣汤', { calories: 180, protein: 12, fat: 8, carbs: 16, fiber: 2, sodium: 1000 }],
-  ['水煮鱼', { calories: 380, protein: 32, fat: 22, carbs: 8, fiber: 1, sodium: 1300 }],
-  ['白灼虾', { calories: 220, protein: 30, fat: 4, carbs: 2, fiber: 0, sodium: 600 }],
-  ['蒸蛋', { calories: 160, protein: 12, fat: 10, carbs: 4, fiber: 0, sodium: 400 }],
-  ['鱼香肉丝', { calories: 350, protein: 22, fat: 18, carbs: 22, fiber: 2, sodium: 1050 }],
-  ['土豆烧牛肉', { calories: 440, protein: 26, fat: 20, carbs: 38, fiber: 3, sodium: 850 }],
-  ['凉拌黄瓜', { calories: 80, protein: 2, fat: 4, carbs: 10, fiber: 2, sodium: 450 }],
-  ['蒜苗炒腊肉', { calories: 460, protein: 18, fat: 36, carbs: 10, fiber: 2, sodium: 1400 }],
-  ['红烧茄子', { calories: 260, protein: 4, fat: 14, carbs: 28, fiber: 4, sodium: 700 }],
-  ['葱油拌面', { calories: 380, protein: 10, fat: 12, carbs: 58, fiber: 2, sodium: 850 }],
-  ['韭菜炒鸡蛋', { calories: 240, protein: 14, fat: 16, carbs: 8, fiber: 2, sodium: 560 }],
-  ['清蒸鱼', { calories: 200, protein: 28, fat: 6, carbs: 4, fiber: 0, sodium: 700 }],
-])

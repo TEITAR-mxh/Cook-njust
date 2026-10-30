@@ -1,5 +1,8 @@
 import type { RecipeWithId, SearchMode } from '../model/recipe';
 import { getIngredientAliases } from '../data/IngredientSynonyms';
+import { isCatalogIngredientAvailable, sameCatalogIngredient } from '../data/foodCatalog';
+import { IngredientTypeMapper } from '../utils/IngredientTypeMapper';
+import { hasIngredient, normalizeIngredientName } from './IngredientMatchService';
 
 /**
  * 菜谱匹配逻辑，与 Web `cook/app/composables/store/recipe.ts` 中 `searchRecipes` 对齐。
@@ -8,52 +11,24 @@ import { getIngredientAliases } from '../data/IngredientSynonyms';
  */
 export class RecipeSearchService {
   /**
-   * 将一组食材名各自展开同义词，返回扁平化的等价名集合。
-   */
-  private static expandWithSynonyms(stuff: string[]): string[] {
-    const expanded: string[] = [];
-    for (let i = 0; i < stuff.length; i++) {
-      const aliases = getIngredientAliases(stuff[i]);
-      for (let j = 0; j < aliases.length; j++) {
-        let found = false;
-        for (let k = 0; k < expanded.length; k++) {
-          if (expanded[k] === aliases[j]) { found = true; break; }
-        }
-        if (!found) { expanded.push(aliases[j]); }
-      }
-    }
-    return expanded;
-  }
-
-  /**
    * 检查菜谱的 stuff 数组中是否包含目标食材（考虑同义词扩展）。
    * @param recipeStuff 菜谱食材列表
    * @param target 单个目标食材（用户所选）
    */
   private static recipeHasStuff(recipeStuff: string[], target: string): boolean {
-    const aliases = getIngredientAliases(target);
+    if (hasIngredient(target, recipeStuff)) {
+      return true;
+    }
+    const aliases = getIngredientAliases(normalizeIngredientName(target));
     for (let i = 0; i < recipeStuff.length; i++) {
       for (let j = 0; j < aliases.length; j++) {
-        if (recipeStuff[i] === aliases[j]) {
+        if (normalizeIngredientName(recipeStuff[i]) === aliases[j]) {
           return true;
         }
       }
-    }
-    return false;
-  }
-
-  /**
-   * 检查用户选择的食材集中是否包含某个菜谱食材（生存模式用）。
-   * @param selectedExpanded 用户所选食材（已展开同义词）
-   * @param ingredient 菜谱中某个食材名
-   */
-  private static selectedCoversIngredient(selectedExpanded: string[], ingredient: string): boolean {
-    const aliases = getIngredientAliases(ingredient);
-    for (let i = 0; i < aliases.length; i++) {
-      for (let j = 0; j < selectedExpanded.length; j++) {
-        if (selectedExpanded[j] === aliases[i]) {
-          return true;
-        }
+      // 菜谱原始名常带品种/数量（猪五花肉、土鸡半只），按冰箱选料目录归一后比较
+      if (sameCatalogIngredient(recipeStuff[i], target)) {
+        return true;
       }
     }
     return false;
@@ -73,53 +48,36 @@ export class RecipeSearchService {
     mode: SearchMode,
     keyword: string = '',
   ): RecipeWithId[] {
-    let result: RecipeWithId[] = [];
-    const hasTool: boolean = curTool.length > 0;
-    const stuffCount: number = selectedStuff.length;
-
-    if (mode === 'strict') {
-      result = all.filter((item: RecipeWithId): boolean => {
-        const stuffFlag: boolean = selectedStuff.every(
-          (stuff: string): boolean => RecipeSearchService.recipeHasStuff(item.stuff, stuff)
-        );
-        const toolFlag: boolean = item.tools.includes(curTool);
-        return hasTool ? (stuffFlag && toolFlag) : stuffFlag;
-      });
-    } else if (mode === 'loose') {
-      result = all.filter((item: RecipeWithId): boolean => {
-        const stuffFlag: boolean = selectedStuff.every(
-          (stuff: string): boolean => RecipeSearchService.recipeHasStuff(item.stuff, stuff)
-        );
-        const toolFlag: boolean = Boolean(item.tools?.includes(curTool));
-
-        if (hasTool && stuffCount > 0) {
-          return stuffFlag && toolFlag;
-        }
-        if (stuffCount > 0) {
-          return stuffFlag;
-        }
-        if (hasTool) {
-          return toolFlag;
-        }
+    const selected = selectedStuff.map(normalizeIngredientName).filter((name: string): boolean => name.length > 0);
+    const tool = curTool.trim();
+    const query = keyword.trim();
+    return all.filter((item: RecipeWithId): boolean => {
+      if (tool.length > 0 && !item.tools.includes(tool)) {
         return false;
-      });
-    } else {
-      // survival：菜谱所有食材均在用户所选食材（含同义词）中
-      const selectedExpanded = RecipeSearchService.expandWithSynonyms(selectedStuff);
-      result = all.filter((item: RecipeWithId): boolean => {
-        const stuffFlag: boolean = item.stuff.every(
+      }
+      if (query.length > 0 && !item.name.includes(query)) {
+        return false;
+      }
+      if (mode === 'survival') {
+        // 空库存/缺少食材资料均不能声称“现在能做”。
+        // 葱姜蒜、生抽、香料等厨房常备项不在冰箱选料里，需视为可用，
+        // 否则任何带调料的菜都会被判定为做不了（冰箱目录只收主料）。
+        return selected.length > 0 && item.stuff.length > 0 && item.stuff.every(
           (ingredient: string): boolean =>
-            RecipeSearchService.selectedCoversIngredient(selectedExpanded, ingredient)
-        );
-        const toolFlag: boolean = item.tools?.includes(curTool) ?? false;
-        return Boolean(hasTool ? (stuffFlag && toolFlag) : stuffFlag);
-      });
-    }
-
-    if (keyword.length > 0) {
-      result = result.filter((item: RecipeWithId): boolean => item.name.includes(keyword));
-    }
-    return result;
+            IngredientTypeMapper.isPantryItem(ingredient) ||
+            hasIngredient(ingredient, selectedStuff) ||
+            isCatalogIngredientAvailable(ingredient, selectedStuff));
+      }
+      if (selected.length === 0) {
+        return true;
+      }
+      if (mode === 'strict') {
+        // 都用上：菜谱必须同时包含所有已选食材
+        return selected.every((ingredient: string): boolean =>
+          RecipeSearchService.recipeHasStuff(item.stuff, ingredient));
+      }
+      return selected.some((ingredient: string): boolean => RecipeSearchService.recipeHasStuff(item.stuff, ingredient));
+    });
   }
 
   /**

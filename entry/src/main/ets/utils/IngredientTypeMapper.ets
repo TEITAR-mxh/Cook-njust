@@ -2,7 +2,9 @@
  * 食材类型映射工具 - 将食材名称映射到对应的视觉类型和购物分类
  * 用于 IngredientTag 组件的颜色主题 和 购物清单的分类分组
  */
-import { TagType } from '../components/IngredientTag'
+import { TagType } from '../model/ingredient'
+import type { StuffItem } from '../model/recipe'
+import { meatItems, vegetableItems, stapleItems } from '../data/foodCatalog'
 
 // ── 购物清单分类枚举 ──────────────────────────────────────────────────────
 
@@ -68,6 +70,51 @@ const CATEGORY_MAP: Record<string, ShoppingCategory> = {
   '酵母': ShoppingCategory.SEASONING
 }
 
+// ── 全库成员集合：静态映射表未覆盖时，用食材库兜底分类 ──────────────────
+
+const CATALOG_MEAT: Set<string> = new Set(meatItems.map((it: StuffItem) => it.name))
+const CATALOG_VEG: Set<string> = new Set(vegetableItems.map((it: StuffItem) => it.name))
+const CATALOG_STAPLE: Set<string> = new Set(stapleItems.map((it: StuffItem) => it.name))
+
+// ── 关键词兜底规则（顺序即优先级）────────────────────────────────────────
+
+const CATEGORY_KEYWORDS: Record<ShoppingCategory, string[]> = {
+  [ShoppingCategory.MEAT]: [
+    '肉', '排骨', '骨', '鸡', '鸭', '鹅', '鱼', '虾', '蟹', '贝', '蛤', '蚝',
+    '螺', '蛏', '鱿', '墨鱼', '章鱼', '肠', '火腿', '培根', '肚', '蹄', '翅',
+    '肝', '腰', '舌', '筋', '血'
+  ],
+  [ShoppingCategory.VEG]: [
+    '菜', '瓜', '菇', '菌', '笋', '茄', '萝卜', '薯', '芋', '藕', '豆', '苗',
+    '苔', '蒿', '椒', '兰', '玉米', '番茄', '西红柿', '柠檬', '果'
+  ],
+  [ShoppingCategory.STAPLE]: ['面', '粉', '米', '饭', '吐司', '面包', '饺', '馄饨', '年糕'],
+  [ShoppingCategory.SEASONING]: [
+    '盐', '糖', '油', '酱', '醋', '酒', '椒粉', '香料', '八角', '桂皮', '孜然',
+    '味精', '鸡精', '蜂蜜', '葱', '姜', '蒜', '十三香', '五香', '咖喱'
+  ],
+  [ShoppingCategory.OTHER]: []
+}
+
+function containsAny(name: string, keys: string[]): boolean {
+  for (let i = 0; i < keys.length; i++) {
+    if (name.includes(keys[i])) return true
+  }
+  return false
+}
+
+/**
+ * 「厨房常备」辅料关键词：调料、香料、干制增香物与水/高汤。
+ * 评估「现在能做」时视为现成可用，不要求出现在冰箱选料里。
+ * 面粉、面包糠等会决定菜能否成立的原料不在此列。
+ */
+const PANTRY_KEYWORDS: string[] = [
+  '淀粉', '酵母', '泡打粉', '小苏打',
+  '胡椒', '花椒', '孜然', '香叶', '八角', '桂皮', '五香', '十三香', '咖喱',
+  '豆豉', '腐乳', '泡椒', '剁椒',
+  '枸杞', '芝麻', '党参', '当归', '黄芪', '高汤', '温水'
+]
+
 export class IngredientTypeMapper {
   /**
    * 肉类食材名称集合
@@ -113,9 +160,33 @@ export class IngredientTypeMapper {
 
   // ── 购物清单分类方法 ─────────────────────────────────────────────────
 
-  /** 获取食材的购物分类 */
+  /**
+   * 是否为「厨房常备」的调料/辅料。
+   * 用于「只看能做」筛选：菜谱里的葱姜蒜、生抽、香料等默认家里有，
+   * 不因冰箱选料里无法勾选这些项，就把整道菜判为「做不了」。
+   */
+  static isPantryItem(name: string): boolean {
+    if (IngredientTypeMapper.getShoppingCategory(name) === ShoppingCategory.SEASONING) {
+      return true
+    }
+    return containsAny(name, PANTRY_KEYWORDS)
+  }
+
+  /** 获取食材的购物分类：静态表 → 食材库 → 关键词兜底，尽量避免「肉菜混在其它」 */
   static getShoppingCategory(name: string): ShoppingCategory {
-    return CATEGORY_MAP[name] ?? ShoppingCategory.OTHER
+    const mapped = CATEGORY_MAP[name]
+    if (mapped !== undefined) return mapped
+    if (CATALOG_MEAT.has(name)) return ShoppingCategory.MEAT
+    if (CATALOG_STAPLE.has(name)) return ShoppingCategory.STAPLE
+    if (CATALOG_VEG.has(name)) return ShoppingCategory.VEG
+    // 调料关键词优先于肉类判断，避免「花椒」被当成肉、「葱姜蒜」落入其它
+    if (containsAny(name, CATEGORY_KEYWORDS[ShoppingCategory.SEASONING])) {
+      return ShoppingCategory.SEASONING
+    }
+    if (containsAny(name, CATEGORY_KEYWORDS[ShoppingCategory.MEAT])) return ShoppingCategory.MEAT
+    if (containsAny(name, CATEGORY_KEYWORDS[ShoppingCategory.VEG])) return ShoppingCategory.VEG
+    if (containsAny(name, CATEGORY_KEYWORDS[ShoppingCategory.STAPLE])) return ShoppingCategory.STAPLE
+    return ShoppingCategory.OTHER
   }
 
   /** 获取分类的中文标签 */

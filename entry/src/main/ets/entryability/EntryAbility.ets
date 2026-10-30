@@ -57,7 +57,28 @@ export default class EntryAbility extends UIAbility {
     const fromReminder: Object = params['openFromDailyReminder'];
     if (fromReminder !== undefined && fromReminder !== null) {
       AppStorage.setOrCreate<boolean>('pendingDailyReminder', true);
+      // 通知在调度时点名的菜谱 ID（string 形式传入），供首页精确打开
+      const recipeId: number = EntryAbility.parseRecipeId(params['dailyReminderRecipeId']);
+      if (recipeId > 0) {
+        AppStorage.setOrCreate<number>('pendingDailyReminderRecipeId', recipeId);
+      }
     }
+  }
+
+  /** 解析 want 中携带的菜谱 ID，兼容 string / number 两种类型 */
+  private static parseRecipeId(raw: Object | undefined): number {
+    if (raw === undefined || raw === null) {
+      return 0;
+    }
+    if (typeof raw === 'number') {
+      const n: number = raw as number;
+      return Number.isNaN(n) ? 0 : Math.floor(n);
+    }
+    if (typeof raw === 'string') {
+      const n: number = Number.parseInt(raw as string, 10);
+      return Number.isNaN(n) ? 0 : n;
+    }
+    return 0;
   }
 
   /**

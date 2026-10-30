@@ -4,26 +4,20 @@
  * 通过复合阴影实现高级的3D凹陷效果
  */
 import { AppColors } from '../constants/AppColors'
-
-// Task4: 滑动距离阈值，超过此值视为滑动而非点击
-const PLATE_TAP_SLOP_VP: number = 5
+import { RecipeImage, RecipeImageVariant } from './RecipeImage'
 
 @Component
 export struct PlateCard {
   @Prop dishName: string = ''
-  @Prop emoji: string = '🍽️'
+  @Prop imageKey: string = ''
+  @Prop emoji: string = ''
   @Prop isFavorite: boolean = true
+  @Prop isDark: boolean = false
   onPlateClick?: () => void
   onFavoriteClick?: () => void
 
   @State scaleValue: number = 1.0
   @State translateY: number = 0
-
-  // Task4: 触摸位置记录，用于判断滑动 vs 点击
-  private pointerDownX: number = 0
-  private pointerDownY: number = 0
-  private pointerDownValid: boolean = false
-  private slopExceeded: boolean = false
 
   build() {
     Column({ space: 10 }) {
@@ -39,14 +33,21 @@ export struct PlateCard {
           .borderColor('rgba(240, 235, 230, 0.6)')
           .shadow({ radius: 12, color: 'rgba(0,0,0,0.05)', offsetX: 0, offsetY: 4 })
 
-        // 菜品 emoji
-        Text(this.emoji)
-          .fontSize(48)
+        // 菜品缩略图（无图/坏图回退中性空盘占位）
+        RecipeImage({
+          imageKey: this.imageKey,
+          emoji: this.emoji,
+          variant: RecipeImageVariant.THUMB,
+          placeholderBg: '#FFFFFF',
+          cornerRadius: 1000
+        })
+        .width('72%')
+        .height('72%')
 
         // 收藏星标（右上角）
         Text(this.isFavorite ? '★' : '☆')
           .fontSize(14)
-          .fontColor(this.isFavorite ? '#F59E0B' : AppColors.GRAY_300)
+          .fontColor(this.isFavorite ? AppColors.FAVORITE_ACTIVE : AppColors.GRAY_300)
           .backgroundColor('rgba(255,255,255,0.9)')
           .borderRadius(100)
           .padding(4)
@@ -68,7 +69,7 @@ export struct PlateCard {
       // 菜名标签
       Text(this.dishName)
         .fontSize(12)
-        .fontColor('#5C5042')
+        .fontColor(this.isDark ? AppColors.DARK_GRAY_900 : '#5C5042')
         .fontWeight(FontWeight.Medium)
         .textAlign(TextAlign.Center)
         .maxLines(2)
@@ -77,46 +78,19 @@ export struct PlateCard {
     }
     .width(130)
     .alignItems(HorizontalAlign.Center)
+    // 用内置 onClick 参与横向滚动容器的点击/滑动仲裁，避免滑餐桌时误开详情
+    .onClick(() => {
+      if (this.onPlateClick) {
+        this.onPlateClick()
+      }
+    })
     .onTouch((event) => {
       if (event.type === TouchType.Down) {
-        // Task4: 记录按下位置
-        this.pointerDownValid = event.touches.length > 0
-        if (this.pointerDownValid) {
-          this.pointerDownX = event.touches[0].x
-          this.pointerDownY = event.touches[0].y
-        }
-        this.slopExceeded = false
         this.scaleValue = 0.93
         this.translateY = 3
-      } else if (event.type === TouchType.Move) {
-        // Task4: 检测滑动距离，超过阈值标记为滑动
-        if (this.pointerDownValid && event.touches.length > 0) {
-          const dx = event.touches[0].x - this.pointerDownX
-          const dy = event.touches[0].y - this.pointerDownY
-          if (dx * dx + dy * dy > PLATE_TAP_SLOP_VP * PLATE_TAP_SLOP_VP) {
-            this.slopExceeded = true
-          }
-        }
       } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
         this.scaleValue = 1.0
         this.translateY = 0
-        // Task4: 仅当未超过滑动阈值且松开时触发点击
-        if (event.type === TouchType.Up && this.onPlateClick && this.pointerDownValid) {
-          let treatAsTap = !this.slopExceeded
-          if (treatAsTap && event.changedTouches.length > 0) {
-            const t = event.changedTouches[0]
-            const dx = t.x - this.pointerDownX
-            const dy = t.y - this.pointerDownY
-            if (dx * dx + dy * dy > PLATE_TAP_SLOP_VP * PLATE_TAP_SLOP_VP) {
-              treatAsTap = false
-            }
-          }
-          if (treatAsTap) {
-            this.onPlateClick()
-          }
-        }
-        this.pointerDownValid = false
-        this.slopExceeded = false
       }
     })
   }

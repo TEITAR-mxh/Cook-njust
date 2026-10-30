@@ -8,7 +8,7 @@ export class AppColors {
   static readonly BRAND_COLOR_LIGHT: string = '#FFE4E6'
   static readonly BRAND_GRADIENT_START: string = '#FF6B6B'
   static readonly BRAND_GRADIENT_END: string = '#FF4757'
-  static readonly FAVORITE_ACTIVE: string = '#FF6B6B'
+  static readonly FAVORITE_ACTIVE: string = '#F59E0B'
 
   // 背景色
   static readonly BG_COLOR: string = '#F4F5F7'
@@ -55,14 +55,14 @@ export class AppColors {
   static readonly DARK_CARD_BG: string = '#1E1E1E'
   static readonly DARK_TABLE_BG: string = '#1A1A1A'
 
-  // 深色灰度色系
+  // 深色灰度色系（文字色 400/500/600 已提亮，保证暗色卡片上的对比度）
   static readonly DARK_GRAY_50: string = '#252525'
   static readonly DARK_GRAY_100: string = '#2D2D2D'
   static readonly DARK_GRAY_200: string = '#3D3D3D'
   static readonly DARK_GRAY_300: string = '#4D4D4D'
-  static readonly DARK_GRAY_400: string = '#6D6D6D'
-  static readonly DARK_GRAY_500: string = '#8D8D8D'
-  static readonly DARK_GRAY_600: string = '#ADADAD'
+  static readonly DARK_GRAY_400: string = '#8C8C8C'
+  static readonly DARK_GRAY_500: string = '#A6A6A6'
+  static readonly DARK_GRAY_600: string = '#BDBDBD'
   static readonly DARK_GRAY_800: string = '#CDCDCD'
   static readonly DARK_GRAY_900: string = '#EDEDED'
 

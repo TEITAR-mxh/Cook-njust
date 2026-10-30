@@ -38,6 +38,10 @@ export interface CloudAnalysisResult {
   fat: number
   carbs: number
   servingWeight: number
+  /** 百度返回的置信度（0~1） */
+  confidence: number
+  /** 营养数据为占位估算（本地库未命中）时为 true */
+  estimated: boolean
 }
 
 // ── 常量 ─────────────────────────────────────────────────────────────────────
@@ -52,6 +56,13 @@ const DISH_API_BASE = 'https://aip.baidubce.com/rest/2.0/image-classify/v2/dish'
 const DEFAULT_SERVING = 200
 
 const TIMEOUT_MS = 20000
+
+/**
+ * 云端菜品识别的置信度下限。
+ * 非菜品图片（桌面、人像、风景等）常被硬套一个菜名但置信度很低，
+ * 低于该阈值一律视为「没认出来」，避免把非菜品记录成饮食。
+ */
+const CLOUD_MIN_CONFIDENCE = 0.35
 
 // ── 状态缓存（静态，app 生命周期内有效） ──────────────────────────────────────
 
@@ -88,15 +99,35 @@ export class CloudFoodAnalyzer {
     }
 
     // 3. 调用菜品识别接口
-    let foodName: string
+    let top: DishItem
     try {
-      foodName = await CloudFoodAnalyzer.callDishApi(token, base64)
+      const r = await CloudFoodAnalyzer.callDishApi(token, base64)
+      if (r === null) return null
+      top = r
     } catch (e) {
       console.error('[CloudFoodAnalyzer] 菜品识别请求失败:', JSON.stringify(e))
       return null
     }
 
+    const foodName = top.name.trim()
     if (foodName.length === 0) return null
+
+    // 置信度过低 → 大概率不是菜品，按未识别处理
+    const probNum = top.probability.length > 0 ? Number(top.probability) : 1
+    const confidence = Number.isNaN(probNum) ? 1 : probNum
+    if (confidence < CLOUD_MIN_CONFIDENCE) {
+      console.info(`[CloudFoodAnalyzer] "${foodName}" 置信度 ${confidence.toFixed(3)} 低于 ${CLOUD_MIN_CONFIDENCE}，视为非菜品`)
+      return null
+    }
+
+    // 百度返回的每 100g 热量（has_calorie=true 且可解析时优先采用）
+    let baiduCalories: number | null = null
+    if (top.has_calorie && top.calorie) {
+      const c = Number(top.calorie)
+      if (!Number.isNaN(c) && c > 0) {
+        baiduCalories = c
+      }
+    }
 
     // 4. 本地营养库查询
     const nutrient =
@@ -106,15 +137,31 @@ export class CloudFoodAnalyzer {
     if (nutrient !== null && nutrient !== undefined) {
       return {
         foodName,
-        calories:      nutrient.calories,
+        calories:      baiduCalories ?? nutrient.calories,
         protein:       nutrient.protein,
         fat:           nutrient.fat,
         carbs:         nutrient.carbs,
         servingWeight: nutrient.servingWeight,
+        confidence,
+        estimated:     false,
       }
     }
 
-    // 5. 本地未命中：用食物名 + 默认营养占位，让用户调整份量
+    // 5. 本地未命中：有百度热量则用百度热量（蛋白/脂肪/碳水用占位），否则默认占位
+    if (baiduCalories !== null) {
+      console.info(`[CloudFoodAnalyzer] "${foodName}" 不在本地库，采用百度热量 ${baiduCalories} kcal/100g`)
+      return {
+        foodName,
+        calories:      baiduCalories,
+        protein:       6,
+        fat:           5,
+        carbs:         20,
+        servingWeight: DEFAULT_SERVING,
+        confidence,
+        estimated:     true,
+      }
+    }
+
     console.warn(`[CloudFoodAnalyzer] "${foodName}" 不在本地库，使用默认营养数据`)
     return {
       foodName,
@@ -123,6 +170,8 @@ export class CloudFoodAnalyzer {
       fat:           5,
       carbs:         20,
       servingWeight: DEFAULT_SERVING,
+      confidence,
+      estimated:     true,
     }
   }
 
@@ -156,7 +205,7 @@ export class CloudFoodAnalyzer {
 
   // ── 菜品识别接口 ──────────────────────────────────────────────────────────
 
-  private static async callDishApi(token: string, base64: string): Promise<string> {
+  private static async callDishApi(token: string, base64: string): Promise<DishItem | null> {
     const url = `${DISH_API_BASE}?access_token=${token}`
 
     // 百度菜品接口要求 application/x-www-form-urlencoded
@@ -185,17 +234,17 @@ export class CloudFoodAnalyzer {
 
       if (parsed.error_code !== undefined && parsed.error_code !== 0) {
         console.warn(`[CloudFoodAnalyzer] 百度 API 错误 ${parsed.error_code}: ${parsed.error_msg ?? ''}`)
-        return ''
+        return null
       }
 
       if (parsed.result_num <= 0 || parsed.result.length === 0) {
-        return ''
+        return null
       }
 
-      // 取置信度最高的第一条
+      // 取置信度最高的第一条（完整对象，含 calorie / has_calorie）
       const top = parsed.result[0]
-      console.info(`[CloudFoodAnalyzer] 识别结果: ${top.name} (${top.probability})`)
-      return top.name.trim()
+      console.info(`[CloudFoodAnalyzer] 识别结果: ${top.name} (${top.probability}), has_calorie=${top.has_calorie}, calorie=${top.calorie}`)
+      return top
     } finally {
       req.destroy()
     }

@@ -7,6 +7,9 @@ export interface TagTone {
   bg: string
   border: string
   text: string
+  bgDark: string
+  borderDark: string
+  textDark: string
 }
 
 export class DSColor {
@@ -80,11 +83,11 @@ export class DSSheet {
 }
 
 const TAG_TONES: TagTone[] = [
-  { bg: '#EDF5FF', border: '#D4E4FF', text: '#2F5FB6' },
-  { bg: '#EFFFF5', border: '#D6F5E3', text: '#207A49' },
-  { bg: '#FFF3EC', border: '#FFDCCF', text: '#B5542C' },
-  { bg: '#F5F0FF', border: '#E4D9FF', text: '#6A44B8' },
-  { bg: '#FFF9E8', border: '#F9E7B7', text: '#8E6A0D' }
+  { bg: '#EDF5FF', border: '#D4E4FF', text: '#2F5FB6', bgDark: '#1E3A5F', borderDark: '#2F5FB6', textDark: '#93C5FD' },
+  { bg: '#EFFFF5', border: '#D6F5E3', text: '#207A49', bgDark: '#1A3A2A', borderDark: '#2F7A4A', textDark: '#86EFAC' },
+  { bg: '#FFF3EC', border: '#FFDCCF', text: '#B5542C', bgDark: '#3A2A1A', borderDark: '#B5542C', textDark: '#FDBA74' },
+  { bg: '#F5F0FF', border: '#E4D9FF', text: '#6A44B8', bgDark: '#2A1A3A', borderDark: '#6A44B8', textDark: '#C4B5FD' },
+  { bg: '#FFF9E8', border: '#F9E7B7', text: '#8E6A0D', bgDark: '#3A331A', borderDark: '#8E6A0D', textDark: '#FDE68A' }
 ]
 
 export function pickTagTone(index: number): TagTone {

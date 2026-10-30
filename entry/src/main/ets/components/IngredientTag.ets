@@ -5,13 +5,8 @@
  */
 import { AppColors } from '../constants/AppColors'
 
-export enum TagType {
-  MEAT = 'meat',
-  VEG = 'veg',
-  CARB = 'carb',
-  TOOL = 'tool',
-  DEFAULT = 'default'
-}
+import { TagType } from '../model/ingredient'
+export { TagType } from '../model/ingredient'
 
 @Component
 export struct IngredientTag {
@@ -20,47 +15,48 @@ export struct IngredientTag {
   @Prop isActive: boolean = false
   @Prop isHighlighted: boolean = false
   @Prop emoji: string = ''
+  @Prop isDark: boolean = false
   onTagClick?: () => void
 
   @State scaleValue: number = 1.0
 
   private getBackgroundColor(): string {
     if (this.isHighlighted) {
-      return AppColors.GRAY_300
+      return this.isDark ? AppColors.DARK_GRAY_300 : AppColors.GRAY_300
     }
 
     if (!this.isActive) {
-      return AppColors.CARD_BG
+      return this.isDark ? AppColors.DARK_CARD_BG : AppColors.CARD_BG
     }
     switch (this.tagType) {
       case TagType.MEAT:
-        return AppColors.MEAT_BG
+        return this.isDark ? AppColors.DARK_MEAT_BG : AppColors.MEAT_BG
       case TagType.VEG:
-        return AppColors.VEG_BG
+        return this.isDark ? AppColors.DARK_VEG_BG : AppColors.VEG_BG
       case TagType.CARB:
-        return AppColors.CARB_BG
+        return this.isDark ? AppColors.DARK_CARB_BG : AppColors.CARB_BG
       case TagType.TOOL:
-        return AppColors.TOOL_BG
+        return this.isDark ? AppColors.DARK_TOOL_BG : AppColors.TOOL_BG
       default:
-        return AppColors.CARD_BG
+        return this.isDark ? AppColors.DARK_CARD_BG : AppColors.CARD_BG
     }
   }
 
   private getBorderColor(): string {
     if (!this.isActive) {
-      return AppColors.GRAY_200
+      return this.isDark ? AppColors.DARK_GRAY_200 : AppColors.GRAY_200
     }
     switch (this.tagType) {
       case TagType.MEAT:
-        return AppColors.MEAT_BORDER
+        return this.isDark ? AppColors.DARK_MEAT_BORDER : AppColors.MEAT_BORDER
       case TagType.VEG:
-        return AppColors.VEG_BORDER
+        return this.isDark ? AppColors.DARK_VEG_BORDER : AppColors.VEG_BORDER
       case TagType.CARB:
-        return AppColors.CARB_BORDER
+        return this.isDark ? AppColors.DARK_CARB_BORDER : AppColors.CARB_BORDER
       case TagType.TOOL:
-        return AppColors.TOOL_BORDER
+        return this.isDark ? AppColors.DARK_TOOL_BORDER : AppColors.TOOL_BORDER
       default:
-        return AppColors.GRAY_200
+        return this.isDark ? AppColors.DARK_GRAY_200 : AppColors.GRAY_200
     }
   }
 
@@ -70,19 +66,19 @@ export struct IngredientTag {
     }
 
     if (!this.isActive) {
-      return AppColors.GRAY_600
+      return this.isDark ? AppColors.DARK_GRAY_600 : AppColors.GRAY_600
     }
     switch (this.tagType) {
       case TagType.MEAT:
-        return AppColors.MEAT_TEXT
+        return this.isDark ? AppColors.DARK_MEAT_TEXT : AppColors.MEAT_TEXT
       case TagType.VEG:
-        return AppColors.VEG_TEXT
+        return this.isDark ? AppColors.DARK_VEG_TEXT : AppColors.VEG_TEXT
       case TagType.CARB:
-        return AppColors.CARB_TEXT
+        return this.isDark ? AppColors.DARK_CARB_TEXT : AppColors.CARB_TEXT
       case TagType.TOOL:
-        return AppColors.TOOL_TEXT
+        return this.isDark ? AppColors.DARK_TOOL_TEXT : AppColors.TOOL_TEXT
       default:
-        return AppColors.GRAY_600
+        return this.isDark ? AppColors.DARK_GRAY_600 : AppColors.GRAY_600
     }
   }
 

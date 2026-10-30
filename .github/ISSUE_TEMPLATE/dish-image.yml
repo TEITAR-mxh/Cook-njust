@@ -1,0 +1,48 @@
+name: 菜品配图补充
+description: 为还没有成品图的菜谱提交一张实拍或已授权图片
+title: "[配图] "
+labels: ["配图"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢补充！请只在图片为**本人拍摄**或**已获得授权**时提交，并注明来源。
+        图片会由维护者核对后再合入，不符合要求的图片会被退回。
+  - type: input
+    id: recipe-name
+    attributes:
+      label: 菜品名称
+      description: 与 App 内显示的名称保持一致
+      placeholder: 例如：清炒茭白
+    validations:
+      required: true
+  - type: input
+    id: recipe-id
+    attributes:
+      label: 菜品 ID
+      description: 在菜谱详情页的「帮助补充成品图」中可一键复制
+      placeholder: 例如：30
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: 图片来源与授权
+      description: 本人拍摄，或原图链接 + 授权说明
+      placeholder: 本人拍摄于 2026-10 / 或来源链接与授权说明
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: 备注（可选）
+      description: 拍摄设备、成品特点、裁切建议等
+  - type: markdown
+    attributes:
+      value: |
+        ### 图片要求
+
+        - 一张**成品照**，不要原料图、过程图或拼图
+        - 横向 4:3 或 1:1，长边不少于 800px
+        - 无水印、无文字贴纸、无夸张滤镜
+        - 请直接把图片拖拽到本 Issue 的编辑框中上传

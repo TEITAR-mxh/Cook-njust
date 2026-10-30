@@ -19,6 +19,10 @@ export interface FoodRecognitionResult {
   source: 'local_npu' | 'local_cpu' | 'cloud' | 'manual' | 'none'
   /** 原始识别标签（调试用，云端时为空） */
   rawLabels: string[]
+  /** 模型置信度（0~1，手动输入时无） */
+  confidence?: number
+  /** 营养数据为估算占位（本地/云端未命中营养库）时为 true */
+  isEstimated: boolean
 }
 
 /** 默认兜底营养数据（未识别时展示） */
@@ -42,10 +46,9 @@ export class FoodRecognitionService {
         FoodRecognitionService.hybrid = new HybridRecognizer()
       }
       const result = await FoodRecognitionService.hybrid.recognize(imageUri)
-      // 如果混合链路返回了有效结果（identified=true 或至少尝试了），直接返回
-      if (result.identified || result.source !== 'none') {
-        return result
-      }
+      // HybridRecognizer 内部已走完「NPU → CPU → 云端」完整链路并返回最终结果，
+      // 无论成败都直接返回，避免在云端已失败时重复调用一次云端。
+      return result
     } catch (e) {
       console.error('[FoodRecognition] 混合识别链路异常:', JSON.stringify(e))
     }
@@ -67,6 +70,8 @@ export class FoodRecognitionService {
           nutrient,
           source:     'cloud',
           rawLabels:  [],
+          confidence: cloudResult.confidence,
+          isEstimated: cloudResult.estimated,
         }
       }
     } catch (e) {
@@ -79,6 +84,7 @@ export class FoodRecognitionService {
       nutrient:   DEFAULT_NUTRIENT,
       source:     'none',
       rawLabels:  [],
+      isEstimated: true,
     }
   }
 }

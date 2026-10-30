@@ -9,6 +9,9 @@
     "pages/DietaryStructurePage",
     "pages/CreateFolderPage",
     "pages/FolderDetailPage",
-    "pages/CalorieScanPage"
+    "pages/CalorieScanPage",
+    "pages/MealPlanPage",
+    "pages/HealthGoalPage",
+    "pages/CuisinePage"
   ]
 }

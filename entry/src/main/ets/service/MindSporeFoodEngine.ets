@@ -122,19 +122,13 @@ export class MindSporeFoodEngine implements InferenceEngine {
         imageUri, MODEL_INPUT_W, MODEL_INPUT_H
       )
 
-      // 2. 获取模型输入/输出张量（MindSpore Lite 需预分配 outputs）
+      // 2. 获取模型输入张量（Model API 没有 getOutputs，输出由 predict 返回）
       const model = this.msModel as Record<string, Function>
       const inputs: Object[] = model['getInputs']() as Object[]
       if (inputs.length === 0) {
         console.error('[MindSporeFoodEngine] No input tensors found')
         return null
       }
-      const outputs: Object[] = model['getOutputs']() as Object[]
-      if (outputs.length === 0) {
-        console.error('[MindSporeFoodEngine] No output tensors found')
-        return null
-      }
-      console.info(`[MindSporeFoodEngine] Model has ${inputs.length} input(s), ${outputs.length} output(s)`)
 
       // 3. 填充输入数据 (Float32Array → 独立 ArrayBuffer，避免 byteOffset 问题)
       const inputBuffer: ArrayBuffer = inputTensor.buffer.slice(
@@ -143,8 +137,12 @@ export class MindSporeFoodEngine implements InferenceEngine {
       const inputTensorObj = inputs[0] as Record<string, Function>
       inputTensorObj['setData'](inputBuffer)
 
-      // 4. 执行推理（predict 将结果写入预分配的 outputs 张量，返回 void）
-      await model['predict'](inputs, outputs)
+      // 4. 执行推理：predict 返回输出张量数组
+      const outputs: Object[] = await model['predict'](inputs) as Object[]
+      if (outputs.length === 0) {
+        console.error('[MindSporeFoodEngine] predict returned no output tensors')
+        return null
+      }
       console.info('[MindSporeFoodEngine] predict() completed')
 
       // 5. 读取输出数据

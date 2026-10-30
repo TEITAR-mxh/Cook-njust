@@ -166,6 +166,27 @@ export class DietDatabaseHelper {
     return this.queryByDate(context, DietDatabaseHelper.todayDateStr())
   }
 
+  /**
+   * 查询所有记录引用过的图片 URI（去重）。
+   * 用于识别没有记录引用的识图照片，避免清理缓存时误删仍在使用的图片。
+   */
+  async queryAllImageUris(context: common.Context): Promise<string[]> {
+    const s = await this.getStore(context)
+    const rs = await s.querySql(
+      `SELECT DISTINCT image_uri FROM ${TABLE}
+       WHERE image_uri IS NOT NULL AND image_uri != ''`,
+    )
+    const uris: string[] = []
+    try {
+      while (rs.goToNextRow()) {
+        uris.push(rs.getString(rs.getColumnIndex('image_uri')))
+      }
+    } finally {
+      rs.close()
+    }
+    return uris
+  }
+
   /** 查询今日摄入汇总（热量+三大营养素合计） */
   async queryTodayTotal(context: common.Context): Promise<DailyTotal> {
     const s = await this.getStore(context)

@@ -1,0 +1,3892 @@
+{
+"西兰花": {
+"calories": 33,
+"protein": 4.2,
+"fat": 0.6,
+"carbs": 6.6,
+"fiber": 2.6,
+"sodium": 46.0,
+"servingWeight": 200,
+"source": "成分表"
+},
+"蒜": {
+"calories": 128,
+"protein": 4.5,
+"fat": 0.2,
+"carbs": 27.6,
+"fiber": 1.1,
+"sodium": 19.6,
+"servingWeight": 5,
+"source": "成分表"
+},
+"盐": {
+"calories": 0,
+"protein": 0,
+"fat": 0,
+"carbs": 0,
+"fiber": 0,
+"sodium": 39311,
+"servingWeight": 3,
+"source": "成分表"
+},
+"油麦菜": {
+"calories": 15,
+"protein": 1.4,
+"fat": 0.4,
+"carbs": 2.1,
+"fiber": 0.6,
+"sodium": 32.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"蚝油": {
+"calories": 114,
+"protein": 3.5,
+"fat": 0.5,
+"carbs": 23.0,
+"fiber": 0,
+"sodium": 3500,
+"servingWeight": 10,
+"source": "成分表"
+},
+"上海青": {
+"calories": 18,
+"protein": 1.5,
+"fat": 0.2,
+"carbs": 2.7,
+"fiber": 1.2,
+"sodium": 50.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"土豆": {
+"calories": 77,
+"protein": 2.0,
+"fat": 0.2,
+"carbs": 17.2,
+"fiber": 0.7,
+"sodium": 5.9,
+"servingWeight": 200,
+"source": "成分表"
+},
+"干辣椒": {
+"calories": 320,
+"protein": 12.0,
+"fat": 12.0,
+"carbs": 50.0,
+"fiber": 25.0,
+"sodium": 10.0,
+"servingWeight": 5,
+"source": "成分表"
+},
+"白醋": {
+"calories": 6,
+"protein": 0.1,
+"fat": 0,
+"carbs": 0.9,
+"fiber": 0,
+"sodium": 20.0,
+"servingWeight": 10,
+"source": "估算"
+},
+"青椒": {
+"calories": 23,
+"protein": 1.0,
+"fat": 0.2,
+"carbs": 5.5,
+"fiber": 1.4,
+"sodium": 3.0,
+"servingWeight": 150,
+"source": "成分表"
+},
+"四季豆": {
+"calories": 28,
+"protein": 2.0,
+"fat": 0.4,
+"carbs": 5.7,
+"fiber": 1.5,
+"sodium": 8.6,
+"servingWeight": 150,
+"source": "成分表"
+},
+"猪肉末": {
+"calories": 210,
+"protein": 19.0,
+"fat": 14.6,
+"carbs": 0.6,
+"fiber": 0,
+"sodium": 55.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"花椒": {
+"calories": 258,
+"protein": 6.7,
+"fat": 8.9,
+"carbs": 66.5,
+"fiber": 28.7,
+"sodium": 47.0,
+"servingWeight": 3,
+"source": "成分表"
+},
+"芽菜": {
+"calories": 25,
+"protein": 2.0,
+"fat": 0.3,
+"carbs": 5.0,
+"fiber": 1.5,
+"sodium": 800.0,
+"servingWeight": 80,
+"source": "估算"
+},
+"空心菜": {
+"calories": 20,
+"protein": 2.2,
+"fat": 0.3,
+"carbs": 3.6,
+"fiber": 1.4,
+"sodium": 94.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"腐乳": {
+"calories": 130,
+"protein": 10.0,
+"fat": 8.0,
+"carbs": 4.0,
+"fiber": 0.5,
+"sodium": 3000,
+"servingWeight": 15,
+"source": "估算"
+},
+"生菜": {
+"calories": 15,
+"protein": 1.3,
+"fat": 0.3,
+"carbs": 2.0,
+"fiber": 0.7,
+"sodium": 32.8,
+"servingWeight": 150,
+"source": "成分表"
+},
+"生抽": {
+"calories": 63,
+"protein": 5.6,
+"fat": 0.1,
+"carbs": 10.0,
+"fiber": 0,
+"sodium": 5757,
+"servingWeight": 12,
+"source": "成分表"
+},
+"娃娃菜": {
+"calories": 17,
+"protein": 1.5,
+"fat": 0.1,
+"carbs": 3.2,
+"fiber": 1.0,
+"sodium": 40.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"茄子": {
+"calories": 21,
+"protein": 1.1,
+"fat": 0.2,
+"carbs": 4.9,
+"fiber": 1.3,
+"sodium": 5.4,
+"servingWeight": 200,
+"source": "成分表"
+},
+"西红柿": {
+"calories": 19,
+"protein": 0.9,
+"fat": 0.2,
+"carbs": 4.0,
+"fiber": 0.5,
+"sodium": 5.0,
+"servingWeight": 200,
+"source": "成分表"
+},
+"淀粉": {
+"calories": 346,
+"protein": 0.5,
+"fat": 0.1,
+"carbs": 85.0,
+"fiber": 0,
+"sodium": 2.0,
+"servingWeight": 20,
+"source": "估算"
+},
+"猪肉": {
+"calories": 143,
+"protein": 20.3,
+"fat": 6.2,
+"carbs": 1.5,
+"fiber": 0,
+"sodium": 57.5,
+"servingWeight": 200,
+"source": "成分表"
+},
+"豆瓣酱": {
+"calories": 178,
+"protein": 13.6,
+"fat": 6.8,
+"carbs": 16.5,
+"fiber": 1.5,
+"sodium": 5000,
+"servingWeight": 15,
+"source": "估算"
+},
+"姜": {
+"calories": 46,
+"protein": 1.3,
+"fat": 0.6,
+"carbs": 10.3,
+"fiber": 2.7,
+"sodium": 14.9,
+"servingWeight": 5,
+"source": "成分表"
+},
+"泡椒": {
+"calories": 20,
+"protein": 1.0,
+"fat": 0.3,
+"carbs": 4.0,
+"fiber": 1.5,
+"sodium": 1200,
+"servingWeight": 15,
+"source": "估算"
+},
+"葱花": {
+"calories": 30,
+"protein": 1.6,
+"fat": 0.3,
+"carbs": 6.5,
+"fiber": 1.1,
+"sodium": 4.0,
+"servingWeight": 5,
+"source": "估算"
+},
+"冬瓜": {
+"calories": 10,
+"protein": 0.4,
+"fat": 0.2,
+"carbs": 2.6,
+"fiber": 0.7,
+"sodium": 1.8,
+"servingWeight": 300,
+"source": "成分表"
+},
+"木耳": {
+"calories": 21,
+"protein": 1.5,
+"fat": 0.2,
+"carbs": 5.3,
+"fiber": 2.6,
+"sodium": 8.5,
+"servingWeight": 100,
+"source": "成分表"
+},
+"黄瓜": {
+"calories": 15,
+"protein": 0.8,
+"fat": 0.2,
+"carbs": 2.9,
+"fiber": 0.5,
+"sodium": 4.9,
+"servingWeight": 200,
+"source": "成分表"
+},
+"醋": {
+"calories": 31,
+"protein": 2.1,
+"fat": 0.3,
+"carbs": 4.9,
+"fiber": 0,
+"sodium": 262.1,
+"servingWeight": 10,
+"source": "成分表"
+},
+"香油": {
+"calories": 899,
+"protein": 0,
+"fat": 99.9,
+"carbs": 0,
+"fiber": 0,
+"sodium": 0,
+"servingWeight": 5,
+"source": "估算"
+},
+"花生米": {
+"calories": 567,
+"protein": 25.8,
+"fat": 49.2,
+"carbs": 16.1,
+"fiber": 8.5,
+"sodium": 3.6,
+"servingWeight": 50,
+"source": "成分表"
+},
+"丝瓜": {
+"calories": 20,
+"protein": 1.0,
+"fat": 0.2,
+"carbs": 4.2,
+"fiber": 0.6,
+"sodium": 2.6,
+"servingWeight": 200,
+"source": "成分表"
+},
+"鸡蛋": {
+"calories": 144,
+"protein": 13.3,
+"fat": 8.8,
+"carbs": 2.8,
+"fiber": 0,
+"sodium": 131.5,
+"servingWeight": 100,
+"source": "成分表"
+},
+"西葫芦": {
+"calories": 18,
+"protein": 0.8,
+"fat": 0.2,
+"carbs": 3.8,
+"fiber": 0.6,
+"sodium": 5.0,
+"servingWeight": 200,
+"source": "成分表"
+},
+"番茄": {
+"calories": 19,
+"protein": 0.9,
+"fat": 0.2,
+"carbs": 4.0,
+"fiber": 0.5,
+"sodium": 5.0,
+"servingWeight": 200,
+"source": "成分表"
+},
+"苦瓜": {
+"calories": 19,
+"protein": 1.0,
+"fat": 0.1,
+"carbs": 4.9,
+"fiber": 1.4,
+"sodium": 2.5,
+"servingWeight": 200,
+"source": "成分表"
+},
+"糖": {
+"calories": 400,
+"protein": 0,
+"fat": 0,
+"carbs": 100.0,
+"fiber": 0,
+"sodium": 1.0,
+"servingWeight": 8,
+"source": "成分表"
+},
+"南瓜": {
+"calories": 22,
+"protein": 0.7,
+"fat": 0.1,
+"carbs": 5.3,
+"fiber": 0.8,
+"sodium": 0.8,
+"servingWeight": 200,
+"source": "成分表"
+},
+"莲藕": {
+"calories": 70,
+"protein": 1.9,
+"fat": 0.2,
+"carbs": 16.4,
+"fiber": 1.2,
+"sodium": 44.2,
+"servingWeight": 200,
+"source": "成分表"
+},
+"荷兰豆": {
+"calories": 30,
+"protein": 2.5,
+"fat": 0.3,
+"carbs": 4.9,
+"fiber": 1.4,
+"sodium": 8.8,
+"servingWeight": 150,
+"source": "估算"
+},
+"胡萝卜": {
+"calories": 37,
+"protein": 1.0,
+"fat": 0.2,
+"carbs": 8.8,
+"fiber": 1.1,
+"sodium": 71.4,
+"servingWeight": 100,
+"source": "成分表"
+},
+"莴笋": {
+"calories": 15,
+"protein": 1.0,
+"fat": 0.1,
+"carbs": 2.8,
+"fiber": 0.6,
+"sodium": 36.5,
+"servingWeight": 150,
+"source": "成分表"
+},
+"茭白": {
+"calories": 23,
+"protein": 1.2,
+"fat": 0.2,
+"carbs": 4.9,
+"fiber": 1.9,
+"sodium": 5.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"毛豆": {
+"calories": 123,
+"protein": 13.1,
+"fat": 5.0,
+"carbs": 10.5,
+"fiber": 4.0,
+"sodium": 3.9,
+"servingWeight": 150,
+"source": "成分表"
+},
+"香干": {
+"calories": 140,
+"protein": 16.2,
+"fat": 7.8,
+"carbs": 3.5,
+"fiber": 0.8,
+"sodium": 400.0,
+"servingWeight": 100,
+"source": "估算"
+},
+"八角": {
+"calories": 280,
+"protein": 4.0,
+"fat": 8.0,
+"carbs": 60.0,
+"fiber": 30.0,
+"sodium": 20.0,
+"servingWeight": 2,
+"source": "估算"
+},
+"桂皮": {
+"calories": 260,
+"protein": 4.0,
+"fat": 2.0,
+"carbs": 55.0,
+"fiber": 35.0,
+"sodium": 20.0,
+"servingWeight": 3,
+"source": "估算"
+},
+"扁豆": {
+"calories": 28,
+"protein": 2.0,
+"fat": 0.4,
+"carbs": 5.7,
+"fiber": 1.5,
+"sodium": 3.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"豆苗": {
+"calories": 30,
+"protein": 3.0,
+"fat": 0.5,
+"carbs": 4.0,
+"fiber": 1.5,
+"sodium": 5.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"皮蛋": {
+"calories": 171,
+"protein": 14.2,
+"fat": 10.7,
+"carbs": 4.5,
+"fiber": 0,
+"sodium": 542.0,
+"servingWeight": 100,
+"source": "成分表"
+},
+"咸鸭蛋": {
+"calories": 190,
+"protein": 12.7,
+"fat": 12.7,
+"carbs": 6.3,
+"fiber": 0,
+"sodium": 2706.0,
+"servingWeight": 100,
+"source": "成分表"
+},
+"高汤": {
+"calories": 10,
+"protein": 1.0,
+"fat": 0.2,
+"carbs": 1.0,
+"fiber": 0,
+"sodium": 400.0,
+"servingWeight": 100,
+"source": "估算"
+},
+"菠菜": {
+"calories": 28,
+"protein": 2.6,
+"fat": 0.3,
+"carbs": 4.5,
+"fiber": 1.7,
+"sodium": 85.2,
+"servingWeight": 200,
+"source": "成分表"
+},
+"粉丝": {
+"calories": 335,
+"protein": 0.8,
+"fat": 0.2,
+"carbs": 83.7,
+"fiber": 0.5,
+"sodium": 9.3,
+"servingWeight": 50,
+"source": "成分表"
+},
+"韭菜": {
+"calories": 26,
+"protein": 2.4,
+"fat": 0.4,
+"carbs": 4.6,
+"fiber": 1.4,
+"sodium": 8.1,
+"servingWeight": 150,
+"source": "成分表"
+},
+"红椒": {
+"calories": 32,
+"protein": 1.3,
+"fat": 0.4,
+"carbs": 6.4,
+"fiber": 1.6,
+"sodium": 3.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"姜丝": {
+"calories": 46,
+"protein": 1.3,
+"fat": 0.6,
+"carbs": 10.3,
+"fiber": 2.7,
+"sodium": 14.9,
+"servingWeight": 5,
+"source": "估算"
+},
+"绿豆芽": {
+"calories": 18,
+"protein": 2.1,
+"fat": 0.1,
+"carbs": 3.8,
+"fiber": 1.0,
+"sodium": 5.0,
+"servingWeight": 150,
+"source": "成分表"
+},
+"黄豆芽": {
+"calories": 44,
+"protein": 4.5,
+"fat": 1.6,
+"carbs": 4.5,
+"fiber": 1.5,
+"sodium": 7.2,
+"servingWeight": 150,
+"source": "估算"
+},
+"芹菜": {
+"calories": 14,
+"protein": 0.6,
+"fat": 0.1,
+"carbs": 3.3,
+"fiber": 1.6,
+"sodium": 159.0,
+"servingWeight": 150,
+"source": "成分表"
+},
+"山药": {
+"calories": 57,
+"protein": 1.9,
+"fat": 0.2,
+"carbs": 12.4,
+"fiber": 0.8,
+"sodium": 18.6,
+"servingWeight": 200,
+"source": "成分表"
+},
+"洋葱": {
+"calories": 40,
+"protein": 1.1,
+"fat": 0.2,
+"carbs": 9.0,
+"fiber": 0.9,
+"sodium": 4.4,
+"servingWeight": 100,
+"source": "成分表"
+},
+"香菜": {
+"calories": 31,
+"protein": 1.8,
+"fat": 0.4,
+"carbs": 6.2,
+"fiber": 1.2,
+"sodium": 48.5,
+"servingWeight": 30,
+"source": "成分表"
+},
+"木耳菜": {
+"calories": 20,
+"protein": 1.6,
+"fat": 0.3,
+"carbs": 3.5,
+"fiber": 1.5,
+"sodium": 30.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"茼蒿": {
+"calories": 24,
+"protein": 1.9,
+"fat": 0.3,
+"carbs": 4.3,
+"fiber": 1.2,
+"sodium": 60.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"菜心": {
+"calories": 18,
+"protein": 1.5,
+"fat": 0.2,
+"carbs": 2.7,
+"fiber": 1.2,
+"sodium": 50.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"白萝卜": {
+"calories": 16,
+"protein": 0.7,
+"fat": 0.1,
+"carbs": 3.6,
+"fiber": 0.8,
+"sodium": 20.0,
+"servingWeight": 200,
+"source": "成分表"
+},
+"老抽": {
+"calories": 55,
+"protein": 5.0,
+"fat": 0.1,
+"carbs": 8.0,
+"fiber": 0,
+"sodium": 6200,
+"servingWeight": 12,
+"source": "成分表"
+},
+"冰糖": {
+"calories": 400,
+"protein": 0,
+"fat": 0,
+"carbs": 100.0,
+"fiber": 0,
+"sodium": 1.0,
+"servingWeight": 8,
+"source": "成分表"
+},
+"青蒜": {
+"calories": 40,
+"protein": 2.0,
+"fat": 0.2,
+"carbs": 8.0,
+"fiber": 2.0,
+"sodium": 5.0,
+"servingWeight": 5,
+"source": "估算"
+},
+"白糖": {
+"calories": 400,
+"protein": 0,
+"fat": 0,
+"carbs": 100.0,
+"fiber": 0,
+"sodium": 1.0,
+"servingWeight": 8,
+"source": "成分表"
+},
+"海带": {
+"calories": 12,
+"protein": 1.2,
+"fat": 0.1,
+"carbs": 2.1,
+"fiber": 0.5,
+"sodium": 30.0,
+"servingWeight": 150,
+"source": "成分表"
+},
+"豆皮": {
+"calories": 409,
+"protein": 44.6,
+"fat": 17.4,
+"carbs": 18.8,
+"fiber": 1.0,
+"sodium": 9.4,
+"servingWeight": 100,
+"source": "成分表"
+},
+"腐竹": {
+"calories": 461,
+"protein": 44.6,
+"fat": 21.7,
+"carbs": 22.3,
+"fiber": 1.0,
+"sodium": 26.5,
+"servingWeight": 60,
+"source": "成分表"
+},
+"豆腐": {
+"calories": 76,
+"protein": 8.1,
+"fat": 3.7,
+"carbs": 4.2,
+"fiber": 0.4,
+"sodium": 7.2,
+"servingWeight": 150,
+"source": "成分表"
+},
+"花椒粉": {
+"calories": 258,
+"protein": 6.7,
+"fat": 8.9,
+"carbs": 66.5,
+"fiber": 28.7,
+"sodium": 47.0,
+"servingWeight": 3,
+"source": "估算"
+},
+"蒜苗": {
+"calories": 40,
+"protein": 2.0,
+"fat": 0.2,
+"carbs": 8.0,
+"fiber": 2.0,
+"sodium": 5.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"水淀粉": {
+"calories": 50,
+"protein": 0.1,
+"fat": 0,
+"carbs": 12.0,
+"fiber": 0,
+"sodium": 1.0,
+"servingWeight": 30,
+"source": "估算"
+},
+"小葱": {
+"calories": 30,
+"protein": 1.6,
+"fat": 0.3,
+"carbs": 6.5,
+"fiber": 1.1,
+"sodium": 4.0,
+"servingWeight": 5,
+"source": "估算"
+},
+"香菇": {
+"calories": 19,
+"protein": 2.2,
+"fat": 0.3,
+"carbs": 5.2,
+"fiber": 3.3,
+"sodium": 1.4,
+"servingWeight": 150,
+"source": "成分表"
+},
+"白菜": {
+"calories": 17,
+"protein": 1.5,
+"fat": 0.1,
+"carbs": 3.2,
+"fiber": 0.8,
+"sodium": 57.5,
+"servingWeight": 200,
+"source": "成分表"
+},
+"金针菇": {
+"calories": 26,
+"protein": 2.4,
+"fat": 0.4,
+"carbs": 6.0,
+"fiber": 2.7,
+"sodium": 4.3,
+"servingWeight": 150,
+"source": "成分表"
+},
+"杏鲍菇": {
+"calories": 31,
+"protein": 1.3,
+"fat": 0.1,
+"carbs": 8.3,
+"fiber": 2.1,
+"sodium": 3.5,
+"servingWeight": 150,
+"source": "估算"
+},
+"黑胡椒": {
+"calories": 255,
+"protein": 10.0,
+"fat": 3.0,
+"carbs": 55.0,
+"fiber": 25.0,
+"sodium": 20.0,
+"servingWeight": 3,
+"source": "估算"
+},
+"平菇": {
+"calories": 20,
+"protein": 1.9,
+"fat": 0.3,
+"carbs": 4.6,
+"fiber": 2.3,
+"sodium": 3.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"面粉": {
+"calories": 344,
+"protein": 11.2,
+"fat": 1.5,
+"carbs": 73.6,
+"fiber": 2.1,
+"sodium": 3.1,
+"servingWeight": 100,
+"source": "成分表"
+},
+"椒盐": {
+"calories": 200,
+"protein": 5.0,
+"fat": 1.0,
+"carbs": 40.0,
+"fiber": 10.0,
+"sodium": 20000,
+"servingWeight": 3,
+"source": "估算"
+},
+"茶树菇": {
+"calories": 25,
+"protein": 2.0,
+"fat": 0.4,
+"carbs": 5.0,
+"fiber": 2.5,
+"sodium": 3.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"豆角": {
+"calories": 30,
+"protein": 2.5,
+"fat": 0.2,
+"carbs": 6.7,
+"fiber": 2.1,
+"sodium": 3.0,
+"servingWeight": 150,
+"source": "成分表"
+},
+"蟹味菇": {
+"calories": 20,
+"protein": 2.0,
+"fat": 0.3,
+"carbs": 4.5,
+"fiber": 2.5,
+"sodium": 3.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"白玉菇": {
+"calories": 24,
+"protein": 2.0,
+"fat": 0.3,
+"carbs": 5.0,
+"fiber": 2.5,
+"sodium": 3.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"甜玉米粒": {
+"calories": 105,
+"protein": 4.0,
+"fat": 1.2,
+"carbs": 19.0,
+"fiber": 2.9,
+"sodium": 1.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"青豆": {
+"calories": 373,
+"protein": 34.5,
+"fat": 16.0,
+"carbs": 35.4,
+"fiber": 12.6,
+"sodium": 3.0,
+"servingWeight": 50,
+"source": "估算"
+},
+"松仁": {
+"calories": 640,
+"protein": 13.7,
+"fat": 62.0,
+"carbs": 12.2,
+"fiber": 3.6,
+"sodium": 5.0,
+"servingWeight": 30,
+"source": "估算"
+},
+"菜花": {
+"calories": 24,
+"protein": 1.9,
+"fat": 0.2,
+"carbs": 4.6,
+"fiber": 1.2,
+"sodium": 31.0,
+"servingWeight": 200,
+"source": "成分表"
+},
+"五花肉": {
+"calories": 508,
+"protein": 9.3,
+"fat": 50.4,
+"carbs": 0.9,
+"fiber": 0,
+"sodium": 52.0,
+"servingWeight": 200,
+"source": "成分表"
+},
+"花菜": {
+"calories": 24,
+"protein": 1.9,
+"fat": 0.2,
+"carbs": 4.6,
+"fiber": 1.2,
+"sodium": 31.0,
+"servingWeight": 200,
+"source": "成分表"
+},
+"孜然粉": {
+"calories": 375,
+"protein": 18.0,
+"fat": 22.0,
+"carbs": 44.0,
+"fiber": 10.0,
+"sodium": 100.0,
+"servingWeight": 3,
+"source": "估算"
+},
+"包菜": {
+"calories": 22,
+"protein": 1.5,
+"fat": 0.2,
+"carbs": 4.6,
+"fiber": 1.0,
+"sodium": 27.2,
+"servingWeight": 200,
+"source": "成分表"
+},
+"粉条": {
+"calories": 337,
+"protein": 0.5,
+"fat": 0.1,
+"carbs": 84.0,
+"fiber": 0.5,
+"sodium": 9.0,
+"servingWeight": 50,
+"source": "估算"
+},
+"干豆腐": {
+"calories": 140,
+"protein": 16.2,
+"fat": 7.8,
+"carbs": 3.5,
+"fiber": 0.8,
+"sodium": 400.0,
+"servingWeight": 100,
+"source": "估算"
+},
+"尖椒": {
+"calories": 23,
+"protein": 1.0,
+"fat": 0.2,
+"carbs": 5.5,
+"fiber": 1.4,
+"sodium": 3.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"豆干": {
+"calories": 140,
+"protein": 16.2,
+"fat": 7.8,
+"carbs": 3.5,
+"fiber": 0.8,
+"sodium": 400.0,
+"servingWeight": 100,
+"source": "估算"
+},
+"香叶": {
+"calories": 300,
+"protein": 6.0,
+"fat": 7.0,
+"carbs": 60.0,
+"fiber": 25.0,
+"sodium": 20.0,
+"servingWeight": 1,
+"source": "估算"
+},
+"酸菜": {
+"calories": 14,
+"protein": 1.0,
+"fat": 0.2,
+"carbs": 3.0,
+"fiber": 1.0,
+"sodium": 800.0,
+"servingWeight": 100,
+"source": "估算"
+},
+"辣椒油": {
+"calories": 899,
+"protein": 0,
+"fat": 99.9,
+"carbs": 0,
+"fiber": 0,
+"sodium": 0,
+"servingWeight": 10,
+"source": "估算"
+},
+"老豆腐": {
+"calories": 82,
+"protein": 8.0,
+"fat": 4.2,
+"carbs": 4.0,
+"fiber": 0.5,
+"sodium": 7.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"雪菜": {
+"calories": 24,
+"protein": 2.0,
+"fat": 0.4,
+"carbs": 4.0,
+"fiber": 1.5,
+"sodium": 500.0,
+"servingWeight": 100,
+"source": "估算"
+},
+"嫩豆腐": {
+"calories": 47,
+"protein": 5.0,
+"fat": 2.5,
+"carbs": 2.6,
+"fiber": 0.3,
+"sodium": 5.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"梅干菜": {
+"calories": 100,
+"protein": 5.0,
+"fat": 1.0,
+"carbs": 20.0,
+"fiber": 6.0,
+"sodium": 600.0,
+"servingWeight": 80,
+"source": "估算"
+},
+"笋干": {
+"calories": 250,
+"protein": 10.0,
+"fat": 1.0,
+"carbs": 55.0,
+"fiber": 20.0,
+"sodium": 10.0,
+"servingWeight": 80,
+"source": "估算"
+},
+"竹笋": {
+"calories": 19,
+"protein": 2.2,
+"fat": 0.2,
+"carbs": 3.6,
+"fiber": 1.8,
+"sodium": 1.0,
+"servingWeight": 150,
+"source": "成分表"
+},
+"芦笋": {
+"calories": 19,
+"protein": 1.4,
+"fat": 0.1,
+"carbs": 4.9,
+"fiber": 1.9,
+"sodium": 3.0,
+"servingWeight": 150,
+"source": "成分表"
+},
+"干木耳": {
+"calories": 265,
+"protein": 12.1,
+"fat": 1.5,
+"carbs": 65.6,
+"fiber": 29.9,
+"sodium": 48.5,
+"servingWeight": 30,
+"source": "成分表"
+},
+"秋葵": {
+"calories": 37,
+"protein": 2.0,
+"fat": 0.1,
+"carbs": 7.1,
+"fiber": 3.9,
+"sodium": 4.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"老南瓜": {
+"calories": 22,
+"protein": 0.7,
+"fat": 0.1,
+"carbs": 5.3,
+"fiber": 0.8,
+"sodium": 0.8,
+"servingWeight": 200,
+"source": "估算"
+},
+"红枣": {
+"calories": 264,
+"protein": 3.2,
+"fat": 0.5,
+"carbs": 67.8,
+"fiber": 6.2,
+"sodium": 6.2,
+"servingWeight": 30,
+"source": "成分表"
+},
+"长茄子": {
+"calories": 21,
+"protein": 1.1,
+"fat": 0.2,
+"carbs": 4.9,
+"fiber": 1.3,
+"sodium": 5.4,
+"servingWeight": 200,
+"source": "成分表"
+},
+"铁棍山药": {
+"calories": 57,
+"protein": 1.9,
+"fat": 0.2,
+"carbs": 12.4,
+"fiber": 0.8,
+"sodium": 18.6,
+"servingWeight": 200,
+"source": "估算"
+},
+"桂花蜜": {
+"calories": 321,
+"protein": 0.4,
+"fat": 1.9,
+"carbs": 75.6,
+"fiber": 0,
+"sodium": 0.3,
+"servingWeight": 10,
+"source": "估算"
+},
+"小芋头": {
+"calories": 79,
+"protein": 2.2,
+"fat": 0.2,
+"carbs": 18.1,
+"fiber": 1.0,
+"sodium": 33.1,
+"servingWeight": 200,
+"source": "成分表"
+},
+"紫甘蓝": {
+"calories": 25,
+"protein": 1.4,
+"fat": 0.2,
+"carbs": 5.8,
+"fiber": 1.5,
+"sodium": 27.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"圣女果": {
+"calories": 22,
+"protein": 1.0,
+"fat": 0.2,
+"carbs": 5.8,
+"fiber": 1.8,
+"sodium": 3.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"糯米粉": {
+"calories": 350,
+"protein": 7.0,
+"fat": 0.5,
+"carbs": 78.0,
+"fiber": 0.5,
+"sodium": 2.0,
+"servingWeight": 50,
+"source": "估算"
+},
+"油": {
+"calories": 899,
+"protein": 0,
+"fat": 99.9,
+"carbs": 0,
+"fiber": 0,
+"sodium": 0,
+"servingWeight": 15,
+"source": "成分表"
+},
+"胡椒粉": {
+"calories": 260,
+"protein": 9.0,
+"fat": 3.0,
+"carbs": 60.0,
+"fiber": 20.0,
+"sodium": 10.0,
+"servingWeight": 3,
+"source": "估算"
+},
+"面包糠": {
+"calories": 350,
+"protein": 10.0,
+"fat": 2.0,
+"carbs": 72.0,
+"fiber": 2.0,
+"sodium": 300.0,
+"servingWeight": 30,
+"source": "估算"
+},
+"春卷皮": {
+"calories": 300,
+"protein": 8.0,
+"fat": 1.0,
+"carbs": 65.0,
+"fiber": 1.0,
+"sodium": 100.0,
+"servingWeight": 50,
+"source": "估算"
+},
+"豆芽": {
+"calories": 18,
+"protein": 2.1,
+"fat": 0.1,
+"carbs": 3.8,
+"fiber": 1.0,
+"sodium": 5.0,
+"servingWeight": 150,
+"source": "成分表"
+},
+"玉米粒": {
+"calories": 105,
+"protein": 4.0,
+"fat": 1.2,
+"carbs": 19.0,
+"fiber": 2.9,
+"sodium": 1.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"豆豉": {
+"calories": 250,
+"protein": 20.0,
+"fat": 10.0,
+"carbs": 22.0,
+"fiber": 4.0,
+"sodium": 2000,
+"servingWeight": 10,
+"source": "估算"
+},
+"鲜香菇": {
+"calories": 19,
+"protein": 2.2,
+"fat": 0.3,
+"carbs": 5.2,
+"fiber": 3.3,
+"sodium": 1.4,
+"servingWeight": 150,
+"source": "成分表"
+},
+"玉米笋": {
+"calories": 26,
+"protein": 2.0,
+"fat": 0.5,
+"carbs": 5.0,
+"fiber": 2.0,
+"sodium": 5.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"黄豆酱": {
+"calories": 138,
+"protein": 12.1,
+"fat": 5.0,
+"carbs": 11.5,
+"fiber": 1.0,
+"sodium": 4000,
+"servingWeight": 15,
+"source": "估算"
+},
+"大白菜": {
+"calories": 17,
+"protein": 1.5,
+"fat": 0.1,
+"carbs": 3.2,
+"fiber": 0.8,
+"sodium": 57.5,
+"servingWeight": 200,
+"source": "成分表"
+},
+"猪里脊肉": {
+"calories": 155,
+"protein": 20.2,
+"fat": 7.9,
+"carbs": 0.7,
+"fiber": 0,
+"sodium": 43.2,
+"servingWeight": 200,
+"source": "成分表"
+},
+"料酒": {
+"calories": 15,
+"protein": 0.5,
+"fat": 0,
+"carbs": 2.0,
+"fiber": 0,
+"sodium": 100.0,
+"servingWeight": 10,
+"source": "估算"
+},
+"甜面酱": {
+"calories": 136,
+"protein": 5.5,
+"fat": 0.6,
+"carbs": 28.0,
+"fiber": 1.0,
+"sodium": 2000,
+"servingWeight": 10,
+"source": "估算"
+},
+"蛋清": {
+"calories": 60,
+"protein": 11.6,
+"fat": 0.1,
+"carbs": 3.1,
+"fiber": 0,
+"sodium": 79.4,
+"servingWeight": 60,
+"source": "估算"
+},
+"大葱": {
+"calories": 30,
+"protein": 1.6,
+"fat": 0.3,
+"carbs": 6.5,
+"fiber": 1.1,
+"sodium": 4.0,
+"servingWeight": 5,
+"source": "成分表"
+},
+"豆腐皮": {
+"calories": 409,
+"protein": 44.6,
+"fat": 17.4,
+"carbs": 18.8,
+"fiber": 1.0,
+"sodium": 9.4,
+"servingWeight": 100,
+"source": "估算"
+},
+"猪瘦肉": {
+"calories": 143,
+"protein": 20.3,
+"fat": 6.2,
+"carbs": 1.5,
+"fiber": 0,
+"sodium": 57.5,
+"servingWeight": 200,
+"source": "成分表"
+},
+"蒜苔": {
+"calories": 40,
+"protein": 2.0,
+"fat": 0.2,
+"carbs": 8.0,
+"fiber": 2.0,
+"sodium": 5.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"猪五花肉": {
+"calories": 508,
+"protein": 9.3,
+"fat": 50.4,
+"carbs": 0.9,
+"fiber": 0,
+"sodium": 52.0,
+"servingWeight": 200,
+"source": "成分表"
+},
+"葱": {
+"calories": 30,
+"protein": 1.6,
+"fat": 0.3,
+"carbs": 6.5,
+"fiber": 1.1,
+"sodium": 4.0,
+"servingWeight": 5,
+"source": "成分表"
+},
+"猪肋排": {
+"calories": 278,
+"protein": 18.3,
+"fat": 22.6,
+"carbs": 0,
+"fiber": 0,
+"sodium": 60.0,
+"servingWeight": 300,
+"source": "成分表"
+},
+"白芝麻": {
+"calories": 517,
+"protein": 19.1,
+"fat": 46.1,
+"carbs": 24.0,
+"fiber": 9.8,
+"sodium": 8.0,
+"servingWeight": 5,
+"source": "成分表"
+},
+"甜玉米": {
+"calories": 105,
+"protein": 4.0,
+"fat": 1.2,
+"carbs": 19.0,
+"fiber": 2.9,
+"sodium": 1.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"白胡椒粉": {
+"calories": 260,
+"protein": 9.0,
+"fat": 3.0,
+"carbs": 60.0,
+"fiber": 20.0,
+"sodium": 10.0,
+"servingWeight": 3,
+"source": "估算"
+},
+"枸杞": {
+"calories": 258,
+"protein": 13.9,
+"fat": 1.5,
+"carbs": 64.0,
+"fiber": 16.9,
+"sodium": 298.0,
+"servingWeight": 10,
+"source": "成分表"
+},
+"蒸肉米粉": {
+"calories": 350,
+"protein": 8.0,
+"fat": 5.0,
+"carbs": 68.0,
+"fiber": 2.0,
+"sodium": 500.0,
+"servingWeight": 50,
+"source": "估算"
+},
+"蜂蜜": {
+"calories": 321,
+"protein": 0.4,
+"fat": 1.9,
+"carbs": 75.6,
+"fiber": 0,
+"sodium": 0.3,
+"servingWeight": 10,
+"source": "成分表"
+},
+"干香菇": {
+"calories": 274,
+"protein": 20.0,
+"fat": 1.2,
+"carbs": 61.7,
+"fiber": 31.6,
+"sodium": 11.0,
+"servingWeight": 50,
+"source": "成分表"
+},
+"干海带": {
+"calories": 90,
+"protein": 8.0,
+"fat": 0.5,
+"carbs": 20.0,
+"fiber": 6.0,
+"sodium": 200.0,
+"servingWeight": 30,
+"source": "估算"
+},
+"芋头": {
+"calories": 79,
+"protein": 2.2,
+"fat": 0.2,
+"carbs": 18.1,
+"fiber": 1.0,
+"sodium": 33.1,
+"servingWeight": 200,
+"source": "成分表"
+},
+"鹌鹑蛋": {
+"calories": 160,
+"protein": 12.8,
+"fat": 11.1,
+"carbs": 2.1,
+"fiber": 0,
+"sodium": 106.0,
+"servingWeight": 100,
+"source": "成分表"
+},
+"猪前肘": {
+"calories": 251,
+"protein": 17.7,
+"fat": 19.9,
+"carbs": 0.5,
+"fiber": 0,
+"sodium": 65.0,
+"servingWeight": 300,
+"source": "估算"
+},
+"青菜": {
+"calories": 18,
+"protein": 1.5,
+"fat": 0.2,
+"carbs": 2.7,
+"fiber": 1.2,
+"sodium": 50.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"番茄酱": {
+"calories": 84,
+"protein": 1.0,
+"fat": 0.2,
+"carbs": 19.5,
+"fiber": 0.5,
+"sodium": 300.0,
+"servingWeight": 15,
+"source": "估算"
+},
+"猪绞肉": {
+"calories": 210,
+"protein": 19.0,
+"fat": 14.6,
+"carbs": 0.6,
+"fiber": 0,
+"sodium": 55.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"馒头渣": {
+"calories": 221,
+"protein": 7.0,
+"fat": 1.1,
+"carbs": 47.0,
+"fiber": 1.0,
+"sodium": 100.0,
+"servingWeight": 30,
+"source": "估算"
+},
+"五香粉": {
+"calories": 280,
+"protein": 8.0,
+"fat": 5.0,
+"carbs": 55.0,
+"fiber": 20.0,
+"sodium": 50.0,
+"servingWeight": 3,
+"source": "估算"
+},
+"马蹄": {
+"calories": 59,
+"protein": 1.2,
+"fat": 0.2,
+"carbs": 13.1,
+"fiber": 1.1,
+"sodium": 15.7,
+"servingWeight": 150,
+"source": "估算"
+},
+"荸荠": {
+"calories": 59,
+"protein": 1.2,
+"fat": 0.2,
+"carbs": 13.1,
+"fiber": 1.1,
+"sodium": 15.7,
+"servingWeight": 150,
+"source": "估算"
+},
+"猪肉丸子": {
+"calories": 210,
+"protein": 13.0,
+"fat": 15.0,
+"carbs": 6.0,
+"fiber": 0,
+"sodium": 400.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"猪血肠": {
+"calories": 150,
+"protein": 10.0,
+"fat": 10.0,
+"carbs": 3.0,
+"fiber": 0,
+"sodium": 500.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"蒜泥": {
+"calories": 128,
+"protein": 4.5,
+"fat": 0.2,
+"carbs": 27.6,
+"fiber": 1.1,
+"sodium": 19.6,
+"servingWeight": 5,
+"source": "估算"
+},
+"板栗仁": {
+"calories": 185,
+"protein": 4.2,
+"fat": 0.7,
+"carbs": 42.2,
+"fiber": 1.7,
+"sodium": 2.0,
+"servingWeight": 80,
+"source": "估算"
+},
+"腊肉": {
+"calories": 498,
+"protein": 11.8,
+"fat": 48.8,
+"carbs": 2.9,
+"fiber": 0,
+"sodium": 763.9,
+"servingWeight": 100,
+"source": "成分表"
+},
+"广式腊肠": {
+"calories": 508,
+"protein": 20.2,
+"fat": 43.3,
+"carbs": 5.3,
+"fiber": 0,
+"sodium": 1420.0,
+"servingWeight": 100,
+"source": "成分表"
+},
+"大米": {
+"calories": 346,
+"protein": 7.4,
+"fat": 0.8,
+"carbs": 77.9,
+"fiber": 0.7,
+"sodium": 3.8,
+"servingWeight": 100,
+"source": "成分表"
+},
+"风干肉": {
+"calories": 390,
+"protein": 25.0,
+"fat": 30.0,
+"carbs": 1.0,
+"fiber": 0,
+"sodium": 1500.0,
+"servingWeight": 100,
+"source": "估算"
+},
+"酱肉": {
+"calories": 380,
+"protein": 20.0,
+"fat": 32.0,
+"carbs": 2.0,
+"fiber": 0,
+"sodium": 1200.0,
+"servingWeight": 100,
+"source": "估算"
+},
+"春笋": {
+"calories": 19,
+"protein": 2.2,
+"fat": 0.2,
+"carbs": 3.6,
+"fiber": 1.8,
+"sodium": 1.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"猪皮": {
+"calories": 363,
+"protein": 27.4,
+"fat": 28.1,
+"carbs": 0,
+"fiber": 0,
+"sodium": 72.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"猪蹄": {
+"calories": 260,
+"protein": 22.6,
+"fat": 18.8,
+"carbs": 0,
+"fiber": 0,
+"sodium": 70.0,
+"servingWeight": 300,
+"source": "成分表"
+},
+"黄豆": {
+"calories": 390,
+"protein": 35.0,
+"fat": 16.0,
+"carbs": 34.2,
+"fiber": 15.5,
+"sodium": 2.2,
+"servingWeight": 50,
+"source": "成分表"
+},
+"猪耳朵": {
+"calories": 176,
+"protein": 22.5,
+"fat": 11.1,
+"carbs": 0,
+"fiber": 0,
+"sodium": 63.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"猪腰": {
+"calories": 96,
+"protein": 15.4,
+"fat": 3.2,
+"carbs": 1.4,
+"fiber": 0,
+"sodium": 134.2,
+"servingWeight": 150,
+"source": "估算"
+},
+"猪肝": {
+"calories": 129,
+"protein": 19.3,
+"fat": 3.5,
+"carbs": 5.0,
+"fiber": 0,
+"sodium": 68.6,
+"servingWeight": 150,
+"source": "成分表"
+},
+"猪肥肠": {
+"calories": 196,
+"protein": 6.9,
+"fat": 18.7,
+"carbs": 0,
+"fiber": 0,
+"sodium": 116.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"卤肥肠": {
+"calories": 240,
+"protein": 12.0,
+"fat": 20.0,
+"carbs": 2.0,
+"fiber": 0,
+"sodium": 900.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"猪心": {
+"calories": 119,
+"protein": 16.6,
+"fat": 5.3,
+"carbs": 1.1,
+"fiber": 0,
+"sodium": 71.2,
+"servingWeight": 150,
+"source": "估算"
+},
+"猪肚": {
+"calories": 110,
+"protein": 15.2,
+"fat": 5.1,
+"carbs": 0.7,
+"fiber": 0,
+"sodium": 75.1,
+"servingWeight": 150,
+"source": "估算"
+},
+"鸡腿": {
+"calories": 181,
+"protein": 16.0,
+"fat": 11.6,
+"carbs": 3.0,
+"fiber": 0,
+"sodium": 64.0,
+"servingWeight": 300,
+"source": "成分表"
+},
+"白胡椒粒": {
+"calories": 255,
+"protein": 10.0,
+"fat": 3.0,
+"carbs": 55.0,
+"fiber": 25.0,
+"sodium": 20.0,
+"servingWeight": 3,
+"source": "估算"
+},
+"猪舌": {
+"calories": 190,
+"protein": 17.1,
+"fat": 12.7,
+"carbs": 0.4,
+"fiber": 0,
+"sodium": 88.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"猪梅花肉": {
+"calories": 240,
+"protein": 18.0,
+"fat": 18.0,
+"carbs": 1.0,
+"fiber": 0,
+"sodium": 50.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"叉烧酱": {
+"calories": 180,
+"protein": 4.0,
+"fat": 1.0,
+"carbs": 38.0,
+"fiber": 0,
+"sodium": 1500,
+"servingWeight": 15,
+"source": "估算"
+},
+"叉烧肉": {
+"calories": 270,
+"protein": 20.0,
+"fat": 16.0,
+"carbs": 10.0,
+"fiber": 0,
+"sodium": 800.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"土豆淀粉": {
+"calories": 340,
+"protein": 0.3,
+"fat": 0.1,
+"carbs": 83.0,
+"fiber": 0,
+"sodium": 2.0,
+"servingWeight": 20,
+"source": "估算"
+},
+"葱丝": {
+"calories": 30,
+"protein": 1.6,
+"fat": 0.3,
+"carbs": 6.5,
+"fiber": 1.1,
+"sodium": 4.0,
+"servingWeight": 5,
+"source": "估算"
+},
+"胡萝卜丝": {
+"calories": 37,
+"protein": 1.0,
+"fat": 0.2,
+"carbs": 8.8,
+"fiber": 1.1,
+"sodium": 71.4,
+"servingWeight": 100,
+"source": "成分表"
+},
+"辣椒粉": {
+"calories": 320,
+"protein": 12.0,
+"fat": 12.0,
+"carbs": 50.0,
+"fiber": 25.0,
+"sodium": 10.0,
+"servingWeight": 5,
+"source": "估算"
+},
+"黑胡椒粉": {
+"calories": 255,
+"protein": 10.0,
+"fat": 3.0,
+"carbs": 55.0,
+"fiber": 25.0,
+"sodium": 20.0,
+"servingWeight": 3,
+"source": "估算"
+},
+"黄椒": {
+"calories": 27,
+"protein": 1.0,
+"fat": 0.2,
+"carbs": 6.0,
+"fiber": 1.5,
+"sodium": 3.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"猪排骨": {
+"calories": 278,
+"protein": 18.3,
+"fat": 22.6,
+"carbs": 0,
+"fiber": 0,
+"sodium": 60.0,
+"servingWeight": 300,
+"source": "成分表"
+},
+"韭黄": {
+"calories": 22,
+"protein": 2.3,
+"fat": 0.2,
+"carbs": 3.9,
+"fiber": 1.2,
+"sodium": 6.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"红菜苔": {
+"calories": 20,
+"protein": 1.5,
+"fat": 0.2,
+"carbs": 3.5,
+"fiber": 1.5,
+"sodium": 40.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"榨菜": {
+"calories": 29,
+"protein": 2.2,
+"fat": 0.3,
+"carbs": 6.5,
+"fiber": 2.0,
+"sodium": 2700.0,
+"servingWeight": 50,
+"source": "估算"
+},
+"萝卜干": {
+"calories": 60,
+"protein": 3.0,
+"fat": 0.5,
+"carbs": 12.0,
+"fiber": 3.0,
+"sodium": 500.0,
+"servingWeight": 100,
+"source": "估算"
+},
+"干豆角": {
+"calories": 250,
+"protein": 10.0,
+"fat": 1.0,
+"carbs": 55.0,
+"fiber": 8.0,
+"sodium": 30.0,
+"servingWeight": 80,
+"source": "估算"
+},
+"茄子干": {
+"calories": 200,
+"protein": 8.0,
+"fat": 1.0,
+"carbs": 40.0,
+"fiber": 10.0,
+"sodium": 40.0,
+"servingWeight": 80,
+"source": "估算"
+},
+"猪大排": {
+"calories": 264,
+"protein": 18.3,
+"fat": 20.4,
+"carbs": 0,
+"fiber": 0,
+"sodium": 60.0,
+"servingWeight": 300,
+"source": "估算"
+},
+"千张": {
+"calories": 262,
+"protein": 24.5,
+"fat": 16.0,
+"carbs": 5.5,
+"fiber": 0.8,
+"sodium": 20.0,
+"servingWeight": 100,
+"source": "估算"
+},
+"油豆皮": {
+"calories": 409,
+"protein": 44.6,
+"fat": 17.4,
+"carbs": 18.8,
+"fiber": 1.0,
+"sodium": 9.4,
+"servingWeight": 100,
+"source": "估算"
+},
+"鸡腿或半只鸡": {
+"calories": 181,
+"protein": 16.0,
+"fat": 11.6,
+"carbs": 3.0,
+"fiber": 0,
+"sodium": 64.0,
+"servingWeight": 300,
+"source": "成分表"
+},
+"土鸡半只": {
+"calories": 124,
+"protein": 20.8,
+"fat": 4.5,
+"carbs": 0,
+"fiber": 0,
+"sodium": 64.0,
+"servingWeight": 300,
+"source": "成分表"
+},
+"老母鸡1只": {
+"calories": 250,
+"protein": 17.0,
+"fat": 20.0,
+"carbs": 0.5,
+"fiber": 0,
+"sodium": 70.0,
+"servingWeight": 300,
+"source": "估算"
+},
+"乌鸡半只": {
+"calories": 111,
+"protein": 22.3,
+"fat": 2.3,
+"carbs": 0.3,
+"fiber": 0,
+"sodium": 64.0,
+"servingWeight": 300,
+"source": "成分表"
+},
+"党参": {
+"calories": 60,
+"protein": 2.0,
+"fat": 0.5,
+"carbs": 13.0,
+"fiber": 2.0,
+"sodium": 50.0,
+"servingWeight": 10,
+"source": "估算"
+},
+"黄芪": {
+"calories": 60,
+"protein": 2.0,
+"fat": 0.5,
+"carbs": 13.0,
+"fiber": 2.0,
+"sodium": 50.0,
+"servingWeight": 10,
+"source": "估算"
+},
+"三黄鸡1只": {
+"calories": 167,
+"protein": 19.3,
+"fat": 9.4,
+"carbs": 1.3,
+"fiber": 0,
+"sodium": 63.0,
+"servingWeight": 300,
+"source": "估算"
+},
+"花生碎": {
+"calories": 567,
+"protein": 25.8,
+"fat": 49.2,
+"carbs": 16.1,
+"fiber": 8.5,
+"sodium": 3.6,
+"servingWeight": 30,
+"source": "估算"
+},
+"花椒油": {
+"calories": 899,
+"protein": 0,
+"fat": 99.9,
+"carbs": 0,
+"fiber": 0,
+"sodium": 0,
+"servingWeight": 5,
+"source": "估算"
+},
+"芝麻酱": {
+"calories": 630,
+"protein": 20.0,
+"fat": 53.0,
+"carbs": 18.0,
+"fiber": 5.0,
+"sodium": 40.0,
+"servingWeight": 10,
+"source": "估算"
+},
+"鸡腿或鸡胸": {
+"calories": 181,
+"protein": 16.0,
+"fat": 11.6,
+"carbs": 3.0,
+"fiber": 0,
+"sodium": 64.0,
+"servingWeight": 300,
+"source": "成分表"
+},
+"粗盐": {
+"calories": 0,
+"protein": 0,
+"fat": 0,
+"carbs": 0,
+"fiber": 0,
+"sodium": 39311,
+"servingWeight": 3,
+"source": "成分表"
+},
+"盐焗鸡粉": {
+"calories": 200,
+"protein": 5.0,
+"fat": 1.0,
+"carbs": 40.0,
+"fiber": 0,
+"sodium": 8000,
+"servingWeight": 10,
+"source": "估算"
+},
+"鸡腿或鸡翅": {
+"calories": 181,
+"protein": 16.0,
+"fat": 11.6,
+"carbs": 3.0,
+"fiber": 0,
+"sodium": 64.0,
+"servingWeight": 300,
+"source": "成分表"
+},
+"玉米淀粉": {
+"calories": 346,
+"protein": 0.5,
+"fat": 0.1,
+"carbs": 85.0,
+"fiber": 0,
+"sodium": 2.0,
+"servingWeight": 20,
+"source": "估算"
+},
+"牛奶": {
+"calories": 65,
+"protein": 3.3,
+"fat": 3.6,
+"carbs": 4.8,
+"fiber": 0,
+"sodium": 37.2,
+"servingWeight": 200,
+"source": "成分表"
+},
+"鸡胸肉": {
+"calories": 133,
+"protein": 19.4,
+"fat": 5.0,
+"carbs": 2.5,
+"fiber": 0,
+"sodium": 34.4,
+"servingWeight": 200,
+"source": "成分表"
+},
+"鸡翅中": {
+"calories": 240,
+"protein": 17.4,
+"fat": 19.0,
+"carbs": 0,
+"fiber": 0,
+"sodium": 62.0,
+"servingWeight": 300,
+"source": "成分表"
+},
+"可乐": {
+"calories": 43,
+"protein": 0,
+"fat": 0,
+"carbs": 10.8,
+"fiber": 0,
+"sodium": 12.0,
+"servingWeight": 100,
+"source": "估算"
+},
+"奥尔良腌料": {
+"calories": 250,
+"protein": 5.0,
+"fat": 1.0,
+"carbs": 55.0,
+"fiber": 1.0,
+"sodium": 2000,
+"servingWeight": 15,
+"source": "估算"
+},
+"蒜粉": {
+"calories": 128,
+"protein": 4.5,
+"fat": 0.2,
+"carbs": 27.6,
+"fiber": 1.1,
+"sodium": 19.6,
+"servingWeight": 5,
+"source": "估算"
+},
+"鸡腿肉": {
+"calories": 181,
+"protein": 16.0,
+"fat": 11.6,
+"carbs": 3.0,
+"fiber": 0,
+"sodium": 64.0,
+"servingWeight": 300,
+"source": "成分表"
+},
+"粉皮": {
+"calories": 140,
+"protein": 0.5,
+"fat": 0.1,
+"carbs": 34.0,
+"fiber": 0.3,
+"sodium": 5.0,
+"servingWeight": 100,
+"source": "估算"
+},
+"鸡心": {
+"calories": 172,
+"protein": 15.9,
+"fat": 11.8,
+"carbs": 0.6,
+"fiber": 0,
+"sodium": 68.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"鸡肝": {
+"calories": 121,
+"protein": 16.6,
+"fat": 4.5,
+"carbs": 2.8,
+"fiber": 0,
+"sodium": 62.0,
+"servingWeight": 150,
+"source": "成分表"
+},
+"鸡胗": {
+"calories": 118,
+"protein": 19.2,
+"fat": 2.8,
+"carbs": 4.0,
+"fiber": 0,
+"sodium": 63.0,
+"servingWeight": 150,
+"source": "成分表"
+},
+"鸡杂": {
+"calories": 130,
+"protein": 16.0,
+"fat": 6.0,
+"carbs": 2.0,
+"fiber": 0,
+"sodium": 65.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"鸡脖": {
+"calories": 240,
+"protein": 17.0,
+"fat": 19.0,
+"carbs": 0,
+"fiber": 0,
+"sodium": 70.0,
+"servingWeight": 250,
+"source": "估算"
+},
+"鸡爪": {
+"calories": 254,
+"protein": 23.9,
+"fat": 16.4,
+"carbs": 2.7,
+"fiber": 0,
+"sodium": 68.0,
+"servingWeight": 250,
+"source": "成分表"
+},
+"鸭子1只": {
+"calories": 240,
+"protein": 15.5,
+"fat": 19.7,
+"carbs": 0.2,
+"fiber": 0,
+"sodium": 69.0,
+"servingWeight": 300,
+"source": "成分表"
+},
+"鸭子半只": {
+"calories": 240,
+"protein": 15.5,
+"fat": 19.7,
+"carbs": 0.2,
+"fiber": 0,
+"sodium": 69.0,
+"servingWeight": 300,
+"source": "成分表"
+},
+"啤酒": {
+"calories": 32,
+"protein": 0.4,
+"fat": 0,
+"carbs": 3.5,
+"fiber": 0,
+"sodium": 5.0,
+"servingWeight": 50,
+"source": "估算"
+},
+"老姜": {
+"calories": 46,
+"protein": 1.3,
+"fat": 0.6,
+"carbs": 10.3,
+"fiber": 2.7,
+"sodium": 14.9,
+"servingWeight": 5,
+"source": "估算"
+},
+"米酒": {
+"calories": 15,
+"protein": 0.5,
+"fat": 0,
+"carbs": 2.0,
+"fiber": 0,
+"sodium": 50.0,
+"servingWeight": 10,
+"source": "估算"
+},
+"老鸭半只": {
+"calories": 240,
+"protein": 15.5,
+"fat": 19.7,
+"carbs": 0.2,
+"fiber": 0,
+"sodium": 69.0,
+"servingWeight": 300,
+"source": "估算"
+},
+"鸭腿肉": {
+"calories": 240,
+"protein": 15.5,
+"fat": 19.7,
+"carbs": 0.2,
+"fiber": 0,
+"sodium": 69.0,
+"servingWeight": 300,
+"source": "成分表"
+},
+"鸭腿": {
+"calories": 240,
+"protein": 15.5,
+"fat": 19.7,
+"carbs": 0.2,
+"fiber": 0,
+"sodium": 69.0,
+"servingWeight": 300,
+"source": "成分表"
+},
+"鸭胸肉": {
+"calories": 90,
+"protein": 15.0,
+"fat": 1.5,
+"carbs": 4.0,
+"fiber": 0,
+"sodium": 62.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"鸭心": {
+"calories": 143,
+"protein": 20.0,
+"fat": 6.0,
+"carbs": 1.0,
+"fiber": 0,
+"sodium": 70.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"鸭肝": {
+"calories": 128,
+"protein": 14.5,
+"fat": 7.5,
+"carbs": 0.5,
+"fiber": 0,
+"sodium": 60.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"鸭胗": {
+"calories": 92,
+"protein": 17.9,
+"fat": 1.3,
+"carbs": 2.1,
+"fiber": 0,
+"sodium": 65.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"鸭杂": {
+"calories": 130,
+"protein": 16.0,
+"fat": 6.0,
+"carbs": 2.0,
+"fiber": 0,
+"sodium": 65.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"鸭翅": {
+"calories": 146,
+"protein": 16.5,
+"fat": 6.1,
+"carbs": 6.3,
+"fiber": 0,
+"sodium": 70.0,
+"servingWeight": 250,
+"source": "估算"
+},
+"鸭脖": {
+"calories": 240,
+"protein": 15.5,
+"fat": 19.7,
+"carbs": 0.2,
+"fiber": 0,
+"sodium": 70.0,
+"servingWeight": 250,
+"source": "估算"
+},
+"鸭头": {
+"calories": 240,
+"protein": 15.5,
+"fat": 19.7,
+"carbs": 0.2,
+"fiber": 0,
+"sodium": 70.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"鸭掌": {
+"calories": 150,
+"protein": 26.9,
+"fat": 6.2,
+"carbs": 0,
+"fiber": 0,
+"sodium": 70.0,
+"servingWeight": 250,
+"source": "估算"
+},
+"鹅肉半只": {
+"calories": 251,
+"protein": 17.9,
+"fat": 19.9,
+"carbs": 0,
+"fiber": 0,
+"sodium": 58.8,
+"servingWeight": 300,
+"source": "成分表"
+},
+"老鹅半只": {
+"calories": 251,
+"protein": 17.9,
+"fat": 19.9,
+"carbs": 0,
+"fiber": 0,
+"sodium": 58.8,
+"servingWeight": 300,
+"source": "估算"
+},
+"鹅胸肉": {
+"calories": 251,
+"protein": 17.9,
+"fat": 19.9,
+"carbs": 0,
+"fiber": 0,
+"sodium": 58.8,
+"servingWeight": 200,
+"source": "估算"
+},
+"鹅半只": {
+"calories": 251,
+"protein": 17.9,
+"fat": 19.9,
+"carbs": 0,
+"fiber": 0,
+"sodium": 58.8,
+"servingWeight": 300,
+"source": "成分表"
+},
+"鸭半只": {
+"calories": 240,
+"protein": 15.5,
+"fat": 19.7,
+"carbs": 0.2,
+"fiber": 0,
+"sodium": 69.0,
+"servingWeight": 300,
+"source": "成分表"
+},
+"鸭血": {
+"calories": 58,
+"protein": 13.6,
+"fat": 0.4,
+"carbs": 0,
+"fiber": 0,
+"sodium": 56.0,
+"servingWeight": 100,
+"source": "估算"
+},
+"油豆腐": {
+"calories": 245,
+"protein": 17.0,
+"fat": 17.6,
+"carbs": 4.9,
+"fiber": 0.5,
+"sodium": 6.0,
+"servingWeight": 100,
+"source": "估算"
+},
+"海带丝": {
+"calories": 12,
+"protein": 1.2,
+"fat": 0.1,
+"carbs": 2.1,
+"fiber": 0.5,
+"sodium": 30.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"剁椒": {
+"calories": 30,
+"protein": 1.0,
+"fat": 0.5,
+"carbs": 6.0,
+"fiber": 2.0,
+"sodium": 1500,
+"servingWeight": 15,
+"source": "估算"
+},
+"酸豆角": {
+"calories": 25,
+"protein": 2.0,
+"fat": 0.3,
+"carbs": 5.0,
+"fiber": 1.5,
+"sodium": 900.0,
+"servingWeight": 80,
+"source": "估算"
+},
+"土鸡1只": {
+"calories": 124,
+"protein": 20.8,
+"fat": 4.5,
+"carbs": 0,
+"fiber": 0,
+"sodium": 64.0,
+"servingWeight": 300,
+"source": "成分表"
+},
+"藤椒油": {
+"calories": 899,
+"protein": 0,
+"fat": 99.9,
+"carbs": 0,
+"fiber": 0,
+"sodium": 0,
+"servingWeight": 5,
+"source": "估算"
+},
+"青花椒": {
+"calories": 258,
+"protein": 6.7,
+"fat": 8.9,
+"carbs": 66.5,
+"fiber": 28.7,
+"sodium": 47.0,
+"servingWeight": 3,
+"source": "估算"
+},
+"柠檬": {
+"calories": 35,
+"protein": 1.1,
+"fat": 1.2,
+"carbs": 6.2,
+"fiber": 1.3,
+"sodium": 1.1,
+"servingWeight": 30,
+"source": "成分表"
+},
+"酸梅": {
+"calories": 30,
+"protein": 1.0,
+"fat": 0.5,
+"carbs": 7.0,
+"fiber": 1.0,
+"sodium": 50.0,
+"servingWeight": 10,
+"source": "估算"
+},
+"百香果": {
+"calories": 97,
+"protein": 2.2,
+"fat": 0.7,
+"carbs": 23.4,
+"fiber": 10.4,
+"sodium": 28.0,
+"servingWeight": 50,
+"source": "估算"
+},
+"鹅肉": {
+"calories": 251,
+"protein": 17.9,
+"fat": 19.9,
+"carbs": 0,
+"fiber": 0,
+"sodium": 58.8,
+"servingWeight": 300,
+"source": "成分表"
+},
+"鸡肉末": {
+"calories": 167,
+"protein": 19.3,
+"fat": 9.4,
+"carbs": 1.3,
+"fiber": 0,
+"sodium": 63.3,
+"servingWeight": 200,
+"source": "成分表"
+},
+"鸭肉末": {
+"calories": 240,
+"protein": 15.5,
+"fat": 19.7,
+"carbs": 0.2,
+"fiber": 0,
+"sodium": 69.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"鸡油": {
+"calories": 899,
+"protein": 0,
+"fat": 99.9,
+"carbs": 0,
+"fiber": 0,
+"sodium": 0,
+"servingWeight": 10,
+"source": "估算"
+},
+"鸭油": {
+"calories": 899,
+"protein": 0,
+"fat": 99.9,
+"carbs": 0,
+"fiber": 0,
+"sodium": 0,
+"servingWeight": 10,
+"source": "估算"
+},
+"鸡肉": {
+"calories": 167,
+"protein": 19.3,
+"fat": 9.4,
+"carbs": 1.3,
+"fiber": 0,
+"sodium": 63.3,
+"servingWeight": 200,
+"source": "成分表"
+},
+"红薯淀粉": {
+"calories": 340,
+"protein": 0.3,
+"fat": 0.1,
+"carbs": 83.0,
+"fiber": 0,
+"sodium": 2.0,
+"servingWeight": 20,
+"source": "估算"
+},
+"九层塔": {
+"calories": 30,
+"protein": 3.0,
+"fat": 0.5,
+"carbs": 4.0,
+"fiber": 2.0,
+"sodium": 5.0,
+"servingWeight": 5,
+"source": "估算"
+},
+"鸭肉": {
+"calories": 240,
+"protein": 15.5,
+"fat": 19.7,
+"carbs": 0.2,
+"fiber": 0,
+"sodium": 69.0,
+"servingWeight": 300,
+"source": "成分表"
+},
+"萝卜": {
+"calories": 16,
+"protein": 0.7,
+"fat": 0.1,
+"carbs": 3.6,
+"fiber": 0.8,
+"sodium": 20.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"当归": {
+"calories": 60,
+"protein": 2.0,
+"fat": 0.5,
+"carbs": 13.0,
+"fiber": 2.0,
+"sodium": 50.0,
+"servingWeight": 10,
+"source": "估算"
+},
+"鲫鱼": {
+"calories": 108,
+"protein": 17.1,
+"fat": 2.7,
+"carbs": 3.8,
+"fiber": 0,
+"sodium": 41.2,
+"servingWeight": 300,
+"source": "成分表"
+},
+"蒸鱼豉油": {
+"calories": 60,
+"protein": 5.0,
+"fat": 0.1,
+"carbs": 9.0,
+"fiber": 0,
+"sodium": 6000,
+"servingWeight": 12,
+"source": "估算"
+},
+"鲤鱼": {
+"calories": 109,
+"protein": 17.6,
+"fat": 4.1,
+"carbs": 0.5,
+"fiber": 0,
+"sodium": 41.2,
+"servingWeight": 300,
+"source": "成分表"
+},
+"草鱼块": {
+"calories": 113,
+"protein": 16.6,
+"fat": 5.2,
+"carbs": 0,
+"fiber": 0,
+"sodium": 46.0,
+"servingWeight": 200,
+"source": "成分表"
+},
+"草鱼": {
+"calories": 113,
+"protein": 16.6,
+"fat": 5.2,
+"carbs": 0,
+"fiber": 0,
+"sodium": 46.0,
+"servingWeight": 200,
+"source": "成分表"
+},
+"鲈鱼": {
+"calories": 105,
+"protein": 18.6,
+"fat": 3.4,
+"carbs": 0,
+"fiber": 0,
+"sodium": 33.0,
+"servingWeight": 300,
+"source": "成分表"
+},
+"武昌鱼": {
+"calories": 135,
+"protein": 18.3,
+"fat": 6.3,
+"carbs": 1.2,
+"fiber": 0,
+"sodium": 41.1,
+"servingWeight": 300,
+"source": "估算"
+},
+"鳊鱼": {
+"calories": 135,
+"protein": 18.3,
+"fat": 6.3,
+"carbs": 1.2,
+"fiber": 0,
+"sodium": 41.1,
+"servingWeight": 300,
+"source": "估算"
+},
+"罗非鱼": {
+"calories": 98,
+"protein": 18.4,
+"fat": 1.5,
+"carbs": 2.8,
+"fiber": 0,
+"sodium": 36.0,
+"servingWeight": 300,
+"source": "估算"
+},
+"鲶鱼": {
+"calories": 103,
+"protein": 17.3,
+"fat": 3.7,
+"carbs": 0,
+"fiber": 0,
+"sodium": 43.0,
+"servingWeight": 300,
+"source": "估算"
+},
+"小杂鱼": {
+"calories": 105,
+"protein": 17.0,
+"fat": 4.0,
+"carbs": 0.5,
+"fiber": 0,
+"sodium": 60.0,
+"servingWeight": 300,
+"source": "估算"
+},
+"小黄鱼或小杂鱼": {
+"calories": 99,
+"protein": 17.9,
+"fat": 3.0,
+"carbs": 0.1,
+"fiber": 0,
+"sodium": 103.0,
+"servingWeight": 300,
+"source": "估算"
+},
+"草鱼片": {
+"calories": 113,
+"protein": 16.6,
+"fat": 5.2,
+"carbs": 0,
+"fiber": 0,
+"sodium": 46.0,
+"servingWeight": 200,
+"source": "成分表"
+},
+"草鱼皮": {
+"calories": 113,
+"protein": 16.6,
+"fat": 5.2,
+"carbs": 0,
+"fiber": 0,
+"sodium": 46.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"鱼籽": {
+"calories": 120,
+"protein": 20.0,
+"fat": 4.0,
+"carbs": 1.0,
+"fiber": 0,
+"sodium": 60.0,
+"servingWeight": 100,
+"source": "估算"
+},
+"鱼泡": {
+"calories": 70,
+"protein": 15.0,
+"fat": 1.0,
+"carbs": 0,
+"fiber": 0,
+"sodium": 50.0,
+"servingWeight": 100,
+"source": "估算"
+},
+"鱼肝": {
+"calories": 130,
+"protein": 15.0,
+"fat": 7.0,
+"carbs": 1.0,
+"fiber": 0,
+"sodium": 60.0,
+"servingWeight": 100,
+"source": "估算"
+},
+"大虾": {
+"calories": 93,
+"protein": 18.6,
+"fat": 0.8,
+"carbs": 2.8,
+"fiber": 0,
+"sodium": 165.2,
+"servingWeight": 200,
+"source": "成分表"
+},
+"虾仁": {
+"calories": 48,
+"protein": 10.4,
+"fat": 0.7,
+"carbs": 0,
+"fiber": 0,
+"sodium": 90.0,
+"servingWeight": 200,
+"source": "成分表"
+},
+"河虾": {
+"calories": 93,
+"protein": 18.6,
+"fat": 0.8,
+"carbs": 2.8,
+"fiber": 0,
+"sodium": 165.2,
+"servingWeight": 200,
+"source": "估算"
+},
+"小龙虾": {
+"calories": 93,
+"protein": 18.9,
+"fat": 1.1,
+"carbs": 0.4,
+"fiber": 0,
+"sodium": 60.0,
+"servingWeight": 300,
+"source": "估算"
+},
+"火锅底料": {
+"calories": 400,
+"protein": 8.0,
+"fat": 35.0,
+"carbs": 15.0,
+"fiber": 2.0,
+"sodium": 3000,
+"servingWeight": 30,
+"source": "估算"
+},
+"十三香粉": {
+"calories": 280,
+"protein": 8.0,
+"fat": 5.0,
+"carbs": 55.0,
+"fiber": 20.0,
+"sodium": 50.0,
+"servingWeight": 3,
+"source": "估算"
+},
+"小龙虾尾": {
+"calories": 93,
+"protein": 18.9,
+"fat": 1.1,
+"carbs": 0.4,
+"fiber": 0,
+"sodium": 60.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"马苏里拉芝士": {
+"calories": 300,
+"protein": 25.0,
+"fat": 20.0,
+"carbs": 3.0,
+"fiber": 0,
+"sodium": 600.0,
+"servingWeight": 30,
+"source": "估算"
+},
+"沙拉酱": {
+"calories": 680,
+"protein": 1.5,
+"fat": 74.0,
+"carbs": 8.0,
+"fiber": 0,
+"sodium": 500.0,
+"servingWeight": 15,
+"source": "估算"
+},
+"螃蟹": {
+"calories": 103,
+"protein": 17.5,
+"fat": 2.6,
+"carbs": 2.3,
+"fiber": 0,
+"sodium": 193.5,
+"servingWeight": 300,
+"source": "成分表"
+},
+"大闸蟹": {
+"calories": 103,
+"protein": 17.5,
+"fat": 2.6,
+"carbs": 2.3,
+"fiber": 0,
+"sodium": 193.5,
+"servingWeight": 300,
+"source": "成分表"
+},
+"蟹粉（蟹黄蟹肉）": {
+"calories": 103,
+"protein": 17.5,
+"fat": 2.6,
+"carbs": 2.3,
+"fiber": 0,
+"sodium": 193.0,
+"servingWeight": 100,
+"source": "估算"
+},
+"蟹棒": {
+"calories": 90,
+"protein": 9.0,
+"fat": 0.6,
+"carbs": 12.0,
+"fiber": 0,
+"sodium": 500.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"花甲": {
+"calories": 62,
+"protein": 10.1,
+"fat": 1.1,
+"carbs": 2.8,
+"fiber": 0,
+"sodium": 425.0,
+"servingWeight": 250,
+"source": "估算"
+},
+"花蛤": {
+"calories": 62,
+"protein": 10.1,
+"fat": 1.1,
+"carbs": 2.8,
+"fiber": 0,
+"sodium": 425.0,
+"servingWeight": 250,
+"source": "估算"
+},
+"蛏子": {
+"calories": 62,
+"protein": 10.1,
+"fat": 1.1,
+"carbs": 2.8,
+"fiber": 0,
+"sodium": 425.0,
+"servingWeight": 250,
+"source": "估算"
+},
+"蛤蜊": {
+"calories": 62,
+"protein": 10.1,
+"fat": 1.1,
+"carbs": 2.8,
+"fiber": 0,
+"sodium": 425.0,
+"servingWeight": 250,
+"source": "成分表"
+},
+"生蚝": {
+"calories": 73,
+"protein": 10.9,
+"fat": 1.5,
+"carbs": 4.9,
+"fiber": 0,
+"sodium": 462.0,
+"servingWeight": 200,
+"source": "成分表"
+},
+"生蚝肉": {
+"calories": 73,
+"protein": 10.9,
+"fat": 1.5,
+"carbs": 4.9,
+"fiber": 0,
+"sodium": 462.0,
+"servingWeight": 200,
+"source": "成分表"
+},
+"扇贝": {
+"calories": 110,
+"protein": 17.0,
+"fat": 1.5,
+"carbs": 5.0,
+"fiber": 0,
+"sodium": 140.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"扇贝肉": {
+"calories": 110,
+"protein": 17.0,
+"fat": 1.5,
+"carbs": 5.0,
+"fiber": 0,
+"sodium": 140.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"鱿鱼": {
+"calories": 75,
+"protein": 15.2,
+"fat": 0.8,
+"carbs": 0.9,
+"fiber": 0,
+"sodium": 134.7,
+"servingWeight": 200,
+"source": "成分表"
+},
+"鱿鱼须": {
+"calories": 75,
+"protein": 15.2,
+"fat": 0.8,
+"carbs": 0.9,
+"fiber": 0,
+"sodium": 134.7,
+"servingWeight": 200,
+"source": "估算"
+},
+"鱿鱼圈": {
+"calories": 75,
+"protein": 15.2,
+"fat": 0.8,
+"carbs": 0.9,
+"fiber": 0,
+"sodium": 134.7,
+"servingWeight": 200,
+"source": "估算"
+},
+"墨鱼": {
+"calories": 83,
+"protein": 15.2,
+"fat": 0.9,
+"carbs": 3.4,
+"fiber": 0,
+"sodium": 140.0,
+"servingWeight": 200,
+"source": "成分表"
+},
+"墨鱼干": {
+"calories": 287,
+"protein": 65.3,
+"fat": 1.9,
+"carbs": 2.1,
+"fiber": 0,
+"sodium": 560.0,
+"servingWeight": 80,
+"source": "估算"
+},
+"排骨": {
+"calories": 278,
+"protein": 18.3,
+"fat": 22.6,
+"carbs": 0,
+"fiber": 0,
+"sodium": 60.0,
+"servingWeight": 300,
+"source": "成分表"
+},
+"带鱼": {
+"calories": 127,
+"protein": 17.7,
+"fat": 4.9,
+"carbs": 3.1,
+"fiber": 0,
+"sodium": 150.1,
+"servingWeight": 200,
+"source": "成分表"
+},
+"小黄鱼": {
+"calories": 99,
+"protein": 17.9,
+"fat": 3.0,
+"carbs": 0.1,
+"fiber": 0,
+"sodium": 103.0,
+"servingWeight": 300,
+"source": "估算"
+},
+"梅鱼": {
+"calories": 105,
+"protein": 17.0,
+"fat": 4.0,
+"carbs": 0.5,
+"fiber": 0,
+"sodium": 60.0,
+"servingWeight": 300,
+"source": "估算"
+},
+"马头鱼": {
+"calories": 105,
+"protein": 17.0,
+"fat": 4.0,
+"carbs": 0.5,
+"fiber": 0,
+"sodium": 60.0,
+"servingWeight": 300,
+"source": "估算"
+},
+"秋刀鱼": {
+"calories": 205,
+"protein": 18.1,
+"fat": 14.2,
+"carbs": 0.5,
+"fiber": 0,
+"sodium": 60.0,
+"servingWeight": 300,
+"source": "估算"
+},
+"沙丁鱼": {
+"calories": 89,
+"protein": 19.8,
+"fat": 1.1,
+"carbs": 0,
+"fiber": 0,
+"sodium": 80.0,
+"servingWeight": 300,
+"source": "估算"
+},
+"银鱼": {
+"calories": 105,
+"protein": 17.2,
+"fat": 4.0,
+"carbs": 0,
+"fiber": 0,
+"sodium": 75.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"泥鳅": {
+"calories": 96,
+"protein": 17.9,
+"fat": 2.0,
+"carbs": 1.7,
+"fiber": 0,
+"sodium": 40.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"黄鳝": {
+"calories": 89,
+"protein": 18.0,
+"fat": 1.4,
+"carbs": 1.2,
+"fiber": 0,
+"sodium": 52.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"田螺肉": {
+"calories": 60,
+"protein": 11.0,
+"fat": 0.2,
+"carbs": 3.6,
+"fiber": 0,
+"sodium": 380.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"田螺": {
+"calories": 60,
+"protein": 11.0,
+"fat": 0.2,
+"carbs": 3.6,
+"fiber": 0,
+"sodium": 380.0,
+"servingWeight": 250,
+"source": "估算"
+},
+"紫苏": {
+"calories": 30,
+"protein": 3.0,
+"fat": 0.5,
+"carbs": 4.0,
+"fiber": 2.0,
+"sodium": 5.0,
+"servingWeight": 5,
+"source": "估算"
+},
+"螺蛳肉": {
+"calories": 60,
+"protein": 11.0,
+"fat": 0.2,
+"carbs": 3.6,
+"fiber": 0,
+"sodium": 380.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"螺蛳": {
+"calories": 60,
+"protein": 11.0,
+"fat": 0.2,
+"carbs": 3.6,
+"fiber": 0,
+"sodium": 380.0,
+"servingWeight": 250,
+"source": "估算"
+},
+"虾": {
+"calories": 93,
+"protein": 18.6,
+"fat": 0.8,
+"carbs": 2.8,
+"fiber": 0,
+"sodium": 165.2,
+"servingWeight": 200,
+"source": "成分表"
+},
+"小鲫鱼": {
+"calories": 108,
+"protein": 17.1,
+"fat": 2.7,
+"carbs": 3.8,
+"fiber": 0,
+"sodium": 41.2,
+"servingWeight": 300,
+"source": "估算"
+},
+"小河虾": {
+"calories": 93,
+"protein": 18.6,
+"fat": 0.8,
+"carbs": 2.8,
+"fiber": 0,
+"sodium": 165.2,
+"servingWeight": 200,
+"source": "估算"
+},
+"牛里脊肉": {
+"calories": 107,
+"protein": 22.2,
+"fat": 0.9,
+"carbs": 2.4,
+"fiber": 0,
+"sodium": 45.0,
+"servingWeight": 200,
+"source": "成分表"
+},
+"牛腩": {
+"calories": 332,
+"protein": 17.1,
+"fat": 29.3,
+"carbs": 0,
+"fiber": 0,
+"sodium": 50.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"咖喱块": {
+"calories": 500,
+"protein": 8.0,
+"fat": 30.0,
+"carbs": 45.0,
+"fiber": 5.0,
+"sodium": 2000,
+"servingWeight": 15,
+"source": "估算"
+},
+"黑胡椒酱": {
+"calories": 90,
+"protein": 2.0,
+"fat": 0.5,
+"carbs": 18.0,
+"fiber": 0.5,
+"sodium": 1500,
+"servingWeight": 15,
+"source": "估算"
+},
+"黄牛肉": {
+"calories": 125,
+"protein": 20.0,
+"fat": 4.2,
+"carbs": 2.0,
+"fiber": 0,
+"sodium": 55.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"牛腱子肉": {
+"calories": 122,
+"protein": 20.1,
+"fat": 4.1,
+"carbs": 0.6,
+"fiber": 0,
+"sodium": 48.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"牛绞肉": {
+"calories": 210,
+"protein": 19.0,
+"fat": 15.0,
+"carbs": 0.5,
+"fiber": 0,
+"sodium": 55.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"牛肚": {
+"calories": 72,
+"protein": 14.5,
+"fat": 1.6,
+"carbs": 0,
+"fiber": 0,
+"sodium": 60.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"牛筋": {
+"calories": 151,
+"protein": 34.1,
+"fat": 0.5,
+"carbs": 2.6,
+"fiber": 0,
+"sodium": 70.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"牛心": {
+"calories": 106,
+"protein": 15.4,
+"fat": 3.5,
+"carbs": 3.1,
+"fiber": 0,
+"sodium": 70.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"牛肝": {
+"calories": 139,
+"protein": 19.8,
+"fat": 3.9,
+"carbs": 6.2,
+"fiber": 0,
+"sodium": 60.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"牛百叶": {
+"calories": 72,
+"protein": 14.5,
+"fat": 1.6,
+"carbs": 0,
+"fiber": 0,
+"sodium": 60.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"牛舌": {
+"calories": 196,
+"protein": 17.0,
+"fat": 13.3,
+"carbs": 2.2,
+"fiber": 0,
+"sodium": 90.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"杭椒": {
+"calories": 23,
+"protein": 1.0,
+"fat": 0.2,
+"carbs": 5.5,
+"fiber": 1.4,
+"sodium": 3.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"牛排": {
+"calories": 250,
+"protein": 24.0,
+"fat": 17.0,
+"carbs": 0,
+"fiber": 0,
+"sodium": 60.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"黄油": {
+"calories": 888,
+"protein": 0.4,
+"fat": 98.0,
+"carbs": 0,
+"fiber": 0,
+"sodium": 40.0,
+"servingWeight": 10,
+"source": "估算"
+},
+"迷迭香": {
+"calories": 30,
+"protein": 3.0,
+"fat": 0.5,
+"carbs": 4.0,
+"fiber": 2.0,
+"sodium": 5.0,
+"servingWeight": 3,
+"source": "估算"
+},
+"羊肉": {
+"calories": 203,
+"protein": 19.0,
+"fat": 14.1,
+"carbs": 0,
+"fiber": 0,
+"sodium": 80.6,
+"servingWeight": 200,
+"source": "成分表"
+},
+"生姜": {
+"calories": 46,
+"protein": 1.3,
+"fat": 0.6,
+"carbs": 10.3,
+"fiber": 2.7,
+"sodium": 14.9,
+"servingWeight": 5,
+"source": "成分表"
+},
+"羊肉片": {
+"calories": 203,
+"protein": 19.0,
+"fat": 14.1,
+"carbs": 0,
+"fiber": 0,
+"sodium": 80.0,
+"servingWeight": 200,
+"source": "成分表"
+},
+"羊排": {
+"calories": 203,
+"protein": 19.0,
+"fat": 14.1,
+"carbs": 0,
+"fiber": 0,
+"sodium": 80.0,
+"servingWeight": 300,
+"source": "成分表"
+},
+"羊杂（肚、肠、心、肝）": {
+"calories": 120,
+"protein": 15.0,
+"fat": 6.0,
+"carbs": 1.0,
+"fiber": 0,
+"sodium": 80.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"羊杂": {
+"calories": 120,
+"protein": 15.0,
+"fat": 6.0,
+"carbs": 1.0,
+"fiber": 0,
+"sodium": 80.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"羊肚": {
+"calories": 87,
+"protein": 12.2,
+"fat": 3.4,
+"carbs": 1.8,
+"fiber": 0,
+"sodium": 60.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"羊绞肉": {
+"calories": 210,
+"protein": 18.5,
+"fat": 15.0,
+"carbs": 0.5,
+"fiber": 0,
+"sodium": 80.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"兔肉": {
+"calories": 102,
+"protein": 19.7,
+"fat": 2.2,
+"carbs": 0.9,
+"fiber": 0,
+"sodium": 45.0,
+"servingWeight": 200,
+"source": "成分表"
+},
+"蒜末": {
+"calories": 128,
+"protein": 4.5,
+"fat": 0.2,
+"carbs": 27.6,
+"fiber": 1.1,
+"sodium": 19.6,
+"servingWeight": 5,
+"source": "估算"
+},
+"嫩南瓜": {
+"calories": 22,
+"protein": 0.7,
+"fat": 0.1,
+"carbs": 5.3,
+"fiber": 0.8,
+"sodium": 0.8,
+"servingWeight": 200,
+"source": "估算"
+},
+"茶叶": {
+"calories": 2,
+"protein": 0.3,
+"fat": 0,
+"carbs": 0.3,
+"fiber": 0.1,
+"sodium": 2.0,
+"servingWeight": 3,
+"source": "估算"
+},
+"温水": {
+"calories": 0,
+"protein": 0,
+"fat": 0,
+"carbs": 0,
+"fiber": 0,
+"sodium": 0,
+"servingWeight": 100,
+"source": "估算"
+},
+"干贝（瑶柱）": {
+"calories": 264,
+"protein": 55.6,
+"fat": 2.4,
+"carbs": 5.1,
+"fiber": 0,
+"sodium": 306.0,
+"servingWeight": 30,
+"source": "成分表"
+},
+"瘦肉": {
+"calories": 143,
+"protein": 20.3,
+"fat": 6.2,
+"carbs": 1.5,
+"fiber": 0,
+"sodium": 57.5,
+"servingWeight": 200,
+"source": "成分表"
+},
+"米线": {
+"calories": 97,
+"protein": 2.2,
+"fat": 0.2,
+"carbs": 21.5,
+"fiber": 0.5,
+"sodium": 2.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"河粉": {
+"calories": 120,
+"protein": 3.0,
+"fat": 0.5,
+"carbs": 25.0,
+"fiber": 0.5,
+"sodium": 3.0,
+"servingWeight": 200,
+"source": "估算"
+},
+"米饭": {
+"calories": 116,
+"protein": 2.6,
+"fat": 0.3,
+"carbs": 25.6,
+"fiber": 0.3,
+"sodium": 2.5,
+"servingWeight": 200,
+"source": "成分表"
+},
+"火腿": {
+"calories": 330,
+"protein": 16.0,
+"fat": 27.4,
+"carbs": 0,
+"fiber": 0,
+"sodium": 1086.0,
+"servingWeight": 100,
+"source": "成分表"
+},
+"玉米": {
+"calories": 112,
+"protein": 4.0,
+"fat": 1.2,
+"carbs": 22.8,
+"fiber": 2.9,
+"sodium": 1.1,
+"servingWeight": 200,
+"source": "成分表"
+},
+"鸡蛋干": {
+"calories": 140,
+"protein": 14.0,
+"fat": 9.0,
+"carbs": 2.0,
+"fiber": 0,
+"sodium": 400.0,
+"servingWeight": 100,
+"source": "估算"
+},
+"牛尾": {
+"calories": 218,
+"protein": 17.7,
+"fat": 16.3,
+"carbs": 0,
+"fiber": 0,
+"sodium": 60.0,
+"servingWeight": 300,
+"source": "估算"
+},
+"羊蹄": {
+"calories": 250,
+"protein": 21.0,
+"fat": 17.0,
+"carbs": 0,
+"fiber": 0,
+"sodium": 75.0,
+"servingWeight": 250,
+"source": "估算"
+},
+"羊腰": {
+"calories": 96,
+"protein": 16.6,
+"fat": 3.3,
+"carbs": 1.0,
+"fiber": 0,
+"sodium": 130.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"牛腰": {
+"calories": 94,
+"protein": 15.6,
+"fat": 2.6,
+"carbs": 1.0,
+"fiber": 0,
+"sodium": 130.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"羊筋": {
+"calories": 151,
+"protein": 34.1,
+"fat": 0.5,
+"carbs": 2.6,
+"fiber": 0,
+"sodium": 70.0,
+"servingWeight": 150,
+"source": "估算"
+},
+"牛肉": {
+"calories": 106,
+"protein": 20.2,
+"fat": 2.3,
+"carbs": 1.2,
+"fiber": 0,
+"sodium": 53.6,
+"servingWeight": 200,
+"source": "成分表"
+},
+"紫菜": {
+"calories": 250,
+"protein": 26.7,
+"fat": 1.1,
+"carbs": 44.1,
+"fiber": 21.6,
+"sodium": 710.5,
+"servingWeight": 20,
+"source": "成分表"
+},
+"虾皮": {
+"calories": 153,
+"protein": 30.7,
+"fat": 2.2,
+"carbs": 2.5,
+"fiber": 0,
+"sodium": 5057.0,
+"servingWeight": 30,
+"source": "成分表"
+},
+"面条": {
+"calories": 137,
+"protein": 4.8,
+"fat": 0.7,
+"carbs": 28.2,
+"fiber": 0.8,
+"sodium": 2.0,
+"servingWeight": 200,
+"source": "成分表"
+}
+}

@@ -27,13 +27,22 @@ export const INGREDIENT_SYNONYMS: Map<string, string[]> = new Map<string, string
   ['面食', ['面粉', '中筋面粉', '低筋面粉', '高筋面粉', '全麦面粉', '小麦粉']],
   ['粉丝', ['龙口粉丝', '番薯粉丝', '红薯粉丝', '粉条', '宽粉']],
   ['豆皮', ['千张', '豆腐皮', '油皮', '薄百叶']],
+  ['南瓜', ['老南瓜', '嫩南瓜', '贝贝南瓜', '日本南瓜']],
+  ['茄子', ['长茄子', '圆茄子', '紫茄子', '茄子干']],
 ])
+
+/** 同义词展开结果缓存：搜索时每个菜谱都会重复调用，避免重复遍历同义词表 */
+const ALIAS_CACHE: Map<string, string[]> = new Map()
 
 /**
  * 给定一个食材名，返回它的所有等价名（含自身）。
- * 用于在搜索时扩展用户选择的食材集合。
+ * 用于在搜索时扩展用户选择的食材集合。返回值只读，调用方不要修改。
  */
 export function getIngredientAliases(name: string): string[] {
+  const cached = ALIAS_CACHE.get(name)
+  if (cached !== undefined) {
+    return cached
+  }
   const result: string[] = [name]
 
   // 1. 该名作为 key：加入其所有同义词
@@ -81,5 +90,6 @@ export function getIngredientAliases(name: string): string[] {
     }
   })
 
+  ALIAS_CACHE.set(name, result)
   return result
 }

@@ -1,4 +1,6 @@
 import type { StuffItem } from '../model/recipe';
+import { canonicalIngredientName } from '../service/IngredientMatchService';
+import { getIngredientAliases } from './IngredientSynonyms';
 
 /**
  * 扩展后的食材与厨具全库
@@ -46,6 +48,7 @@ export const leafyVegItems: StuffItem[] = [
 
 export const rootVegItems: StuffItem[] = [
   { name: '胡萝卜', emoji: '🥕' },
+  { name: '洋葱', emoji: '🧅' },
   { name: '白萝卜', emoji: '🥕' },
   { name: '萝卜干', emoji: '🥕' },
   { name: '土豆', emoji: '🥔' },
@@ -66,16 +69,12 @@ export const gourdItems: StuffItem[] = [
   { name: '黄椒', emoji: '🫑' },
   { name: '秋葵', emoji: '🌱' },
   { name: '茄子', emoji: '🍆' },
-  { name: '长茄子', emoji: '🍆' },
-  { name: '茄子干', emoji: '🍆' },
   { name: '黄瓜', emoji: '🥒' },
   { name: '苦瓜', emoji: '🥒' },
   { name: '丝瓜', emoji: '🥒' },
   { name: '西葫芦', emoji: '🥒' },
   { name: '冬瓜', emoji: '🍈' },
   { name: '南瓜', emoji: '🎃' },
-  { name: '老南瓜', emoji: '🎃' },
-  { name: '嫩南瓜', emoji: '🎃' },
   { name: '西兰花', emoji: '🥦' },
   { name: '菜花', emoji: '🥦' },
   { name: '玉米', emoji: '🌽' },
@@ -304,9 +303,12 @@ export const meatItems: StuffItem[] = [
 
 // 碳水/主食库（仅保留在 recipe.json 中有实际覆盖的食材）
 export const stapleItems: StuffItem[] = [
-  { name: '粉丝', emoji: '🍜' },
-  { name: '面食', emoji: '🫓' },
-  { name: '米饭', emoji: '🍚' }
+  { name: '米饭', emoji: '🍚' },
+  { name: '面条', emoji: '🍜' },
+  { name: '粉丝', emoji: '🍥' },
+  { name: '米线', emoji: '🍜' },
+  { name: '河粉', emoji: '🍜' },
+  { name: '面食', emoji: '🫓' }
 ];
 
 export const toolItems: StuffItem[] = [
@@ -314,8 +316,222 @@ export const toolItems: StuffItem[] = [
   { name: '炖锅', emoji: '🥘' },
   { name: '煮锅', emoji: '🫕' },
   { name: '蒸锅', emoji: '♨️' },
+  { name: '微波炉', emoji: '⏲️' },
   { name: '平底锅', emoji: '🥞' },
   { name: '砂锅', emoji: '🏺' },
   { name: '烤箱', emoji: '🕋' },
   { name: '电饭煲', emoji: '🍲' },
 ];
+
+/** 全量食材名 → emoji 扁平映射（懒构建一次，用于无图菜谱的 emoji 占位）。 */
+const ingredientEmojiMap: Map<string, string> = (() => {
+  const map = new Map<string, string>();
+  const all: StuffItem[] = [...vegetableItems, ...meatItems, ...stapleItems];
+  for (let i = 0; i < all.length; i++) {
+    if (!map.has(all[i].name)) {
+      map.set(all[i].name, all[i].emoji);
+    }
+  }
+  return map;
+})();
+
+/** 按名称查询食材库中的 emoji，未收录时返回 undefined（供购物清单兜底使用） */
+export function findIngredientEmoji(name: string): string | undefined {
+  return ingredientEmojiMap.get(name);
+}
+
+/** 冰箱选料目录的全量名称（去重），用于把菜谱原始食材名归一化到可勾选的目录名。 */
+const catalogNames: string[] = (() => {
+  const names: string[] = [];
+  const all: StuffItem[] = [...vegetableItems, ...meatItems, ...stapleItems];
+  for (let i = 0; i < all.length; i++) {
+    if (!names.includes(all[i].name)) {
+      names.push(all[i].name);
+    }
+  }
+  return names;
+})();
+
+/** 目录名的规范形式预计算：避免每次解析都对整个目录重算一遍同义词归并 */
+const catalogCanonicalNames: string[] = (() => {
+  const out: string[] = [];
+  for (let i = 0; i < catalogNames.length; i++) {
+    out.push(canonicalIngredientName(catalogNames[i]));
+  }
+  return out;
+})();
+
+interface CatalogFallbackRule {
+  key: string
+  target: string
+}
+
+/**
+ * 关键词兜底（顺序即优先级）：处理「三黄鸡1只 / 鸭半只 / 猪排骨」这类
+ * 带品种、数量或部位说法、无法直接命中的名称。
+ */
+const CATALOG_FALLBACK_RULES: CatalogFallbackRule[] = [
+  { key: '排骨', target: '猪肋排' },
+  { key: '五花', target: '五花肉' },
+  { key: '里脊', target: '猪里脊肉' },
+  { key: '鸡腿', target: '鸡腿' },
+  { key: '鸡胸', target: '鸡胸肉' },
+  { key: '鸡翅', target: '鸡翅中' },
+  { key: '鸡爪', target: '鸡爪' },
+  { key: '鸡', target: '鸡肉' },
+  { key: '鸭', target: '鸭子' },
+  { key: '鹅', target: '鹅肉' },
+  { key: '牛', target: '牛肉' },
+  { key: '羊', target: '羊肉' },
+  { key: '猪', target: '猪肉' },
+  { key: '虾仁', target: '虾仁' },
+  { key: '虾', target: '虾' },
+  { key: '蟹', target: '螃蟹' },
+  { key: '笋', target: '竹笋' }
+]
+
+/**
+ * 属于「同类不同物」的名称：子串/关键词匹配会误判为目录食材
+ * （淀粉→土豆、牛奶→牛肉、鸡油→鸡肉、黄豆→黄豆芽），必须直接跳过。
+ * 仅在「目录同名」之后判断，保证黄豆芽等目录食材本身不受影响。
+ */
+const CATALOG_SKIP_TERMS: string[] = [
+  '淀粉', '面粉', '酸豆', '木耳菜', '盐焗鸡粉', '鸡油', '鸭油',
+  '牛奶', '奶油', '牛油果', '鸡杂', '鸭杂', '黄豆'
+]
+
+/** 无法通过子串/同义词推出的定向别名（键为菜谱原始名，值为目录名）。 */
+const CATALOG_DIRECT_ALIASES: Record<string, string> = {
+  '鸭肉': '鸭子',
+  '萝卜': '白萝卜'
+}
+
+/**
+ * 归一化结果缓存。菜谱食材名在每次勾选搜索中会被反复解析上万次，
+ * 而目录与同义词表是静态的，缓存后重复解析退化为一次 Map 查找。
+ * 键为 trim 后的原始名，值可能是 null（目录未收录），需用 has 语义区分。
+ */
+const resolveCatalogNameCache: Map<string, string | null> = new Map();
+
+/**
+ * 把任意食材名映射到冰箱选料目录中的规范名（采购清单补货与匹配共用）。
+ * 顺序：目录同名 → 排除项 → 别名等价 → 定向别名 → 目录名被包含 →
+ * 同义词库 → 食材名被包含 → 关键词兜底。
+ * 返回 null 表示目录未收录（多为调料、厨具或稀有食材），调用方应跳过。
+ */
+export function resolveCatalogName(name: string): string | null {
+  const trimmed = name.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+  const cached = resolveCatalogNameCache.get(trimmed);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const resolved = resolveCatalogNameUncached(trimmed);
+  resolveCatalogNameCache.set(trimmed, resolved);
+  return resolved;
+}
+
+function resolveCatalogNameUncached(trimmed: string): string | null {
+  if (ingredientEmojiMap.has(trimmed)) {
+    return trimmed;
+  }
+  for (let i = 0; i < CATALOG_SKIP_TERMS.length; i++) {
+    if (trimmed.includes(CATALOG_SKIP_TERMS[i])) {
+      return null;
+    }
+  }
+  const canonical = canonicalIngredientName(trimmed);
+  for (let i = 0; i < catalogNames.length; i++) {
+    if (catalogCanonicalNames[i] === canonical) {
+      return catalogNames[i];
+    }
+  }
+  const direct = CATALOG_DIRECT_ALIASES[trimmed];
+  if (direct !== undefined && ingredientEmojiMap.has(direct)) {
+    return direct;
+  }
+  // 目录名被完整包含（草鱼片 → 草鱼、猪五花肉 → 五花肉），取最长者，避免过粗匹配
+  let contained: string | null = null;
+  for (let i = 0; i < catalogNames.length; i++) {
+    const candidate = catalogNames[i];
+    if (candidate.length >= 2 && trimmed.includes(candidate)) {
+      if (contained === null || candidate.length > contained.length) {
+        contained = candidate;
+      }
+    }
+  }
+  if (contained !== null) {
+    return contained;
+  }
+  // 同义词库（萝卜 → 白萝卜、大米 → 米饭、整鸡 → 鸡肉）
+  const aliases = getIngredientAliases(trimmed);
+  for (let i = 1; i < aliases.length; i++) {
+    if (ingredientEmojiMap.has(aliases[i])) {
+      return aliases[i];
+    }
+  }
+  // 食材名是目录名的片段（里脊肉 → 猪里脊肉、白菜 → 大白菜），取最短者
+  let fragment: string | null = null;
+  for (let i = 0; i < catalogNames.length; i++) {
+    const candidate = catalogNames[i];
+    if (trimmed.length >= 2 && candidate.includes(trimmed)) {
+      if (fragment === null || candidate.length < fragment.length) {
+        fragment = candidate;
+      }
+    }
+  }
+  if (fragment !== null) {
+    return fragment;
+  }
+  for (let i = 0; i < CATALOG_FALLBACK_RULES.length; i++) {
+    const rule = CATALOG_FALLBACK_RULES[i];
+    if (trimmed.includes(rule.key) && ingredientEmojiMap.has(rule.target)) {
+      return rule.target;
+    }
+  }
+  return null;
+}
+
+/**
+ * 两个食材名是否指向冰箱选料目录中的同一项。
+ * 供采购清单与搜索复用，保证「补货入冰箱」后同一个菜谱的缺料判断与推荐一致。
+ * 任一名称无法归一化（调料、厨具、稀有食材）时返回 false。
+ */
+export function sameCatalogIngredient(a: string, b: string): boolean {
+  const ta = a.trim();
+  const tb = b.trim();
+  if (ta.length > 0 && ta === tb) {
+    return true;
+  }
+  const resolvedA = resolveCatalogName(ta);
+  if (resolvedA === null) {
+    return false;
+  }
+  return resolvedA === resolveCatalogName(tb);
+}
+
+/** 冰箱选料（目录名）里是否已有该食材（按目录归一化比较）。 */
+export function isCatalogIngredientAvailable(required: string, selected: string[]): boolean {
+  for (let i = 0; i < selected.length; i++) {
+    if (sameCatalogIngredient(required, selected[i])) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * 依据菜谱食材推导一个代表性 emoji（用于无图占位）。
+ * 按食材出现顺序取第一个命中的食材 emoji，无命中则返回通用餐具 emoji。
+ */
+export function getRecipeEmoji(stuff: string[]): string {
+  for (let i = 0; i < stuff.length; i++) {
+    const e = ingredientEmojiMap.get(stuff[i]);
+    if (e !== undefined) {
+      return e;
+    }
+  }
+  return '🍽️';
+}

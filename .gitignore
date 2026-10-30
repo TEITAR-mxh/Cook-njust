@@ -19,5 +19,14 @@ tools/
 CLAUDE.md
 ~/
 
+# 本地缓存 / 工具生成物
+.cache/
+.sixth/
+__pycache__/
+content/
+
 # 证书文件相关
 /build-profile.json5
+
+# 云服务密钥（含真实 API Key/Secret，禁止提交；请用 CloudApiConfig.example.ets 作模板）
+entry/src/main/ets/config/CloudApiConfig.ets

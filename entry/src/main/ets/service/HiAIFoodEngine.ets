@@ -130,19 +130,13 @@ export class HiAIFoodEngine implements InferenceEngine {
         imageUri, MODEL_INPUT_W, MODEL_INPUT_H
       )
 
-      // 2. 获取模型输入/输出张量（MindSpore Lite 需预分配 outputs）
+      // 2. 获取模型输入张量
       const model = this.msModel as Record<string, Function>
       const inputs: Object[] = model['getInputs']() as Object[]
       if (inputs.length === 0) {
         console.error('[HiAIFoodEngine] No input tensors found')
         return null
       }
-      const outputs: Object[] = model['getOutputs']() as Object[]
-      if (outputs.length === 0) {
-        console.error('[HiAIFoodEngine] No output tensors found')
-        return null
-      }
-      console.info(`[HiAIFoodEngine] Model has ${inputs.length} input(s), ${outputs.length} output(s)`)
 
       // 3. 填充输入数据
       const inputBuffer: ArrayBuffer = inputTensor.buffer.slice(
@@ -151,8 +145,12 @@ export class HiAIFoodEngine implements InferenceEngine {
       const inputTensorObj = inputs[0] as Record<string, Function>
       inputTensorObj['setData'](inputBuffer)
 
-      // 4. 执行推理（predict 将结果写入预分配的 outputs 张量，返回 void）
-      await model['predict'](inputs, outputs)
+      // 4. 执行推理：predict 返回输出张量（运行时没有 getOutputs API）
+      const outputs: Object[] = await model['predict'](inputs) as Object[]
+      if (outputs.length === 0) {
+        console.error('[HiAIFoodEngine] predict returned no output tensors')
+        return null
+      }
       console.info('[HiAIFoodEngine] predict() completed')
 
       // 5. 读取输出
@@ -204,9 +202,8 @@ export class HiAIFoodEngine implements InferenceEngine {
     try {
       const model = this.msModel as Record<string, Function>
       const inputs: Object[] = model['getInputs']() as Object[]
-      const outputs: Object[] = model['getOutputs']() as Object[]
-      if (inputs.length === 0 || outputs.length === 0) {
-        console.error('[HiAIFoodEngine] Verification failed: no tensors')
+      if (inputs.length === 0) {
+        console.error('[HiAIFoodEngine] Verification failed: no input tensors')
         return false
       }
 
@@ -218,7 +215,11 @@ export class HiAIFoodEngine implements InferenceEngine {
       const inputTensorObj = inputs[0] as Record<string, Function>
       inputTensorObj['setData'](inputBuffer)
 
-      await model['predict'](inputs, outputs)
+      const outputs: Object[] = await model['predict'](inputs) as Object[]
+      if (outputs.length === 0) {
+        console.error('[HiAIFoodEngine] Verification failed: no output tensors')
+        return false
+      }
 
       const outputTensorObj = outputs[0] as Record<string, Function>
       const outputBuffer: ArrayBuffer = outputTensorObj['getData']() as ArrayBuffer

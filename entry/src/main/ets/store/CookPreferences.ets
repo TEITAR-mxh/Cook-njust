@@ -1,6 +1,9 @@
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 import type { SearchMode } from '../model/recipe';
+import type { MealPlan, MeatRatio } from '../model/mealPlan';
+import { DEFAULT_DIET_PROFILE } from '../model/dietProfile';
+import type { ActivityLevel, DietProfile, Gender, GoalType } from '../model/dietProfile';
 
 const PREF_STORE_NAME = 'cook_storage';
 
@@ -26,6 +29,20 @@ export interface FolderItem {
   name: string
   recipeIds: number[]
   createdAt: number
+}
+
+/** 下厨记录汇总（供「餐桌」页下厨记录区块与菜谱详情展示） */
+export interface CookedSummary {
+  /** 有下厨记录的天数 */
+  totalTimes: number
+  /** 近 7 天内下厨的天数 */
+  weekTimes: number
+  /** 最近做过的菜谱 id（按日期倒序，已去重） */
+  recentRecipeIds: number[]
+  /** recipeId → 最近一次下厨日期（YYYY-MM-DD） */
+  lastDates: Record<string, string>
+  /** recipeId → 累计下厨天数 */
+  counts: Record<string, number>
 }
 
 const DEFAULT_SETTINGS: UserSettings = { keepLocalData: true };
@@ -59,14 +76,22 @@ export class CookPreferenceKeys {
   static readonly FAVORITES: string = 'favorites'
   static readonly HISTORY: string = 'history'
   static readonly PRIVACY_ACCEPTED: string = 'privacy_accepted'
+  /** 是否已看过新手引导（首次启动展示一次） */
+  static readonly ONBOARDING_DONE: string = 'onboarding_done'
   static readonly THEME_CHANGE_TIMESTAMP: string = 'theme_change_timestamp'
   static readonly FOLDERS: string = 'folders'
   /** 搜索关键词历史（string[]，最新在前，最多 20 条） */
   static readonly SEARCH_HISTORY: string = 'search_history'
   /** 带日期的浏览历史（Record<YYYY-MM-DD, number[]>） */
   static readonly HISTORY_DATED: string = 'history_dated'
+  /** 下厨记录（Record<YYYY-MM-DD, number[]>，加入今日餐桌时自动写入） */
+  static readonly COOKED_LOG: string = 'cooked_log'
   /** 今日餐桌菜谱 ID 列表（number[]） */
   static readonly TODAY_MENU: string = 'today_menu'
+  /** 一餐套餐（MealPlan JSON） */
+  static readonly MEAL_PLAN: string = 'meal_plan'
+  /** 个人健康目标档案（DietProfile JSON） */
+  static readonly DIET_PROFILE: string = 'diet_profile'
   /** 每日推荐通知开关 */
   static readonly DAILY_RECOMMEND_SWITCH: string = 'daily_recommend_switch'
   /** 每日推荐通知时间 - 小时（0-23） */
@@ -79,6 +104,10 @@ export class CookPreferenceKeys {
   static readonly RECOMMEND_HISTORY: string = 'recommend_history'
   /** reminderAgentManager 保存的提醒 ID（用于取消旧提醒） */
   static readonly DAILY_REMINDER_AGENT_ID: string = 'daily_reminder_agent_id'
+  /** 通知里点名推荐的菜谱 ID（点击通知时直接打开这道菜） */
+  static readonly DAILY_REMINDER_RECIPE_ID: string = 'daily_reminder_recipe_id'
+  /** 最近一次刷新通知内容日期（YYYY-M-D，用于每天只刷新一次） */
+  static readonly DAILY_REMINDER_DATE: string = 'daily_reminder_date'
 }
 
 /**
@@ -225,6 +254,7 @@ export class CookPreferences {
     await p.put(CookPreferenceKeys.MODE, 'loose');
     await p.put(CookPreferenceKeys.HISTORY, '[]');
     await p.put(CookPreferenceKeys.FAVORITES, '[]');
+    await p.put(CookPreferenceKeys.COOKED_LOG, '{}');
     await p.flush();
   }
 
@@ -360,6 +390,19 @@ export class CookPreferences {
     await p.flush();
   }
 
+  static async hasSeenOnboarding(context: common.Context): Promise<boolean> {
+    const p = await CookPreferences.getStore(context);
+    const raw = await p.get(CookPreferenceKeys.ONBOARDING_DONE, false);
+    return raw === true;
+  }
+
+  /** 新手引导属于 UI 状态而非用户数据，不受「保留本地数据」开关影响 */
+  static async setOnboardingSeen(context: common.Context, seen: boolean): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.ONBOARDING_DONE, seen);
+    await p.flush();
+  }
+
   /** 记录一次浏览菜谱：去重后插到队首，最多保留 HISTORY_MAX 条；同时写入带日期的历史 */
   static async recordHistoryVisit(context: common.Context, recipeId: number): Promise<void> {
     if (recipeId < 0 || Math.floor(recipeId) !== recipeId) {
@@ -434,8 +477,8 @@ export class CookPreferences {
   static async getSearchMode(context: common.Context): Promise<SearchMode> {
     const p = await CookPreferences.getStore(context);
     const raw = CookPreferences.getSettingsString(await p.get(CookPreferenceKeys.MODE, 'loose'));
-    if (raw === 'strict' || raw === 'survival' || raw === 'loose') {
-      return raw as SearchMode;
+    if (raw === 'survival' || raw === 'strict') {
+      return raw;
     }
     return 'loose';
   }
@@ -494,6 +537,23 @@ export class CookPreferences {
     folders.push(folder);
     await CookPreferences.setFolders(context, folders);
     return folder;
+  }
+
+  /**
+   * 用户还没有任何收藏夹时，收藏自动归入的默认文件夹名称。
+   * 与手动创建的文件夹一致持久化，之后可改名或删除。
+   */
+  static readonly DEFAULT_FOLDER_NAME: string = '默认收藏夹'
+
+  /** 取默认收藏夹；不存在则创建。避免收藏时被空文件夹面板打断。 */
+  static async ensureDefaultFolder(context: common.Context): Promise<FolderItem> {
+    const folders = await CookPreferences.getFolders(context);
+    for (let i = 0; i < folders.length; i++) {
+      if (folders[i].name === CookPreferences.DEFAULT_FOLDER_NAME) {
+        return folders[i];
+      }
+    }
+    return await CookPreferences.createFolder(context, CookPreferences.DEFAULT_FOLDER_NAME);
   }
 
   static async addRecipeToFolder(context: common.Context, folderId: string, recipeId: number): Promise<void> {
@@ -585,7 +645,8 @@ export class CookPreferences {
 
   // ─── 带日期的浏览历史 ─────────────────────────────────────
 
-  private static todayDateString(): string {
+  /** 今天的日期键（YYYY-MM-DD），同时用于浏览历史与下厨记录 */
+  static todayDateString(): string {
     const d = new Date();
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -633,6 +694,149 @@ export class CookPreferences {
     }
   }
 
+  // ─── 下厨记录 ─────────────────────────────────────────────
+
+  static async getCookedLog(context: common.Context): Promise<Record<string, number[]>> {
+    const p = await CookPreferences.getStore(context);
+    const raw = CookPreferences.getSettingsString(await p.get(CookPreferenceKeys.COOKED_LOG, ''));
+    if (raw.length === 0) {
+      return {};
+    }
+    try {
+      const parsed = JSON.parse(raw) as Record<string, number[]>;
+      if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return {};
+      }
+      return parsed;
+    } catch {
+      return {};
+    }
+  }
+
+  /**
+   * 切换「今天做过这道菜」：未记录则写入，已记录则撤销。
+   * 同一天同一道菜只记一次，返回 true 表示当前为已记录状态。
+   */
+  static async toggleCookedToday(context: common.Context, recipeId: number): Promise<boolean> {
+    if (recipeId < 0 || Math.floor(recipeId) !== recipeId) {
+      return false;
+    }
+    const p = await CookPreferences.getStore(context);
+    const log = await CookPreferences.getCookedLog(context);
+    const today = CookPreferences.todayDateString();
+    const todayList: number[] = log[today] ?? [];
+    const kept: number[] = [];
+    let wasCooked = false;
+    for (let i = 0; i < todayList.length; i++) {
+      if (todayList[i] === recipeId) {
+        wasCooked = true;
+      } else {
+        kept.push(todayList[i]);
+      }
+    }
+    if (!wasCooked) {
+      const next: number[] = [recipeId];
+      for (let i = 0; i < kept.length; i++) {
+        next.push(kept[i]);
+      }
+      log[today] = next;
+    } else {
+      // 保留空数组而非 delete，便于后续日期键持续存在（汇总时跳过空列表即可）
+      log[today] = kept;
+    }
+    await p.put(CookPreferenceKeys.COOKED_LOG, JSON.stringify(log));
+    await p.flush();
+    return !wasCooked;
+  }
+
+  /**
+   * 幂等记入「今天做过这道菜」：已记录则不动（不撤销）。
+   * 供「加入今日餐桌」合并动作使用——加入餐桌即视为今天做过，累计下厨次数。
+   */
+  static async recordCookedToday(context: common.Context, recipeId: number): Promise<boolean> {
+    if (recipeId < 0 || Math.floor(recipeId) !== recipeId) {
+      return false;
+    }
+    const p = await CookPreferences.getStore(context);
+    const log = await CookPreferences.getCookedLog(context);
+    const today = CookPreferences.todayDateString();
+    const todayList: number[] = log[today] ?? [];
+    for (let i = 0; i < todayList.length; i++) {
+      if (todayList[i] === recipeId) {
+        return true;
+      }
+    }
+    const next: number[] = [recipeId];
+    for (let i = 0; i < todayList.length; i++) {
+      next.push(todayList[i]);
+    }
+    log[today] = next;
+    await p.put(CookPreferenceKeys.COOKED_LOG, JSON.stringify(log));
+    await p.flush();
+    return true;
+  }
+
+  private static dateKeyToDayIndex(dateStr: string): number {
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) {
+      return -1;
+    }
+    const y = Number(parts[0]);
+    const m = Number(parts[1]);
+    const d = Number(parts[2]);
+    if (!(y > 0 && m > 0 && d > 0)) {
+      return -1;
+    }
+    return Math.floor(new Date(y, m - 1, d).getTime() / 86400000);
+  }
+
+  /** 汇总下厨记录：总天数、近 7 天次数、最近做过的菜与每道菜的累计/上次日期 */
+  static async getCookedSummary(context: common.Context): Promise<CookedSummary> {
+    const log = await CookPreferences.getCookedLog(context);
+    const keys = Object.keys(log);
+    let totalTimes = 0;
+    let weekTimes = 0;
+    const counts: Record<string, number> = {};
+    const lastDates: Record<string, string> = {};
+    const todayIdx = CookPreferences.dateKeyToDayIndex(CookPreferences.todayDateString());
+    for (let i = 0; i < keys.length; i++) {
+      const dateKey = keys[i];
+      const ids = log[dateKey];
+      if (ids === undefined || ids.length === 0) {
+        continue;
+      }
+      totalTimes++;
+      const dayIdx = CookPreferences.dateKeyToDayIndex(dateKey);
+      const ago = todayIdx - dayIdx;
+      if (dayIdx >= 0 && ago >= 0 && ago < 7) {
+        weekTimes++;
+      }
+      for (let j = 0; j < ids.length; j++) {
+        const recipeKey = String(ids[j]);
+        counts[recipeKey] = (counts[recipeKey] ?? 0) + 1;
+        const prev = lastDates[recipeKey] ?? '';
+        if (dateKey > prev) {
+          lastDates[recipeKey] = dateKey;
+        }
+      }
+    }
+    // 按日期倒序取最近做过的菜（去重，最多 8 道）
+    keys.sort((a: string, b: string): number => a < b ? 1 : (a > b ? -1 : 0));
+    const recentRecipeIds: number[] = [];
+    for (let i = 0; i < keys.length && recentRecipeIds.length < 8; i++) {
+      const ids = log[keys[i]];
+      if (ids === undefined) {
+        continue;
+      }
+      for (let j = 0; j < ids.length && recentRecipeIds.length < 8; j++) {
+        if (!recentRecipeIds.includes(ids[j])) {
+          recentRecipeIds.push(ids[j]);
+        }
+      }
+    }
+    return { totalTimes, weekTimes, recentRecipeIds, lastDates, counts };
+  }
+
   // ─── 今日餐桌 ─────────────────────────────────────────────
 
   static async getTodayMenuIds(context: common.Context): Promise<number[]> {
@@ -662,6 +866,85 @@ export class CookPreferences {
   static async clearTodayMenu(context: common.Context): Promise<void> {
     const p = await CookPreferences.getStore(context);
     await p.put(CookPreferenceKeys.TODAY_MENU, '[]');
+    await p.flush();
+  }
+
+  // ─── 一餐套餐 ─────────────────────────────────────────────
+
+  static async getMealPlan(context: common.Context): Promise<MealPlan | null> {
+    const p = await CookPreferences.getStore(context);
+    const raw = CookPreferences.getSettingsString(await p.get(CookPreferenceKeys.MEAL_PLAN, ''));
+    if (raw.length === 0) {
+      return null;
+    }
+    try {
+      const v = JSON.parse(raw) as MealPlan;
+      if (v === null || v === undefined || !Array.isArray(v.dishIds)) {
+        return null;
+      }
+      const ids = CookPreferences.parseRecipeIdArray(JSON.stringify(v.dishIds));
+      const locked: boolean[] = Array.isArray(v.locked)
+        ? v.locked.map((b: boolean) => b === true)
+        : ids.map(() => false);
+      const people = typeof v.people === 'number' ? Math.max(1, Math.min(6, Math.floor(v.people))) : 2;
+      const meatRatio: MeatRatio = (v.meatRatio === '偏素' || v.meatRatio === '偏荤' || v.meatRatio === '均衡')
+        ? v.meatRatio : '均衡';
+      const tools: string[] = Array.isArray(v.tools) ? v.tools : [];
+      const updatedAt = typeof v.updatedAt === 'number' ? v.updatedAt : Date.now();
+      return { people, meatRatio, tools, dishIds: ids, locked, updatedAt };
+    } catch {
+      return null;
+    }
+  }
+
+  static async setMealPlan(context: common.Context, plan: MealPlan): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.MEAL_PLAN, JSON.stringify(plan));
+    await p.flush();
+  }
+
+  static async clearMealPlan(context: common.Context): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.MEAL_PLAN, '');
+    await p.flush();
+  }
+
+  // ─── 个人健康目标 ─────────────────────────────────────────
+
+  static async getDietProfile(context: common.Context): Promise<DietProfile> {
+    const p = await CookPreferences.getStore(context);
+    const raw = CookPreferences.getSettingsString(await p.get(CookPreferenceKeys.DIET_PROFILE, ''));
+    if (raw.length === 0) {
+      return DEFAULT_DIET_PROFILE;
+    }
+    try {
+      const v = JSON.parse(raw) as DietProfile;
+      if (v === null || v === undefined) {
+        return DEFAULT_DIET_PROFILE;
+      }
+      const gender: Gender = v.gender === 'male' ? 'male' : 'female';
+      const activity: ActivityLevel = (v.activity === 'sedentary' || v.activity === 'light' ||
+        v.activity === 'moderate' || v.activity === 'active' || v.activity === 'veryActive')
+        ? v.activity : 'light';
+      const goal: GoalType = (v.goal === 'lose' || v.goal === 'maintain' || v.goal === 'gain')
+        ? v.goal : 'maintain';
+      const age: number = (typeof v.age === 'number' && v.age >= 14 && v.age <= 90)
+        ? Math.round(v.age) : DEFAULT_DIET_PROFILE.age;
+      const heightCm: number = (typeof v.heightCm === 'number' && v.heightCm >= 120 && v.heightCm <= 220)
+        ? Math.round(v.heightCm) : DEFAULT_DIET_PROFILE.heightCm;
+      const weightKg: number = (typeof v.weightKg === 'number' && v.weightKg >= 30 && v.weightKg <= 200)
+        ? Math.round(v.weightKg * 10) / 10 : DEFAULT_DIET_PROFILE.weightKg;
+      const weeklyRateKg: number = (typeof v.weeklyRateKg === 'number' && v.weeklyRateKg > 0 && v.weeklyRateKg <= 1)
+        ? v.weeklyRateKg : DEFAULT_DIET_PROFILE.weeklyRateKg;
+      return { gender, age, heightCm, weightKg, activity, goal, weeklyRateKg };
+    } catch {
+      return DEFAULT_DIET_PROFILE;
+    }
+  }
+
+  static async setDietProfile(context: common.Context, profile: DietProfile): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.DIET_PROFILE, JSON.stringify(profile));
     await p.flush();
   }
 
@@ -746,6 +1029,32 @@ export class CookPreferences {
   static async setDailyReminderAgentId(context: common.Context, reminderId: number): Promise<void> {
     const p = await CookPreferences.getStore(context);
     await p.put(CookPreferenceKeys.DAILY_REMINDER_AGENT_ID, reminderId);
+    await p.flush();
+  }
+
+  /** 通知中点名的菜谱 ID，0 表示未指定 */
+  static async getDailyReminderRecipeId(context: common.Context): Promise<number> {
+    const p = await CookPreferences.getStore(context);
+    const raw = await p.get(CookPreferenceKeys.DAILY_REMINDER_RECIPE_ID, 0);
+    return typeof raw === 'number' ? raw : 0;
+  }
+
+  static async setDailyReminderRecipeId(context: common.Context, recipeId: number): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.DAILY_REMINDER_RECIPE_ID, recipeId);
+    await p.flush();
+  }
+
+  /** 通知内容最近一次刷新日期（YYYY-M-D），'' 表示从未刷新 */
+  static async getDailyReminderDate(context: common.Context): Promise<string> {
+    const p = await CookPreferences.getStore(context);
+    const raw = await p.get(CookPreferenceKeys.DAILY_REMINDER_DATE, '');
+    return typeof raw === 'string' ? raw : '';
+  }
+
+  static async setDailyReminderDate(context: common.Context, date: string): Promise<void> {
+    const p = await CookPreferences.getStore(context);
+    await p.put(CookPreferenceKeys.DAILY_REMINDER_DATE, date);
     await p.flush();
   }
 

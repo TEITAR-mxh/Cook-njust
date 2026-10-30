@@ -70,6 +70,13 @@ struct DietaryStructurePage {
 
   @State private isDark: boolean = false
 
+  // 入场动画与进度条生长
+  @State private pageOpacity: number = 0
+  @State private pageOffset: number = 18
+  @State private heroScale: number = 0.97
+  @State private barsVisible: boolean = false
+  @State private heroBob: number = 0
+
   // ── 生命周期 ──────────────────────────────────────────────────────────────
 
   aboutToAppear(): void {
@@ -78,6 +85,24 @@ struct DietaryStructurePage {
     if (ctx !== undefined) {
       getSystemSafeTopVp(ctx).then((vp: number) => { this.safeTopVp = vp }).catch(() => {})
     }
+    setTimeout(() => {
+      this.getUIContext().animateTo({ duration: 420, curve: Curve.EaseOut }, () => {
+        this.pageOpacity = 1
+        this.pageOffset = 0
+        this.heroScale = 1
+      })
+      // 内容淡入后再让营养素进度条逐条生长
+      setTimeout(() => { this.barsVisible = true }, 160)
+    }, 30)
+    // 顶部图标轻微上下浮动，增加页面呼吸感
+    setTimeout(() => {
+      this.getUIContext().animateTo({
+        duration: 1600,
+        curve: Curve.EaseInOut,
+        iterations: -1,
+        playMode: PlayMode.Alternate
+      }, () => { this.heroBob = -3 })
+    }, 600)
   }
 
   private onThemeChange(): void { this.isDark = this.calcIsDark() }
@@ -114,8 +139,8 @@ struct DietaryStructurePage {
       .onClick(() => { this.getUIContext().getRouter().back() })
 
       Text('饮食结构建议')
-        .fontSize(16)
-        .fontWeight(FontWeight.Medium)
+        .fontSize(18)
+        .fontWeight(FontWeight.Bold)
         .fontColor(this.t1)
         .layoutWeight(1)
         .textAlign(TextAlign.Center)
@@ -133,12 +158,52 @@ struct DietaryStructurePage {
 
   @Builder
   private SectionTitle(title: string) {
-    Text(title)
-      .fontSize(13)
-      .fontWeight(FontWeight.Bold)
-      .fontColor(this.t2)
-      .width('100%')
-      .padding({ left: 20, right: 20, top: 12, bottom: 8 })
+    Row({ space: 8 }) {
+      Row()
+        .width(3).height(14)
+        .borderRadius(2)
+        .backgroundColor(AppColors.BRAND_COLOR)
+      Text(title)
+        .fontSize(16)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(this.t1)
+    }
+    .width('100%')
+    .padding({ left: 20, right: 20, top: 20, bottom: 10 })
+  }
+
+  // ── 顶部主张 ──────────────────────────────────────────────────────────────
+
+  @Builder
+  private HeroCard() {
+    Row({ space: 12 }) {
+      Column() {
+        Text('🥗').fontSize(22)
+      }
+      .width(44).height(44).borderRadius(14)
+      .backgroundColor(this.isDark ? '#3A2A1A' : '#FFE7E2')
+      .justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+      .flexShrink(0)
+      .translate({ y: this.heroBob })
+
+      Column({ space: 3 }) {
+        Text('吃得均衡，比吃得少更重要')
+          .fontSize(16)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.t1)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text('食物多样 · 谷类为主 · 吃动平衡')
+          .fontSize(11)
+          .fontColor(this.t2)
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
+    }
+    .width('100%')
+    .padding({ left: 14, right: 14, top: 12, bottom: 12 })
+    .backgroundColor(this.isDark ? '#241A1B' : '#FFF7F5')
+    .borderRadius(16)
   }
 
   // ── 膳食宝塔图 ────────────────────────────────────────────────────────────
@@ -148,7 +213,7 @@ struct DietaryStructurePage {
     Column({ space: 0 }) {
       Image($r('app.media.diet_structure_ref'))
         .width('100%')
-        .aspectRatio(0.75)
+        .aspectRatio(1)
         .objectFit(ImageFit.Contain)
 
       Text('中国居民平衡膳食宝塔示意图')
@@ -156,12 +221,13 @@ struct DietaryStructurePage {
         .fontColor(this.t3)
         .textAlign(TextAlign.Center)
         .width('100%')
-        .padding({ top: 0, bottom: 1, left: 16, right: 16 })
+        .padding({ top: 2, bottom: 10, left: 16, right: 16 })
     }
     .backgroundColor(this.surface)
     .borderRadius(16)
     .clip(true)
-    .margin({ left: 16, right: 16 })
+    .margin({ left: 20, right: 20, top: 12 })
+    .scale({ x: this.heroScale, y: this.heroScale })
   }
 
   // ── 三大营养素卡片 ────────────────────────────────────────────────────────
@@ -172,7 +238,7 @@ struct DietaryStructurePage {
       ForEach(
         MACROS,
         (item: MacroItem, index: number) => {
-          this.MacroRow(item, index < MACROS.length - 1)
+          this.MacroRow(item, index < MACROS.length - 1, index)
         },
         (item: MacroItem) => item.label
       )
@@ -180,11 +246,11 @@ struct DietaryStructurePage {
     .backgroundColor(this.surface)
     .borderRadius(16)
     .clip(true)
-    .margin({ left: 16, right: 16 })
+    .margin({ left: 20, right: 20 })
   }
 
   @Builder
-  private MacroRow(item: MacroItem, showDivider: boolean) {
+  private MacroRow(item: MacroItem, showDivider: boolean, index: number) {
     Column({ space: 0 }) {
       Column({ space: 8 }) {
         Row() {
@@ -202,10 +268,11 @@ struct DietaryStructurePage {
 
         Row() {
           Row()
-            .width(`${item.ratio * 100}%`)
+            .width(this.barsVisible ? `${item.ratio * 100}%` : '0%')
             .height(5)
             .backgroundColor(this.isDark ? item.darkColor : item.color)
             .borderRadius(3)
+            .animation({ duration: 650, curve: Curve.EaseOut, delay: index * 90 })
         }
         .width('100%')
         .height(5)
@@ -239,7 +306,7 @@ struct DietaryStructurePage {
     .backgroundColor(this.surface)
     .borderRadius(16)
     .clip(true)
-    .margin({ left: 16, right: 16 })
+    .margin({ left: 20, right: 20 })
   }
 
   @Builder
@@ -263,7 +330,7 @@ struct DietaryStructurePage {
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)
-      .padding({ left: 20, right: 16, top: 14, bottom: 14 })
+      .padding({ left: 20, right: 20, top: 14, bottom: 14 })
 
       if (showDivider) {
         Divider().color(this.divider).margin({ left: 60 })
@@ -288,7 +355,7 @@ struct DietaryStructurePage {
     .backgroundColor(this.surface)
     .borderRadius(16)
     .clip(true)
-    .margin({ left: 16, right: 16 })
+    .margin({ left: 20, right: 20 })
   }
 
   @Builder
@@ -349,6 +416,12 @@ struct DietaryStructurePage {
 
       Scroll() {
         Column({ space: 0 }) {
+          // 与下方卡片同宽：用外层 padding 控制左右留白
+          Column() {
+            this.HeroCard()
+          }
+          .width('100%')
+          .padding({ left: 20, right: 20, top: 12 })
           this.ImageCard()
 
           this.SectionTitle('三大营养素供能比（占总热量）')
@@ -364,6 +437,8 @@ struct DietaryStructurePage {
         }
         .width('100%')
         .padding({ top: 0, bottom: 0 })
+        .opacity(this.pageOpacity)
+        .translate({ y: this.pageOffset })
       }
       .layoutWeight(1)
       .scrollBar(BarState.Off)

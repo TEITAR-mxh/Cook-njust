@@ -3,7 +3,7 @@
  * 品牌化同意框 + 沉浸式启动动画
  */
 import { common } from '@kit.AbilityKit'
-import { AppColors } from '../constants/AppColors'
+import { AppColors, ThemeManager } from '../constants/AppColors'
 import { CookPreferences } from '../store/CookPreferences'
 
 // ─── 隐私同意对话框 ─────────────────────────────────────────────────────────────
@@ -18,6 +18,35 @@ struct PrivacyConsentDialog {
 
   @State private isAgreed: boolean = false
 
+  // ── 深色模式响应式订阅 ──────────────────────────────────────────────────────
+  @StorageProp('isSystemDarkMode')
+  @Watch('onThemeChange')
+  private isSystemDark: boolean = false
+
+  @StorageProp('currentThemeMode')
+  @Watch('onThemeChange')
+  private storedThemeMode: string = '系统默认'
+
+  @State private dialogBg: string = AppColors.CARD_BG
+  @State private textColor: string = AppColors.GRAY_900
+  @State private secondColor: string = AppColors.GRAY_500
+  @State private dividerColor: string = AppColors.GRAY_100
+
+  private onThemeChange(): void {
+    this.applyTheme()
+  }
+
+  private applyTheme(): void {
+    this.dialogBg = ThemeManager.getCardBackgroundColor(this.storedThemeMode)
+    this.textColor = ThemeManager.getTextColor(this.storedThemeMode)
+    this.secondColor = ThemeManager.getSecondaryTextColor(this.storedThemeMode)
+    this.dividerColor = ThemeManager.getBorderColor(this.storedThemeMode)
+  }
+
+  aboutToAppear(): void {
+    this.applyTheme()
+  }
+
   build() {
     Column({ space: 0 }) {
 
@@ -25,10 +54,10 @@ struct PrivacyConsentDialog {
       Column({ space: 6 }) {
         Text('🍜')
           .fontSize(56)
-        Text('AUV 您吃了么')
+        Text('AUV您吃了么')
           .fontSize(20)
           .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.GRAY_900)
+          .fontColor(this.textColor)
       }
       .width('100%')
       .alignItems(HorizontalAlign.Center)
@@ -37,7 +66,7 @@ struct PrivacyConsentDialog {
       // ── 说明文字 ──────────────────────────────────────────────────────────
       Text('为保障您的合法权益，使用前请阅读并同意以下协议。我们承诺全部数据在本地处理，不上传任何服务器。')
         .fontSize(14)
-        .fontColor(AppColors.GRAY_500)
+        .fontColor(this.secondColor)
         .lineHeight(22)
         .textAlign(TextAlign.Center)
         .width('100%')
@@ -72,7 +101,7 @@ struct PrivacyConsentDialog {
 
       // ── 分隔线 ────────────────────────────────────────────────────────────
       Divider()
-        .color(AppColors.GRAY_100)
+        .color(this.dividerColor)
         .width('100%')
         .margin({ bottom: 18 })
 
@@ -88,7 +117,7 @@ struct PrivacyConsentDialog {
 
         Text('我已阅读并同意以上全部协议')
           .fontSize(14)
-          .fontColor(AppColors.GRAY_600)
+          .fontColor(this.textColor)
           .layoutWeight(1)
           .onClick(() => { this.isAgreed = !this.isAgreed })
       }
@@ -112,14 +141,14 @@ struct PrivacyConsentDialog {
       // ── 次操作：退出文字链 ────────────────────────────────────────────────
       Text('不同意，退出应用')
         .fontSize(13)
-        .fontColor(AppColors.GRAY_400)
+        .fontColor(this.secondColor)
         .padding({ top: 16, bottom: 28 })
         .onClick(() => { this.onReject() })
 
     }
     .padding({ left: 24, right: 24 })
     .width('88%')
-    .backgroundColor(Color.White)
+    .backgroundColor(this.dialogBg)
     .borderRadius(24)
     .shadow({ radius: 40, color: '#0000001A', offsetX: 0, offsetY: 12 })
   }
@@ -146,6 +175,31 @@ struct StartupPage {
   // 离场动画状态
   @State private exitOpacity: number = 1
   @State private exitScale: number = 1
+
+  // ── 深色模式响应式订阅 ──────────────────────────────────────────────────────
+  @StorageProp('isSystemDarkMode')
+  @Watch('onThemeChange')
+  private isSystemDark: boolean = false
+
+  @StorageProp('currentThemeMode')
+  @Watch('onThemeChange')
+  private storedThemeMode: string = '系统默认'
+
+  @State private bgColor: string = AppColors.BG_COLOR
+  @State private textColor: string = AppColors.GRAY_900
+  @State private secondColor: string = AppColors.GRAY_500
+  @State private dividerColor: string = AppColors.GRAY_100
+
+  private onThemeChange(): void {
+    this.applyTheme()
+  }
+
+  private applyTheme(): void {
+    this.bgColor = ThemeManager.getBackgroundColor(this.storedThemeMode)
+    this.textColor = ThemeManager.getTextColor(this.storedThemeMode)
+    this.secondColor = ThemeManager.getSecondaryTextColor(this.storedThemeMode)
+    this.dividerColor = ThemeManager.getBorderColor(this.storedThemeMode)
+  }
 
   private static readonly MIN_DISPLAY_MS: number = 1800
   private startTime: number = 0
@@ -182,6 +236,7 @@ struct StartupPage {
   })
 
   aboutToAppear(): void {
+    this.applyTheme()
     this.startTime = Date.now()
     this.runEntryAnimation()
     void this.bootstrap()
@@ -340,14 +395,14 @@ struct StartupPage {
         Text('您吃了么')
           .fontSize(20)
           .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.GRAY_800)
+          .fontColor(this.textColor)
           .margin({ top: 14 })
           .opacity(this.subtitleOpacity)
           .translate({ y: this.subtitleOffsetY })
 
         // 分隔线
         Divider()
-          .width(44).strokeWidth(1).color(AppColors.GRAY_200)
+          .width(44).strokeWidth(1).color(this.dividerColor)
           .margin({ top: 36, bottom: 28 })
           .opacity(this.statusOpacity)
 
@@ -358,7 +413,7 @@ struct StartupPage {
             .color(AppColors.BRAND_COLOR)
           Text(this.statusText)
             .fontSize(13)
-            .fontColor(AppColors.GRAY_500)
+            .fontColor(this.secondColor)
         }
         .opacity(this.statusOpacity)
       }
@@ -368,6 +423,6 @@ struct StartupPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#FFF8F5')
+    .backgroundColor(this.bgColor)
   }
 }

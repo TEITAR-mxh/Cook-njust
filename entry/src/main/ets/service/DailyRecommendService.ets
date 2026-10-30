@@ -4,6 +4,7 @@
  * 自动排除近 7 天已推荐过的菜谱
  */
 import { RecipeWithId } from '../model/recipe'
+import { sameCatalogIngredient } from '../data/foodCatalog'
 
 export interface RecommendResult {
   recipe: RecipeWithId
@@ -16,11 +17,13 @@ export class DailyRecommendService {
    * @param allRecipes     全量菜谱（已加载）
    * @param selectedStuff  用户冰箱中选中的食材列表
    * @param excludeIds     近期已推荐的菜谱 ID（排除重复）
+   * @param maxCaloriesPerDish 可选：单道菜热量上限（按用户每日目标折算），超出者不推荐
    */
   static pickRecipe(
     allRecipes: RecipeWithId[],
     selectedStuff: string[],
-    excludeIds: number[]
+    excludeIds: number[],
+    maxCaloriesPerDish?: number
   ): RecommendResult | null {
     if (allRecipes.length === 0) {
       return null;
@@ -33,13 +36,23 @@ export class DailyRecommendService {
     );
 
     // 若全部排除则重置（所有菜都推过了就重新开始）
-    const pool: RecipeWithId[] = candidates.length > 0 ? candidates : allRecipes;
+    let pool: RecipeWithId[] = candidates.length > 0 ? candidates : allRecipes;
+
+    // 按个人热量目标过滤：只在有足够候选时生效，避免目标过严导致推荐池为空
+    if (maxCaloriesPerDish !== undefined && maxCaloriesPerDish > 0) {
+      const lighter: RecipeWithId[] = pool.filter((r: RecipeWithId) =>
+        r.nutrition !== undefined && r.nutrition.calories <= maxCaloriesPerDish);
+      if (lighter.length > 0) {
+        pool = lighter;
+      }
+    }
 
     // 阶段一：冰箱食材全匹配（所有选中食材都在菜谱 stuff 中）
     if (selectedStuff.length > 0) {
       const fridgeAll: RecipeWithId[] = pool.filter((r: RecipeWithId) => {
         const stuffList: string[] = r.stuff ?? [];
-        return selectedStuff.every((s: string) => stuffList.includes(s));
+        return selectedStuff.every((s: string) =>
+          stuffList.includes(s) || stuffList.some((name: string) => sameCatalogIngredient(name, s)));
       });
       if (fridgeAll.length > 0) {
         const picked = fridgeAll[Math.floor(Math.random() * fridgeAll.length)];
@@ -49,7 +62,8 @@ export class DailyRecommendService {
       // 阶段二：冰箱食材任意匹配（至少有一种选中食材）
       const fridgeAny: RecipeWithId[] = pool.filter((r: RecipeWithId) => {
         const stuffList: string[] = r.stuff ?? [];
-        return selectedStuff.some((s: string) => stuffList.includes(s));
+        return selectedStuff.some((s: string) =>
+          stuffList.includes(s) || stuffList.some((name: string) => sameCatalogIngredient(name, s)));
       });
       if (fridgeAny.length > 0) {
         const picked = fridgeAny[Math.floor(Math.random() * fridgeAny.length)];

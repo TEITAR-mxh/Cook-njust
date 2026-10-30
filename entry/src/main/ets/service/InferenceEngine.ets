@@ -3,7 +3,6 @@
  * 为 HiAI NPU / MindSpore Lite 等多引擎提供统一抽象，
  * 便于 HybridRecognizer 进行通用编排。
  */
-import type { NutrientData } from '../utils/CalorieCalculator'
 
 /** 引擎初始化状态 */
 export enum EngineStatus {
@@ -20,13 +19,6 @@ export interface LocalInferenceResult {
   foodName: string
   /** 置信度 (0.0 - 1.0) */
   confidence: number
-}
-
-/** 带营养映射的最终结果 */
-export interface MappedInferenceResult {
-  foodName: string
-  confidence: number
-  nutrient: NutrientData
 }
 
 /** 推理引擎统一接口 */

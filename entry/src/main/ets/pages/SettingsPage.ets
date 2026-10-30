@@ -10,9 +10,11 @@ import { fileIo } from '@kit.CoreFileKit'
 import { notificationManager } from '@kit.NotificationKit'
 import { AppColors, ThemeManager } from '../constants/AppColors'
 import { RecipeRepository } from '../data/RecipeRepository'
+import { DietDatabaseHelper } from '../data/DietDatabaseHelper'
 import { CookPreferences, type UserProfile, type ThemeSettings } from '../store/CookPreferences'
 import { getSystemSafeTopVp } from '../util/StatusBarInset'
 import { ToastView } from '../components/ToastView'
+import { OnboardingSheet } from '../components/OnboardingSheet'
 import { PRIVACY_DOC, AGREEMENT_DOC, type LegalDocConfig, type LegalSection } from '../pages/LegalDocPage'
 import { ReminderService } from '../service/ReminderService'
 
@@ -41,6 +43,8 @@ struct SettingsPage {
   /** 页内协议覆盖层 */
   @State private showLegalOverlay: boolean = false
   @State private legalOverlayDoc: LegalDocConfig = PRIVACY_DOC
+  /** 页内使用引导覆盖层（可随时重看） */
+  @State private showOnboarding: boolean = false
 
   // ====== 主题响应式订阅（由 EntryAbility 写入 AppStorage，零延迟广播） ======
   /**
@@ -125,6 +129,30 @@ struct SettingsPage {
     return this.getUIContext().getHostContext() as common.UIAbilityContext | undefined
   }
 
+  /**
+   * 选择每日推荐偏好：先乐观更新 UI，持久化失败时回滚。
+   * 偏好变化后立即重排提醒，让下一次通知按新偏好点名菜品。
+   */
+  private selectDailyPushPreference(key: string): void {
+    if (this.dailyPushPreference === key) return
+    const prev = this.dailyPushPreference
+    this.dailyPushPreference = key
+    const host = this.getHostContext()
+    if (!host) return
+    void CookPreferences.setDailyRecommendPreference(host, key).then(() => {
+      const label = key === 'fridge_first' ? '冰箱优先' : '随机精选'
+      this.showToast(`推荐偏好已切换为：${label}`)
+      if (this.enableDailyPush) {
+        void ReminderService.scheduleOrUpdate(host).catch((e: Error) => {
+          console.error('[SettingsPage] reschedule after preference change failed:', e.message)
+        })
+      }
+    }).catch(() => {
+      this.dailyPushPreference = prev
+      this.showToast('切换失败，请重试')
+    })
+  }
+
   private async loadSafeArea(): Promise<void> {
     const host = this.getHostContext()
     if (host) {
@@ -152,21 +180,85 @@ struct SettingsPage {
     return total
   }
 
-  /** 读取并展示真实缓存大小 */
+  /**
+   * 列出可回收的沙箱文件：
+   * 1. filesDir 下没有被任何饮食记录引用的识图照片（scan_*.jpg）
+   * 2. filesDir 下非当前使用的历史头像（avatar_*.jpg）
+   * cacheDir / tempDir 由 clearCacheDir 整目录处理。
+   * 数据库读取失败时跳过识图照片，宁可少清也不误删仍在使用的图片。
+   */
+  private async collectGarbage(host: common.UIAbilityContext): Promise<string[]> {
+    const garbage: string[] = []
+
+    let referenced: Set<string> | null = null
+    try {
+      const uris = await DietDatabaseHelper.getInstance().queryAllImageUris(host)
+      referenced = new Set<string>()
+      for (const uri of uris) {
+        if (uri.length > 0) referenced.add(uri)
+      }
+    } catch {
+      referenced = null
+    }
+
+    let currentAvatar: string = ''
+    try {
+      const profile = await CookPreferences.getUserProfile(host)
+      currentAvatar = profile.avatar
+    } catch { /* 读不到时保守保留所有头像 */ }
+
+    try {
+      const names = await fileIo.listFile(host.filesDir)
+      for (const name of names) {
+        const fullPath = `${host.filesDir}/${name}`
+        if (name.startsWith('avatar_') && name.endsWith('.jpg')) {
+          if (currentAvatar.length > 0 && currentAvatar !== `file://${fullPath}` && currentAvatar !== fullPath) {
+            garbage.push(fullPath)
+          }
+        } else if (referenced !== null && name.startsWith('scan_') && name.endsWith('.jpg')) {
+          if (!referenced.has(`file://${fullPath}`) && !referenced.has(fullPath)) {
+            garbage.push(fullPath)
+          }
+        }
+      }
+    } catch { /* filesDir 不可读时跳过 */ }
+
+    return garbage
+  }
+
+  private async sumFileSizes(paths: string[]): Promise<number> {
+    let total: number = 0
+    for (const path of paths) {
+      try {
+        total += (await fileIo.stat(path)).size
+      } catch { /* 文件已不存在时跳过 */ }
+    }
+    return total
+  }
+
+  private formatSize(bytes: number): string {
+    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+    if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`
+    return `${bytes} B`
+  }
+
+  /** 读取并展示真实可清理缓存大小 */
   private async loadCacheSize(): Promise<void> {
     const host = this.getHostContext()
-    if (!host) { this.cacheSize = '0.0 MB'; return }
+    if (!host) { this.cacheSize = '0 B'; return }
     try {
-      const bytes = await this.calcDirSize(host.cacheDir)
-      const mb = bytes / (1024 * 1024)
-      this.cacheSize = mb < 0.05 ? '0.0 MB' : `${mb.toFixed(1)} MB`
+      let bytes: number = await this.sumFileSizes(await this.collectGarbage(host))
+      bytes += await this.calcDirSize(host.cacheDir)
+      if (host.tempDir !== host.cacheDir) bytes += await this.calcDirSize(host.tempDir)
+      this.cacheSize = this.formatSize(bytes)
     } catch {
-      this.cacheSize = '0.0 MB'
+      this.cacheSize = '0 B'
     }
   }
 
-  /** 递归删除目录内所有文件与子目录 */
-  private async clearCacheDir(dir: string): Promise<void> {
+  /** 递归删除目录内所有文件与子目录，返回释放的字节数 */
+  private async clearCacheDir(dir: string): Promise<number> {
+    let freed: number = 0
     try {
       const names = await fileIo.listFile(dir)
       for (const name of names) {
@@ -174,14 +266,31 @@ struct SettingsPage {
         try {
           const st = await fileIo.stat(fullPath)
           if (st.isDirectory()) {
-            await this.clearCacheDir(fullPath)
+            freed += await this.clearCacheDir(fullPath)
             await fileIo.rmdir(fullPath)
           } else {
             await fileIo.unlink(fullPath)
+            freed += st.size
           }
         } catch { /* 单个条目删除失败时跳过，不影响其余文件 */ }
       }
     } catch { /* 目录不可访问时跳过 */ }
+    return freed
+  }
+
+  /** 清理全部可回收空间，返回真正释放的字节数 */
+  private async clearAllCache(host: common.UIAbilityContext): Promise<number> {
+    let freed: number = 0
+    for (const path of await this.collectGarbage(host)) {
+      try {
+        const st = await fileIo.stat(path)
+        await fileIo.unlink(path)
+        freed += st.size
+      } catch { /* 单个文件删除失败时跳过 */ }
+    }
+    freed += await this.clearCacheDir(host.cacheDir)
+    if (host.tempDir !== host.cacheDir) freed += await this.clearCacheDir(host.tempDir)
+    return freed
   }
 
   private async loadData(): Promise<void> {
@@ -314,6 +423,25 @@ struct SettingsPage {
     return `file://${targetPath}`
   }
 
+  /** 开关「保留本地数据」：关闭会清空收藏与历史，需二次确认 */
+  private onKeepLocalToggle(): void {
+    if (this.keepLocalData) {
+      this.getUIContext().showAlertDialog({
+        title: '关闭「保留本地数据」',
+        message: '关闭后将立即清空全部收藏与浏览历史，此操作无法撤销。确定关闭吗？',
+        primaryButton: { value: '取消', action: () => {} },
+        secondaryButton: {
+          value: '关闭并清空',
+          fontColor: AppColors.BRAND_COLOR,
+          action: () => { void this.onKeepLocalChange(false) }
+        },
+        autoCancel: true
+      })
+    } else {
+      void this.onKeepLocalChange(true)
+    }
+  }
+
   private async onKeepLocalChange(isOn: boolean): Promise<void> {
     const host = this.getHostContext()
     if (!host) return
@@ -436,7 +564,7 @@ struct SettingsPage {
           Text('从相册选择').fontSize(15).fontColor(AppColors.BRAND_COLOR).fontWeight(FontWeight.Medium).padding({ left: 24, right: 24, top: 12, bottom: 12 }).backgroundColor(AppColors.BRAND_COLOR_LIGHT).borderRadius(12).onClick(() => { void this.selectImageAvatar() })
         }.width('100%').padding({ top: 8, bottom: 8 })
       }
-    }.width('100%').padding(20).backgroundColor(this.currentCardBgColor).borderRadius(20).margin({ top: 16 })
+    }.width('100%').padding(20).backgroundColor(this.currentCardBgColor).borderRadius(16).margin({ top: 16 })
   }
 
   // 升级版的设置卡片，支持展示 value 字符串
@@ -474,9 +602,33 @@ struct SettingsPage {
     .onClick(() => { !isToggle && onClick && onClick() })
   }
 
+  /**
+   * 推荐偏好的分段选项：两个互斥选项平铺展示，点一次即选中。
+   * 不用「点击整行轮换」——用户看不到另一个选项，也和右侧箭头暗示的「进入」语义冲突。
+   */
+  @Builder
+  PreferenceOption(key: string, label: string, desc: string) {
+    Column({ space: 2 }) {
+      Text(label)
+        .fontSize(14)
+        .fontWeight(this.dailyPushPreference === key ? FontWeight.Bold : FontWeight.Normal)
+        .fontColor(this.dailyPushPreference === key ? Color.White : this.currentTextColor)
+      Text(desc)
+        .fontSize(10)
+        .fontColor(this.dailyPushPreference === key ? 'rgba(255,255,255,0.85)' : this.currentSecondaryTextColor)
+    }
+    .layoutWeight(1)
+    .padding({ top: 8, bottom: 8 })
+    .backgroundColor(this.dailyPushPreference === key ? AppColors.BRAND_COLOR : this.currentBgColor)
+    .borderRadius(12)
+    .borderWidth(1)
+    .borderColor(this.dailyPushPreference === key ? AppColors.BRAND_COLOR : this.currentBorderColor)
+    .onClick(() => { this.selectDailyPushPreference(key) })
+  }
+
   @Builder
   buildSectionHeader(title: string) {
-    Text(title).fontSize(14).fontWeight(FontWeight.Bold).fontColor(this.currentSecondaryTextColor).width('100%').padding({ left: 24, right: 24, top: 16, bottom: 8 })
+    Text(title).fontSize(16).fontWeight(FontWeight.Bold).fontColor(this.currentTextColor).width('100%').padding({ left: 20, right: 20, top: 20, bottom: 10 })
   }
 
   // 颜色模式选择面板内容（页面内渲染，不使用 bindSheet 避免 window overlay 污染）
@@ -685,15 +837,15 @@ struct SettingsPage {
                     Text(`${this.favoriteCount} 收藏`).fontSize(13).fontColor(this.currentSecondaryTextColor)
                   }
                 }.alignItems(HorizontalAlign.Start).layoutWeight(1)
-              }.width('100%').padding(20).backgroundColor(this.currentCardBgColor).borderRadius(20)
+              }.width('100%').padding(20).backgroundColor(this.currentCardBgColor).borderRadius(16)
               if (this.isEditingAvatar) { this.buildAvatarSelector() }
-            }.padding({ left: 16, right: 16, top: 8 })
+            }.padding({ left: 20, right: 20, top: 8 })
 
             // --- 外观与通知 (新增) ---
             this.buildSectionHeader('通用设置')
             Column() {
               this.buildSettingCard('颜色模式', '', false, false, this.themeMode, () => { this.showThemeSheet = true })
-            }.margin({ left: 16, right: 16 }).backgroundColor(this.currentCardBgColor).borderRadius(20)
+            }.margin({ left: 20, right: 20 }).backgroundColor(this.currentCardBgColor).borderRadius(16)
 
             // --- 每日推荐通知 ---
             this.buildSectionHeader('🔔 每日推荐通知')
@@ -773,54 +925,49 @@ struct SettingsPage {
 
                 Divider().color(this.currentBorderColor).margin({ left: 20, right: 20 })
 
-                // 推荐偏好
-                Row({ space: 16 }) {
-                  Column({ space: 4 }) {
+                // 推荐偏好：两个互斥选项直接平铺，点一次即选中
+                Column({ space: 10 }) {
+                  Row({ space: 8 }) {
                     Text('推荐偏好').fontSize(16).fontColor(this.currentTextColor)
-                    Text(this.dailyPushPreference === 'fridge_first' ? '优先使用冰箱食材' : '精选质量菜谱随机')
-                      .fontSize(13).fontColor(this.currentSecondaryTextColor)
+                    Text('决定每日推送挑哪类菜谱')
+                      .fontSize(11).fontColor(this.currentSecondaryTextColor)
                   }
-                  .alignItems(HorizontalAlign.Start).layoutWeight(1)
+                  .width('100%')
+                  .alignItems(VerticalAlign.Center)
 
-                  SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([this.currentSecondaryTextColor])
+                  Row({ space: 8 }) {
+                    this.PreferenceOption('fridge_first', '冰箱优先', '用现有食材')
+                    this.PreferenceOption('random_quality', '随机精选', '高质量菜谱')
+                  }
+                  .width('100%')
                 }
                 .width('100%')
-                .padding({ left: 20, right: 20, top: 14, bottom: 14 })
-                .onClick(() => {
-                  const newPref = this.dailyPushPreference === 'fridge_first' ? 'random_quality' : 'fridge_first'
-                  this.dailyPushPreference = newPref
-                  const host = this.getHostContext()
-                  if (!host) return
-                  void CookPreferences.setDailyRecommendPreference(host, newPref).then(() => {
-                    const label = newPref === 'fridge_first' ? '冰箱优先' : '随机精选'
-                    this.showToast(`推荐偏好已切换为：${label}`)
-                  })
-                })
+                .padding({ left: 20, right: 20, top: 14, bottom: 16 })
 
               }
-            }.margin({ left: 16, right: 16 }).backgroundColor(this.currentCardBgColor).borderRadius(20)
+            }.margin({ left: 20, right: 20 }).backgroundColor(this.currentCardBgColor).borderRadius(16)
 
             // --- 数据管理 ---
             this.buildSectionHeader('存储与数据')
             Column() {
-              this.buildSettingCard('保留本地数据', '关闭后将清空历史记录与收藏内容', true, this.keepLocalData, '', () => { void this.onKeepLocalChange(!this.keepLocalData) })
+              this.buildSettingCard('保留本地数据', '关闭后将清空历史记录与收藏内容', true, this.keepLocalData, '', () => { this.onKeepLocalToggle() })
               Divider().color(this.currentBorderColor).margin({ left: 20, right: 20 })
-              this.buildSettingCard('清理缓存', '清除应用运行产生的图片和临时文件', false, false, this.cacheSize, () => {
+              this.buildSettingCard('清理缓存', '清除识图临时照片、历史头像与运行缓存', false, false, this.cacheSize, () => {
                 this.getUIContext().showAlertDialog({
                   title: '清理缓存',
-                  message: `当前缓存 ${this.cacheSize}，清理后临时文件将被删除，不影响收藏和历史记录。`,
+                  message: `当前可清理 ${this.cacheSize}，将删除无记录引用的识图照片、历史头像与运行缓存，收藏和历史记录不受影响。`,
                   primaryButton: { value: '取消', action: () => {} },
                   secondaryButton: {
                     value: '立即清理',
                     fontColor: AppColors.BRAND_COLOR,
                     action: () => {
                       const host = this.getHostContext()
-                      if (!host) return
+                      if (!host) { this.showToast('清理失败，请重试'); return }
                       this.cacheSize = '清理中...'
-                      void this.clearCacheDir(host.cacheDir)
-                        .then(async () => {
+                      void this.clearAllCache(host)
+                        .then(async (freed: number) => {
                           await this.loadCacheSize()
-                          this.showToast('✨ 缓存已清理完毕')
+                          this.showToast(freed > 0 ? `✨ 已释放 ${this.formatSize(freed)}` : '已是最干净的状态')
                         })
                         .catch(async () => {
                           await this.loadCacheSize()
@@ -836,10 +983,12 @@ struct SettingsPage {
             // --- 隐私与协议 ---
             this.buildSectionHeader('关于我们')
             Column() {
+              this.buildSettingCard('使用引导', '重看冰箱选料、匹配方式与采购清单的用法', false, false, '', () => { this.showOnboarding = true })
+              Divider().color(this.currentBorderColor).margin({ left: 20, right: 20 })
               this.buildSettingCard('隐私政策', '', false, false, '', () => { this.openLegalDoc('privacy') })
               Divider().color(this.currentBorderColor).margin({ left: 20, right: 20 })
               this.buildSettingCard('用户协议', '', false, false, '', () => { this.openLegalDoc('agreement') })
-            }.margin({ left: 16, right: 16 }).backgroundColor(this.currentCardBgColor).borderRadius(20)
+            }.margin({ left: 20, right: 20 }).backgroundColor(this.currentCardBgColor).borderRadius(16)
 
             Blank()
 
@@ -897,10 +1046,13 @@ struct SettingsPage {
                   const h = this.dailyPushHour.toString().padStart(2, '0')
                   const m = this.dailyPushMinute.toString().padStart(2, '0')
                   this.showToast(`推送时间已设为 ${h}:${m}`)
-                  void ReminderService.scheduleOrUpdate(host).catch((e: Error) => {
-                    console.error('[SettingsPage] reschedule after time change failed:', e.message)
-                    this.showToast(`提醒更新失败 ${e.message}`)
-                  })
+                  // 仅在提醒已开启时重排；关闭状态下改时间不应重新创建提醒
+                  if (this.enableDailyPush) {
+                    void ReminderService.scheduleOrUpdate(host).catch((e: Error) => {
+                      console.error('[SettingsPage] reschedule after time change failed:', e.message)
+                      this.showToast(`提醒更新失败 ${e.message}`)
+                    })
+                  }
                 })
                 .catch(() => {
                   this.showToast('保存失败，请重试')
@@ -932,6 +1084,26 @@ struct SettingsPage {
       // 协议全屏覆盖层（在 Stack 内渲染，不产生新路由层）
       if (this.showLegalOverlay) {
         this.LegalOverlay()
+      }
+
+      // 使用引导（底部面板覆盖层）
+      if (this.showOnboarding) {
+        Stack() {
+          Column()
+            .width('100%').height('100%')
+            .backgroundColor('rgba(0,0,0,0.5)')
+            .onClick(() => { this.showOnboarding = false })
+          Column() {
+            OnboardingSheet({
+              fromFirstLaunch: false,
+              onClose: () => { this.showOnboarding = false }
+            })
+          }
+          .width('100%').height('86%')
+          .position({ x: 0, y: '100%' })
+          .markAnchor({ x: 0, y: '100%' })
+        }
+        .width('100%').height('100%')
       }
 
       // Toast 始终在最上层

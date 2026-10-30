@@ -8,19 +8,35 @@ import { photoAccessHelper } from '@kit.MediaLibraryKit'
 import { image } from '@kit.ImageKit'
 import { fileIo } from '@kit.CoreFileKit'
 import { common } from '@kit.AbilityKit'
-import { AppColors } from '../constants/AppColors'
+import { LengthMetricsUnit } from '@kit.ArkUI'
+import { AppColors, ThemeManager } from '../constants/AppColors'
 import type { MissingItem } from '../service/ShoppingListService'
 import { ShoppingCategory, IngredientTypeMapper } from '../utils/IngredientTypeMapper'
 
-// ── Canvas 尺寸常量（9:16，大字清晰版）────────────────────────────────
+// ── Canvas 尺寸常量（1080 宽，高度随内容自适应）──────────────────────
+// 说明：Canvas 以 PX 单位模式绘制（见 drawCtx 的 LengthMetricsUnit.PX）。
+// 默认 vp 模式下 font 的 px 是物理像素，与 vp 布局坐标混用会导致导出的
+// 文字相对版面小得多（手机上几乎看不清），因此这里统一用物理像素坐标。
 const CANVAS_W: number = 1080
-const CANVAS_H: number = 1920
-const PAD_X: number = 68
-const ITEM_H: number = 180                // 食材行高（适配大字体）
-const CAT_HEADER_H: number = 100          // 分类标题高度
-const HEADER_Y: number = 200              // 主标题基线（下调以适配大标题）
-const LIST_START_Y: number = 500          // 清单起始 Y
-const FOOTER_START_Y: number = 1680       // 底部区域起始 Y
+const PAD_X: number = 76
+const CONTENT_W: number = CANVAS_W - PAD_X * 2
+const ITEM_H: number = 140                // 食材行高：字号更小、行距更松，留出高级感
+const CAT_HEADER_H: number = 96           // 分类标题高度
+const CAT_BLOCK_PAD: number = 14          // 分类卡片底部内边距
+const CAT_GAP: number = 30                // 分类卡片之间的间距
+const FOOTER_H: number = 220              // 页脚区域高度
+const MIN_CANVAS_H: number = 1680         // 内容很少时保持竖版比例
+const MAX_CANVAS_H: number = 6000         // 超长清单上限，超出时给出提示
+const LIST_FOOT_RESERVE: number = 72      // 列表与页脚之间的留白 / 溢出提示空间
+
+// 页头内部基线（textBaseline = middle）
+const BRAND_Y: number = 72
+const TITLE_Y: number = 178
+const SUB_Y: number = 262
+const META_Y: number = 312
+const META_PILL_H: number = 38
+const DIVIDER_Y: number = 394
+const LIST_START_Y: number = 430
 
 // ── 样式模板定义 ──────────────────────────────────────────────────────────
 
@@ -35,7 +51,7 @@ interface StyleDef {
 
 const STYLES: StyleDef[] = [
   { key: 'note', label: '唯美便签', previewBg: '#FEFCF5', previewBgDark: '#2C2820', previewAccent: '#F5A623', previewAccentDark: '#FFB347' },
-  { key: 'card', label: '极简白卡', previewBg: '#FFFFFF', previewBgDark: '#1A1A1A', previewAccent: '#E8333A', previewAccentDark: '#FF5A5A' },
+  { key: 'card', label: '极简白卡', previewBg: '#FFFFFF', previewBgDark: '#1A1A1A', previewAccent: '#FF4757', previewAccentDark: '#FF5A5A' },
   { key: 'dark', label: '暗黑柔光', previewBg: '#F5F0E0', previewBgDark: '#1E1C18', previewAccent: '#8B4513', previewAccentDark: '#D4A574' }
 ]
 
@@ -59,15 +75,37 @@ export struct ExportShoppingListDialog {
   @State private toastVisible: boolean = false
   @State private saveSuccess: boolean = false
   @State private swiperKey: number = 0
-  @StorageProp('isSystemDarkMode') private sysDark: boolean = false
-  @StorageProp('currentThemeMode') private themeMode: string = '系统默认'
+  @StorageProp('isSystemDarkMode') @Watch('onThemeChange') private sysDark: boolean = false
+  @StorageProp('currentThemeMode') @Watch('onThemeChange') private themeMode: string = '系统默认'
+
+  // 深色模式弹窗 UI 颜色
+  @State private sheetBg: string = AppColors.CARD_BG
+  @State private titleColor: string = AppColors.GRAY_900
+  @State private cancelColor: string = AppColors.GRAY_400
+  @State private dotColor: string = AppColors.GRAY_300
 
   // 预计算预览数据（@Builder 不允许 const / 方法调用）
   @State private previewDark: boolean = false
   @State private previewShowItems: MissingItem[] = []
   @State private previewOverflow: number = 0
+  // 导出画布高度随清单内容自适应，避免长清单被截断
+  @State private canvasH: number = 1920
 
-  private drawCtx: CanvasRenderingContext2D = new CanvasRenderingContext2D()
+  private onThemeChange(): void {
+    this.applyTheme()
+  }
+
+  private applyTheme(): void {
+    this.sheetBg = ThemeManager.getCardBackgroundColor(this.themeMode)
+    this.titleColor = ThemeManager.getTextColor(this.themeMode)
+    this.cancelColor = ThemeManager.getColor(AppColors.GRAY_400, AppColors.DARK_GRAY_400, this.themeMode)
+    this.dotColor = ThemeManager.getColor(AppColors.GRAY_300, AppColors.DARK_GRAY_300, this.themeMode)
+  }
+
+  // PX 单位模式：绘制坐标、字体、getPixelMap 全部以物理像素为单位，
+  // 避免 font 的 px 与布局的 vp 混用导致文字过小、导出画布尺寸过大的问题。
+  private drawCtx: CanvasRenderingContext2D =
+    new CanvasRenderingContext2D(new RenderingContextSettings(true), LengthMetricsUnit.PX)
 
   private isDark(): boolean {
     if (this.themeMode === '深色模式') return true
@@ -77,12 +115,14 @@ export struct ExportShoppingListDialog {
 
   private onVisibleChange(): void {
     if (this.visible) {
+      this.applyTheme()
       this.selectedIdx = 0
       this.saveSuccess = false
       this.swiperKey++
       this.previewDark = this.isDark()
       this.previewShowItems = this.missingItems.slice(0, 4)
       this.previewOverflow = Math.max(0, this.missingItems.length - 4)
+      this.canvasH = this.calcCanvasHeight(this.groupByCategory(this.missingItems))
     }
   }
 
@@ -110,125 +150,301 @@ export struct ExportShoppingListDialog {
   // Canvas 共享绘制
   // ══════════════════════════════════════════════════════════════════════
 
-  /** 绘制分类区块 */
-  private drawCategoryBlock(
-    ctx: CanvasRenderingContext2D, cat: ShoppingCategory, items: MissingItem[],
-    startY: number, textC: string, subC: string, lineC: string, accent: string,
-    isDark: boolean, inCard: boolean
-  ): number {
-    if (items.length === 0) return startY
-
-    const colors = IngredientTypeMapper.getCategoryColors(cat)
-    const catTextC = pickColor(colors.text, colors.textDark, isDark)
-    const catBg = pickColor(colors.bg, colors.bgDark, isDark)
-    const x0 = inCard ? PAD_X + 24 : PAD_X
-    const w = inCard ? CANVAS_W - PAD_X * 2 - 48 : CANVAS_W - PAD_X * 2
-
-    // 分类标题背景
-    ctx.fillStyle = catBg
-    ctx.fillRect(x0, startY, w, CAT_HEADER_H)
-
-    // 左侧小色条
-    ctx.fillStyle = catTextC
-    ctx.beginPath()
-    this.roundRect(ctx, x0 - (inCard ? 0 : 0), startY + 18, 8, CAT_HEADER_H - 36, 4)
-    ctx.fill()
-
-    // 分类名称
-    ctx.font = '64px sans-serif'
-    ctx.fillStyle = catTextC
-    ctx.textAlign = 'start'
-    ctx.fillText(`${IngredientTypeMapper.getCategoryEmoji(cat)} ${IngredientTypeMapper.getCategoryLabel(cat)}`,
-      x0 + 28, startY + 64)
-
-    // 项数
-    ctx.font = '52px sans-serif'
-    ctx.fillStyle = pickColor('#9CA3AF', '#8D8D8D', isDark)
-    ctx.textAlign = 'end'
-    ctx.fillText(`${items.length}项`, CANVAS_W - PAD_X - (inCard ? 16 : 0), startY + 64)
-
-    // 物品
-    let y = startY + CAT_HEADER_H
-    for (let i = 0; i < items.length; i++) {
-      if (y + ITEM_H > FOOTER_START_Y) break
-      this.drawItemRow(ctx, items[i], y, textC, subC, catTextC, lineC, x0, w)
-      y += ITEM_H
+  /** 按内容计算画布高度：内容少时保持竖版，内容多时自动加长，避免截断 */
+  private calcCanvasHeight(grouped: Map<ShoppingCategory, MissingItem[]>): number {
+    let h = LIST_START_Y + 8
+    for (const cat of IngredientTypeMapper.CATEGORY_ORDER) {
+      const items = grouped.get(cat)
+      if (items && items.length > 0) {
+        h += CAT_HEADER_H + items.length * ITEM_H + CAT_BLOCK_PAD + CAT_GAP
+      }
     }
-
-    // 分类间分隔
-    return y + (inCard ? 24 : 12)
+    h += LIST_FOOT_RESERVE + FOOTER_H
+    return Math.max(MIN_CANVAS_H, Math.min(MAX_CANVAS_H, h))
   }
 
-  /** 绘制单个物品行 */
-  private drawItemRow(
-    ctx: CanvasRenderingContext2D, item: MissingItem,
-    rowY: number, textC: string, subC: string, checkC: string, lineC: string,
-    x0: number, rowW: number
-  ): void {
-    const cx = x0 + 44
-    const cy = rowY + ITEM_H / 2
-    const checkR = 28
+  /** 列表可用区域的下边界（给页脚与溢出提示留白） */
+  private listBottom(): number {
+    return this.canvasH - FOOTER_H - LIST_FOOT_RESERVE
+  }
 
-    // 勾选圆圈
-    ctx.strokeStyle = checkC
-    ctx.lineWidth = 4
-    ctx.beginPath()
-    ctx.arc(cx, cy, checkR, 0, Math.PI * 2)
-    ctx.stroke()
+  /** 绘制全部分类列表，返回未能展示的条目数 */
+  private drawList(
+    ctx: CanvasRenderingContext2D, grouped: Map<ShoppingCategory, MissingItem[]>,
+    textC: string, subC: string, lineC: string, isDark: boolean
+  ): number {
+    const limit = this.listBottom()
 
-    // Emoji
-    ctx.font = '90px sans-serif'
-    ctx.fillStyle = textC
-    ctx.textAlign = 'start'
-    ctx.fillText(item.emoji, cx + 56, cy + 28)
-
-    // 食材名
-    ctx.font = 'bold 76px sans-serif'
-    ctx.fillStyle = textC
-    ctx.fillText(item.name, cx + 158, cy + 26)
-
-    // 用量
-    if (item.amount.length > 0) {
-      ctx.font = '56px sans-serif'
+    if (this.missingItems.length === 0) {
+      ctx.font = '30px sans-serif'
       ctx.fillStyle = subC
-      ctx.textAlign = 'end'
-      ctx.fillText(item.amount, CANVAS_W - PAD_X, cy + 22)
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText('暂无需要采购的食材', CANVAS_W / 2, LIST_START_Y + 200)
+      return 0
     }
 
-    // 行分隔线
+    let y = LIST_START_Y
+    let skipped = 0
+
+    for (const cat of IngredientTypeMapper.CATEGORY_ORDER) {
+      const items = grouped.get(cat)
+      if (!items || items.length === 0) continue
+
+      let shown = items.length
+      if (y + CAT_HEADER_H + items.length * ITEM_H + CAT_BLOCK_PAD > limit) {
+        shown = Math.floor((limit - y - CAT_HEADER_H - CAT_BLOCK_PAD) / ITEM_H)
+        if (shown < 1) {
+          skipped += items.length
+          continue
+        }
+        shown = Math.min(shown, items.length)
+      }
+
+      const colors = IngredientTypeMapper.getCategoryColors(cat)
+      const catTextC = pickColor(colors.text, colors.textDark, isDark)
+      const catBg = pickColor(colors.bg, colors.bgDark, isDark)
+
+      this.drawCategoryHeader(ctx, cat, items.length, y, catTextC, catBg, lineC, isDark, shown * ITEM_H)
+
+      let rowY = y + CAT_HEADER_H
+      for (let i = 0; i < shown; i++) {
+        this.drawItemRow(ctx, items[i], rowY, textC, catTextC, catBg, lineC, isDark, i === shown - 1)
+        rowY += ITEM_H
+      }
+
+      skipped += items.length - shown
+      y = rowY + CAT_BLOCK_PAD + CAT_GAP
+      if (y >= limit) break
+    }
+    return skipped
+  }
+
+  /** 分类卡片：圆角容器 + 分类色标题条 + 项数胶囊 */
+  private drawCategoryHeader(
+    ctx: CanvasRenderingContext2D, cat: ShoppingCategory, count: number,
+    topY: number, catTextC: string, catBg: string, lineC: string,
+    isDark: boolean, bodyH: number
+  ): void {
+    const blockH = CAT_HEADER_H + bodyH + CAT_BLOCK_PAD
+
+    // 分类卡片容器
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.62)'
+    ctx.beginPath()
+    this.roundRect(ctx, PAD_X, topY, CONTENT_W, blockH, 22)
+    ctx.fill()
     ctx.strokeStyle = lineC
     ctx.lineWidth = 1.5
     ctx.beginPath()
-    ctx.moveTo(x0 + 20, rowY + ITEM_H - 2)
-    ctx.lineTo(x0 + rowW, rowY + ITEM_H - 2)
+    this.roundRect(ctx, PAD_X, topY, CONTENT_W, blockH, 22)
     ctx.stroke()
+
+    // 分类色标题条（卡片内嵌，四周留出呼吸空间）
+    const chipX = PAD_X + 12
+    const chipY = topY + 12
+    const chipW = CONTENT_W - 24
+    const chipH = 64
+    ctx.fillStyle = catBg
+    ctx.beginPath()
+    this.roundRect(ctx, chipX, chipY, chipW, chipH, 16)
+    ctx.fill()
+
+    const cy = chipY + chipH / 2
+
+    // 左侧强调条
+    ctx.fillStyle = catTextC
+    ctx.beginPath()
+    this.roundRect(ctx, chipX + 18, cy - 13, 3, 26, 1.5)
+    ctx.fill()
+
+    ctx.textBaseline = 'middle'
+    ctx.textAlign = 'start'
+
+    // emoji 图标（固定起点，保证分类视觉一致）
+    ctx.font = '32px sans-serif'
+    ctx.fillStyle = catTextC
+    ctx.fillText(IngredientTypeMapper.getCategoryEmoji(cat), chipX + 34, cy + 1)
+
+    // 分类名
+    ctx.font = 'bold 32px sans-serif'
+    ctx.fillText(IngredientTypeMapper.getCategoryLabel(cat), chipX + 78, cy + 1)
+
+    // 项数胶囊
+    const txt = `${count} 项`
+    ctx.font = '20px sans-serif'
+    const pw = ctx.measureText(txt).width + 20
+    const ph = 30
+    const px = chipX + chipW - pw - 14
+    const py = cy - ph / 2
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.75)'
+    ctx.beginPath()
+    this.roundRect(ctx, px, py, pw, ph, ph / 2)
+    ctx.fill()
+    ctx.fillStyle = catTextC
+    ctx.textAlign = 'center'
+    ctx.fillText(txt, px + pw / 2, cy + 1)
   }
 
-  /** 页脚：App 品牌名 + 日期 */
-  private drawFooter(ctx: CanvasRenderingContext2D, textC: string, lineC: string, accent: string, brandC: string): void {
-    const today = new Date()
-    const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  /** 单个食材行：分类色勾选圈 + emoji + 名称 + 用量胶囊 */
+  private drawItemRow(
+    ctx: CanvasRenderingContext2D, item: MissingItem, rowY: number,
+    textC: string, catTextC: string, catBg: string, lineC: string,
+    isDark: boolean, isLast: boolean
+  ): void {
+    const cy = rowY + ITEM_H / 2
+    const inset = 24
+    const ringX = PAD_X + inset + 14
+    const ringR = 14
+    const rightLimit = PAD_X + CONTENT_W - inset
 
-    // 分隔线
-    ctx.strokeStyle = lineC
-    ctx.lineWidth = 3
+    // 勾选圈：分类色描边 + 浅色底
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.9)'
     ctx.beginPath()
-    ctx.moveTo(PAD_X, FOOTER_START_Y)
-    ctx.lineTo(CANVAS_W - PAD_X, FOOTER_START_Y)
+    ctx.arc(ringX, cy, ringR, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = catTextC
+    ctx.lineWidth = 2.5
+    ctx.beginPath()
+    ctx.arc(ringX, cy, ringR, 0, Math.PI * 2)
     ctx.stroke()
 
-    // 品牌名 — 大字醒目
-    ctx.font = 'bold 68px sans-serif'
-    ctx.fillStyle = brandC
-    ctx.textAlign = 'center'
-    ctx.fillText('AUV 您吃了么', CANVAS_W / 2, FOOTER_START_Y + 80)
+    ctx.textBaseline = 'middle'
 
-    // 日期 + 数量
-    ctx.font = '50px sans-serif'
+    // emoji：固定中心点，不同字符宽度不会造成名称错位
+    const emojiCx = ringX + 44
+    ctx.font = '38px sans-serif'
     ctx.fillStyle = textC
-    ctx.globalAlpha = 0.5
-    ctx.fillText(`${dateStr}  ·  共 ${this.missingItems.length} 项`, CANVAS_W / 2, FOOTER_START_Y + 154)
+    ctx.textAlign = 'center'
+    ctx.fillText(item.emoji, emojiCx, cy + 2)
+
+    const nameX = emojiCx + 38
+
+    // 用量：先测量再画胶囊，右侧对齐更整齐
+    let pillW = 0
+    let pillText = ''
+    if (item.amount.length > 0) {
+      ctx.font = '24px sans-serif'
+      pillText = this.fitText(ctx, item.amount, CONTENT_W * 0.3)
+      pillW = ctx.measureText(pillText).width + 20
+    }
+
+    // 名称
+    const nameMaxW = rightLimit - nameX - (pillW > 0 ? pillW + 12 : 0)
+    ctx.font = 'bold 34px sans-serif'
+    ctx.fillStyle = textC
+    ctx.textAlign = 'start'
+    ctx.fillText(this.fitText(ctx, item.name, nameMaxW), nameX, cy + 1)
+
+    // 用量胶囊
+    if (pillW > 0) {
+      const ph = 30
+      const px = rightLimit - pillW
+      const py = cy - ph / 2
+      ctx.fillStyle = catBg
+      ctx.beginPath()
+      this.roundRect(ctx, px, py, pillW, ph, ph / 2)
+      ctx.fill()
+      ctx.fillStyle = catTextC
+      ctx.font = '24px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText(pillText, px + pillW / 2, cy + 1)
+    }
+
+    // 行分隔线（从名称处起，避开勾选圈与 emoji）
+    if (!isLast) {
+      ctx.strokeStyle = lineC
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(nameX, rowY + ITEM_H - 1)
+      ctx.lineTo(rightLimit, rowY + ITEM_H - 1)
+      ctx.stroke()
+    }
+  }
+
+  /** 文本超宽时截断并加省略号（调用前需设置 ctx.font） */
+  private fitText(ctx: CanvasRenderingContext2D, text: string, maxW: number): string {
+    if (maxW <= 0 || ctx.measureText(text).width <= maxW) return text
+    let t = text
+    while (t.length > 1 && ctx.measureText(`${t}…`).width > maxW) {
+      t = t.substring(0, t.length - 1)
+    }
+    return `${t}…`
+  }
+
+  /** 页头信息胶囊宽度 */
+  private metaPillWidth(ctx: CanvasRenderingContext2D, text: string): number {
+    ctx.font = '20px sans-serif'
+    return ctx.measureText(text).width + 30
+  }
+
+  /** 页头信息胶囊：日期 · 项数 */
+  private drawMetaPill(
+    ctx: CanvasRenderingContext2D, leftX: number, topY: number,
+    text: string, textC: string, isDark: boolean
+  ): void {
+    const pw = this.metaPillWidth(ctx, text)
+    const ph = META_PILL_H
+
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.045)'
+    ctx.beginPath()
+    this.roundRect(ctx, leftX, topY, pw, ph, ph / 2)
+    ctx.fill()
+
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.05)'
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    this.roundRect(ctx, leftX, topY, pw, ph, ph / 2)
+    ctx.stroke()
+
+    ctx.fillStyle = textC
+    ctx.font = '20px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(text, leftX + pw / 2, topY + ph / 2 + 1)
+  }
+
+  /** 超长清单未能完整展示时的提示 */
+  private drawSkippedHint(ctx: CanvasRenderingContext2D, skipped: number, color: string): void {
+    if (skipped <= 0) return
+    ctx.font = '22px sans-serif'
+    ctx.fillStyle = color
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.globalAlpha = 0.8
+    ctx.fillText(`另有 ${skipped} 项未展示，请在 App 内查看`, CANVAS_W / 2, this.canvasH - FOOTER_H - 40)
     ctx.globalAlpha = 1.0
+  }
+
+  /** 页脚：品牌 + 日期与总项数 */
+  private drawFooter(
+    ctx: CanvasRenderingContext2D, brandC: string, subC: string, lineC: string
+  ): void {
+    const top = this.canvasH - FOOTER_H
+
+    ctx.strokeStyle = lineC
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(PAD_X, top)
+    ctx.lineTo(CANVAS_W - PAD_X, top)
+    ctx.stroke()
+
+    ctx.textBaseline = 'middle'
+    ctx.textAlign = 'center'
+
+    ctx.font = 'bold 36px sans-serif'
+    ctx.fillStyle = brandC
+    ctx.fillText('AUV您吃了么', CANVAS_W / 2, top + 86)
+
+    ctx.font = '24px sans-serif'
+    ctx.fillStyle = subC
+    ctx.globalAlpha = 0.7
+    ctx.fillText(`${this.dateStr()}  ·  共 ${this.missingItems.length} 项`, CANVAS_W / 2, top + 150)
+    ctx.globalAlpha = 1.0
+  }
+
+  private dateStr(): string {
+    const today = new Date()
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   }
 
   /** 圆角矩形 */
@@ -259,61 +475,57 @@ export struct ExportShoppingListDialog {
     const lineC  = pickColor('#EDD9C8', '#3A2E28', dark)
 
     const ctx = this.drawCtx
-    const appNameY = 100
 
     ctx.reset()
     ctx.fillStyle = bg
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
+    ctx.fillRect(0, 0, CANVAS_W, this.canvasH)
 
     // 顶部粗色条
     ctx.fillStyle = accent
-    ctx.fillRect(0, 0, CANVAS_W, 14)
+    ctx.fillRect(0, 0, CANVAS_W, 12)
 
-    // 品牌名 — 右上角突出
-    ctx.font = 'bold 58px sans-serif'
+    // 品牌名 — 右上角
+    ctx.globalAlpha = 0.8
+    ctx.font = 'bold 28px sans-serif'
     ctx.fillStyle = accent
-    ctx.globalAlpha = 0.85
     ctx.textAlign = 'end'
-    ctx.fillText('AUV 您吃了么', CANVAS_W - PAD_X, appNameY)
+    ctx.textBaseline = 'middle'
+    ctx.fillText('AUV您吃了么', CANVAS_W - PAD_X, BRAND_Y)
     ctx.globalAlpha = 1.0
 
     // 主标题
-    ctx.font = 'bold 150px sans-serif'
+    ctx.font = 'bold 76px sans-serif'
     ctx.fillStyle = titleC
     ctx.textAlign = 'center'
-    ctx.fillText('今日采购清单', CANVAS_W / 2, HEADER_Y)
+    ctx.fillText('今日采购清单', CANVAS_W / 2, TITLE_Y)
 
     // 菜名副标题
     if (this.recipeName.length > 0) {
-      ctx.font = '64px sans-serif'
+      ctx.font = '30px sans-serif'
       ctx.fillStyle = subC
-      ctx.fillText(`为「${this.recipeName}」准备`, CANVAS_W / 2, HEADER_Y + 90)
+      ctx.fillText(this.fitText(ctx, `为「${this.recipeName}」准备`, CONTENT_W), CANVAS_W / 2, SUB_Y)
     }
+
+    // 日期 / 项数胶囊
+    const meta = `${this.dateStr()}  ·  共 ${this.missingItems.length} 项`
+    const pw = this.metaPillWidth(ctx, meta)
+    this.drawMetaPill(ctx, (CANVAS_W - pw) / 2, META_Y, meta, subC, dark)
 
     // 双横线分隔
-    const sepY = LIST_START_Y - 48
     ctx.strokeStyle = lineC
     ctx.lineWidth = 3
-    ctx.beginPath(); ctx.moveTo(PAD_X, sepY); ctx.lineTo(CANVAS_W - PAD_X, sepY); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(PAD_X, DIVIDER_Y); ctx.lineTo(CANVAS_W - PAD_X, DIVIDER_Y); ctx.stroke()
     ctx.lineWidth = 1
-    ctx.beginPath(); ctx.moveTo(PAD_X + 20, sepY + 12); ctx.lineTo(CANVAS_W - PAD_X - 20, sepY + 12); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(PAD_X + 24, DIVIDER_Y + 10); ctx.lineTo(CANVAS_W - PAD_X - 24, DIVIDER_Y + 10); ctx.stroke()
 
-    // 分类区块
-    const grouped = this.groupByCategory(this.missingItems)
-    let y = LIST_START_Y
-    for (const cat of IngredientTypeMapper.CATEGORY_ORDER) {
-      const items = grouped.get(cat)
-      if (items && items.length > 0) {
-        y = this.drawCategoryBlock(ctx, cat, items, y, textC, subC, lineC, accent, dark, false)
-        if (y >= FOOTER_START_Y) break
-      }
-    }
-
-    this.drawFooter(ctx, subC, lineC, accent, accent)
+    // 分类清单
+    const skipped = this.drawList(ctx, this.groupByCategory(this.missingItems), textC, subC, lineC, dark)
+    this.drawSkippedHint(ctx, skipped, subC)
+    this.drawFooter(ctx, accent, subC, lineC)
 
     // 底边粗色条
     ctx.fillStyle = accent
-    ctx.fillRect(0, CANVAS_H - 14, CANVAS_W, 14)
+    ctx.fillRect(0, this.canvasH - 12, CANVAS_W, 12)
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -325,66 +537,65 @@ export struct ExportShoppingListDialog {
     const bg     = pickColor('#FFFFFF', '#181818', dark)
     const titleC = pickColor('#111111', '#F2F2F2', dark)
     const textC  = pickColor('#444444', '#AAAAAA', dark)
-    const accent = pickColor('#E8333A', '#FF5A5A', dark)
+    const accent = pickColor('#FF4757', '#FF5A5A', dark)
+    const subC   = pickColor('#9CA3AF', '#7A7A7A', dark)
     const lineC  = pickColor('#EEEEEE', '#2A2A2A', dark)
     const ctx = this.drawCtx
+    const left = PAD_X
 
     ctx.reset()
     ctx.fillStyle = bg
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
+    ctx.fillRect(0, 0, CANVAS_W, this.canvasH)
 
     // 左侧粗竖条
     ctx.fillStyle = accent
-    ctx.fillRect(0, 0, 16, CANVAS_H)
+    ctx.fillRect(0, 0, 14, this.canvasH)
 
-    // 品牌名 — 左上角突出
-    ctx.font = 'bold 58px sans-serif'
+    // 品牌名
+    ctx.font = 'bold 28px sans-serif'
     ctx.fillStyle = accent
     ctx.textAlign = 'start'
-    ctx.fillText('AUV 您吃了么', PAD_X + 16, 100)
+    ctx.textBaseline = 'middle'
+    ctx.fillText('AUV您吃了么', left, BRAND_Y)
 
     // 主标题
-    ctx.font = 'bold 150px sans-serif'
+    ctx.font = 'bold 74px sans-serif'
     ctx.fillStyle = titleC
-    ctx.textAlign = 'start'
-    ctx.fillText('采购清单', PAD_X + 16, HEADER_Y)
+    ctx.fillText('采购清单', left, TITLE_Y)
 
-    // 标题下粗线
+    // 标题下色块
     ctx.fillStyle = accent
-    ctx.fillRect(PAD_X + 16, HEADER_Y + 20, 240, 10)
+    ctx.beginPath()
+    this.roundRect(ctx, left, TITLE_Y + 48, 172, 7, 3.5)
+    ctx.fill()
 
     // 菜名
     if (this.recipeName.length > 0) {
-      ctx.font = '58px sans-serif'
+      ctx.font = '30px sans-serif'
       ctx.fillStyle = textC
-      ctx.textAlign = 'end'
-      ctx.fillText(`为「${this.recipeName}」`, CANVAS_W - PAD_X, HEADER_Y - 20)
+      ctx.fillText(this.fitText(ctx, `为「${this.recipeName}」准备`, CONTENT_W), left, SUB_Y)
     }
+
+    // 日期 / 项数胶囊
+    const meta = `${this.dateStr()}  ·  共 ${this.missingItems.length} 项`
+    this.drawMetaPill(ctx, left, META_Y, meta, subC, dark)
 
     // 分隔线
     ctx.strokeStyle = lineC
     ctx.lineWidth = 2
     ctx.beginPath()
-    ctx.moveTo(PAD_X + 16, LIST_START_Y - 32)
-    ctx.lineTo(CANVAS_W - PAD_X, LIST_START_Y - 32)
+    ctx.moveTo(left, DIVIDER_Y)
+    ctx.lineTo(CANVAS_W - PAD_X, DIVIDER_Y)
     ctx.stroke()
 
-    // 分类区块
-    const grouped = this.groupByCategory(this.missingItems)
-    let y = LIST_START_Y
-    for (const cat of IngredientTypeMapper.CATEGORY_ORDER) {
-      const items = grouped.get(cat)
-      if (items && items.length > 0) {
-        y = this.drawCategoryBlock(ctx, cat, items, y, textC, textC, lineC, accent, dark, false)
-        if (y >= FOOTER_START_Y) break
-      }
-    }
-
-    this.drawFooter(ctx, textC, lineC, accent, accent)
+    // 分类清单
+    const skipped = this.drawList(ctx, this.groupByCategory(this.missingItems), textC, subC, lineC, dark)
+    this.drawSkippedHint(ctx, skipped, subC)
+    this.drawFooter(ctx, accent, subC, lineC)
 
     // 底边
     ctx.fillStyle = accent
-    ctx.fillRect(0, CANVAS_H - 14, CANVAS_W, 14)
+    ctx.fillRect(0, this.canvasH - 12, CANVAS_W, 12)
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -403,75 +614,71 @@ export struct ExportShoppingListDialog {
 
     ctx.reset()
     ctx.fillStyle = bg
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
+    ctx.fillRect(0, 0, CANVAS_W, this.canvasH)
 
     // 纸张纹理
     ctx.fillStyle = pickColor('rgba(100,60,20,0.05)', 'rgba(255,220,150,0.03)', dark)
-    for (let d = 0; d < 150; d++) {
+    for (let d = 0; d < 200; d++) {
       ctx.beginPath()
-      ctx.arc((d * 197 + 31) % CANVAS_W, (d * 113 + 57) % CANVAS_H, 2, 0, Math.PI * 2)
+      ctx.arc((d * 197 + 31) % CANVAS_W, (d * 113 + 57) % this.canvasH, 2, 0, Math.PI * 2)
       ctx.fill()
     }
 
     // 顶部双条纹
     ctx.fillStyle = accent
-    ctx.fillRect(0, 0, CANVAS_W, 14)
+    ctx.fillRect(0, 0, CANVAS_W, 12)
     ctx.fillStyle = pickColor('rgba(181,84,28,0.3)', 'rgba(212,121,58,0.3)', dark)
-    ctx.fillRect(0, 14, CANVAS_W, 8)
+    ctx.fillRect(0, 12, CANVAS_W, 7)
 
-    // 品牌名 — 居中突出
-    ctx.font = 'bold 58px sans-serif'
-    ctx.fillStyle = accent
+    // 品牌名 — 居中
     ctx.globalAlpha = 0.85
+    ctx.font = 'bold 28px sans-serif'
+    ctx.fillStyle = accent
     ctx.textAlign = 'center'
-    ctx.fillText('AUV 您吃了么', CANVAS_W / 2, 100)
+    ctx.textBaseline = 'middle'
+    ctx.fillText('AUV您吃了么', CANVAS_W / 2, BRAND_Y)
     ctx.globalAlpha = 1.0
 
     // 主标题
-    ctx.font = 'bold 140px sans-serif'
+    ctx.font = 'bold 72px sans-serif'
     ctx.fillStyle = titleC
-    ctx.textAlign = 'center'
-    ctx.fillText('✦ 采购清单 ✦', CANVAS_W / 2, HEADER_Y)
+    ctx.fillText('✦ 采购清单 ✦', CANVAS_W / 2, TITLE_Y)
 
     // 装饰线
     ctx.strokeStyle = accent
-    ctx.lineWidth = 5
+    ctx.lineWidth = 3
     ctx.beginPath()
-    ctx.moveTo(CANVAS_W / 2 - 360, HEADER_Y + 24)
-    ctx.lineTo(CANVAS_W / 2 + 360, HEADER_Y + 24)
+    ctx.moveTo(CANVAS_W / 2 - 220, TITLE_Y + 50)
+    ctx.lineTo(CANVAS_W / 2 + 220, TITLE_Y + 50)
     ctx.stroke()
 
     // 菜名
     if (this.recipeName.length > 0) {
-      ctx.font = '62px sans-serif'
+      ctx.font = '30px sans-serif'
       ctx.fillStyle = subC
-      ctx.fillText(`为「${this.recipeName}」准备`, CANVAS_W / 2, HEADER_Y + 104)
+      ctx.fillText(this.fitText(ctx, `为「${this.recipeName}」准备`, CONTENT_W), CANVAS_W / 2, SUB_Y)
     }
+
+    // 日期 / 项数胶囊
+    const meta = `${this.dateStr()}  ·  共 ${this.missingItems.length} 项`
+    const pw = this.metaPillWidth(ctx, meta)
+    this.drawMetaPill(ctx, (CANVAS_W - pw) / 2, META_Y, meta, subC, dark)
 
     // 双横线
-    const sepY = LIST_START_Y - 48
     ctx.strokeStyle = lineC
     ctx.lineWidth = 3
-    ctx.beginPath(); ctx.moveTo(PAD_X, sepY); ctx.lineTo(CANVAS_W - PAD_X, sepY); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(PAD_X, DIVIDER_Y); ctx.lineTo(CANVAS_W - PAD_X, DIVIDER_Y); ctx.stroke()
     ctx.lineWidth = 1
-    ctx.beginPath(); ctx.moveTo(PAD_X + 16, sepY + 12); ctx.lineTo(CANVAS_W - PAD_X - 16, sepY + 12); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(PAD_X + 20, DIVIDER_Y + 10); ctx.lineTo(CANVAS_W - PAD_X - 20, DIVIDER_Y + 10); ctx.stroke()
 
-    // 分类区块
-    const grouped = this.groupByCategory(this.missingItems)
-    let y = LIST_START_Y
-    for (const cat of IngredientTypeMapper.CATEGORY_ORDER) {
-      const items = grouped.get(cat)
-      if (items && items.length > 0) {
-        y = this.drawCategoryBlock(ctx, cat, items, y, textC, subC, lineC, accent, dark, false)
-        if (y >= FOOTER_START_Y) break
-      }
-    }
-
-    this.drawFooter(ctx, subC, lineC, accent, accent)
+    // 分类清单
+    const skipped = this.drawList(ctx, this.groupByCategory(this.missingItems), textC, subC, lineC, dark)
+    this.drawSkippedHint(ctx, skipped, subC)
+    this.drawFooter(ctx, accent, subC, lineC)
 
     // 底边色条
     ctx.fillStyle = accent
-    ctx.fillRect(0, CANVAS_H - 14, CANVAS_W, 14)
+    ctx.fillRect(0, this.canvasH - 12, CANVAS_W, 12)
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -487,7 +694,7 @@ export struct ExportShoppingListDialog {
 
       this.drawCurrentStyle()
 
-      const pm: image.PixelMap = this.drawCtx.getPixelMap(0, 0, CANVAS_W, CANVAS_H)
+      const pm: image.PixelMap = this.drawCtx.getPixelMap(0, 0, CANVAS_W, this.canvasH)
       if (pm === null || pm === undefined) {
         this.showToast('Canvas 读取失败'); this.saving = false; return
       }
@@ -565,8 +772,8 @@ export struct ExportShoppingListDialog {
 
       Column({ space: 10 }) {
         // 品牌名
-        Text('AUV 您吃了么')
-          .fontSize(14).fontWeight(FontWeight.Medium)
+        Text('AUV您吃了么')
+          .fontSize(16).fontWeight(FontWeight.Medium)
           .fontColor(this.previewDark ? style.previewAccentDark : style.previewAccent)
           .opacity(0.85)
           .alignSelf(style.key === 'card' ? ItemAlign.Start : ItemAlign.Center)
@@ -574,7 +781,7 @@ export struct ExportShoppingListDialog {
 
         // 标题
         Text(style.key === 'dark' ? '✦ 采购清单 ✦' : '采购清单')
-          .fontSize(28).fontWeight(FontWeight.Bold)
+          .fontSize(32).fontWeight(FontWeight.Bold)
           .fontColor(this.previewDark
             ? (style.key === 'note' ? '#FF9A3C' : style.key === 'card' ? '#F2F2F2' : '#E8C88A')
             : (style.key === 'note' ? '#D94F00' : style.key === 'card' ? '#111111' : '#7A3B10'))
@@ -584,7 +791,7 @@ export struct ExportShoppingListDialog {
         // 菜名
         if (this.recipeName.length > 0) {
           Text(`为「${this.recipeName}」准备`)
-            .fontSize(16)
+            .fontSize(18)
             .fontColor(this.previewDark ? '#999' : '#666')
             .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
             .alignSelf(style.key === 'card' ? ItemAlign.Start : ItemAlign.Center)
@@ -598,15 +805,15 @@ export struct ExportShoppingListDialog {
               Circle({ width: 14, height: 14 })
                 .fill(Color.Transparent)
                 .stroke(this.previewDark ? '#4D4D4D' : '#D1D5DB')
-              Text(item.emoji).fontSize(18)
+              Text(item.emoji).fontSize(20)
               Text(item.name)
-                .fontSize(16).fontWeight(FontWeight.Medium)
+                .fontSize(19).fontWeight(FontWeight.Medium)
                 .fontColor(this.previewDark ? '#AAA' : '#444')
                 .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
                 .layoutWeight(1)
               if (item.amount.length > 0) {
                 Text(item.amount)
-                  .fontSize(14)
+                  .fontSize(16)
                   .fontColor(this.previewDark ? '#4D4D4D' : '#9CA3AF')
               }
             }
@@ -616,7 +823,7 @@ export struct ExportShoppingListDialog {
 
           if (this.previewOverflow > 0) {
             Text(`+ ${this.previewOverflow} 项…`)
-              .fontSize(14).fontColor('#AAAAAA')
+              .fontSize(15).fontColor('#AAAAAA')
               .alignSelf(style.key === 'card' ? ItemAlign.Start : ItemAlign.Center)
               .padding({ left: style.key === 'card' ? 10 : 0 })
           }
@@ -647,10 +854,10 @@ export struct ExportShoppingListDialog {
           .backgroundColor('rgba(0,0,0,0.45)')
           .onClick(() => { if (this.onClose) this.onClose() })
 
-        // Canvas（移出屏幕但保持挂载）
+        // Canvas（移出屏幕但保持挂载；尺寸用 px，与 PX 单位模式的绘制坐标一致）
         Canvas(this.drawCtx)
-          .width(CANVAS_W)
-          .height(CANVAS_H)
+          .width(`${CANVAS_W}px`)
+          .height(`${this.canvasH}px`)
           .key(`canvas_${this.swiperKey}`)
           .position({ x: -CANVAS_W, y: 0 })
           .onReady(() => { this.drawCurrentStyle() })
@@ -666,7 +873,7 @@ export struct ExportShoppingListDialog {
 
           Text('选择模板样式')
             .fontSize(18).fontWeight(FontWeight.Bold)
-            .fontColor('#1F2937')
+            .fontColor(this.titleColor)
             .margin({ bottom: 14 })
 
           // ── Swiper 样式选择 ──
@@ -684,7 +891,7 @@ export struct ExportShoppingListDialog {
           .disableSwipe(false)
           .indicator(
             Indicator.dot()
-              .color('#CCCCCC')
+              .color(this.dotColor)
               .selectedColor(AppColors.BRAND_COLOR)
               .itemWidth(8).itemHeight(8)
               .selectedItemWidth(22).selectedItemHeight(8)
@@ -695,8 +902,8 @@ export struct ExportShoppingListDialog {
             this.getUIContext().animateTo({ duration: 200, curve: Curve.EaseInOut }, () => {})
           })
           .width('100%')
-          .height(320)
-          .margin({ left: 16, right: 16, bottom: 14 })
+          .height(340)
+          .margin({ left: 20, right: 20, bottom: 14 })
 
           // 当前样式标签
           Text(STYLES[this.selectedIdx]?.label ?? '')
@@ -719,13 +926,13 @@ export struct ExportShoppingListDialog {
 
           // 取消
           Text('取消')
-            .fontSize(16).fontColor('#9CA3AF')
+            .fontSize(16).fontColor(this.cancelColor)
             .width('100%').textAlign(TextAlign.Center)
             .padding({ top: 16, bottom: 16 })
             .onClick(() => { if (this.onClose) this.onClose() })
         }
         .width('100%')
-        .backgroundColor('#F8FAFF')
+        .backgroundColor(this.sheetBg)
         .backdropBlur(22)
         .borderRadius({ topLeft: 24, topRight: 24 })
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])

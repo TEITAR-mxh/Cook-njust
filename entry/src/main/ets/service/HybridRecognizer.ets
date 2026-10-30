@@ -26,9 +26,9 @@ const DEFAULT_NUTRIENT: NutrientData = {
   calories: 100, protein: 5, fat: 3, carbs: 15, servingWeight: 200
 }
 
-/** 置信度阈值 */
+/** 置信度阈值（低于阈值视为没认出来，避免把非菜品当成食物） */
 const HI_AI_CONFIDENCE_THRESHOLD: number = 0.55
-const MINDSPORE_CONFIDENCE_THRESHOLD: number = 0.20
+const MINDSPORE_CONFIDENCE_THRESHOLD: number = 0.35
 
 export class HybridRecognizer {
   private engines: InferenceEngine[] = []
@@ -110,14 +110,16 @@ export class HybridRecognizer {
 
           if (result.confidence >= threshold) {
             // 本地推理成功，映射营养数据
-            const nutrient: NutrientData = this.mapNutrient(result.foodName)
+            const mapping: NutrientMapping = this.mapNutrient(result.foodName)
             console.info(`[HybridRecognizer] ${engine.name} ACCEPTED → source="${engine.source}"`)
             return {
               identified: true,
               foodName: result.foodName,
-              nutrient,
+              nutrient: mapping.data,
               source: engine.source,
               rawLabels: [],
+              confidence: result.confidence,
+              isEstimated: mapping.estimated,
             }
           }
 
@@ -151,6 +153,8 @@ export class HybridRecognizer {
           },
           source: 'cloud',
           rawLabels: [],
+          confidence: cloudResult.confidence,
+          isEstimated: cloudResult.estimated,
         }
       }
     } catch (e) {
@@ -165,6 +169,7 @@ export class HybridRecognizer {
       nutrient: DEFAULT_NUTRIENT,
       source: 'none',
       rawLabels: [],
+      isEstimated: true,
     }
   }
 
@@ -176,26 +181,35 @@ export class HybridRecognizer {
   }
 
   /** 将食物名称映射为营养数据（优先精确匹配，兜底模糊匹配 + 默认值） */
-  private mapNutrient(foodName: string): NutrientData {
+  private mapNutrient(foodName: string): NutrientMapping {
     // 精确匹配
     const exact: NutrientData | null = CalorieCalculator.lookup(foodName)
     if (exact !== null) {
-      return exact
+      return { data: exact, estimated: false }
     }
 
     // 模糊匹配
     const fuzzy = CalorieCalculator.fuzzyMatch([foodName])
     if (fuzzy !== null && fuzzy.data !== undefined) {
-      return fuzzy.data
+      return { data: fuzzy.data, estimated: false }
     }
 
-    // 兜底默认值
+    // 兜底默认值（估算）
     return {
-      calories: 150,
-      protein: 6,
-      fat: 5,
-      carbs: 20,
-      servingWeight: 200,
+      data: {
+        calories: 150,
+        protein: 6,
+        fat: 5,
+        carbs: 20,
+        servingWeight: 200,
+      },
+      estimated: true,
     }
   }
+}
+
+/** 营养映射结果（含是否为估算占位） */
+interface NutrientMapping {
+  data: NutrientData
+  estimated: boolean
 }

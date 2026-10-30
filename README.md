@@ -129,10 +129,6 @@ Pages ── Components ── Service ── Data / Model
 
 复制 `entry/src/main/ets/config/CloudApiConfig.example.ets` 为 `CloudApiConfig.ets`，填入自己的百度 AI Key。不配置也能用，只是识别会走本地引擎。
 
-**安装注意**
-
-首次安装前建议卸载旧版本，避免应用名缓存；名称显示异常时执行 `Run → Clean Project` 后重装。
-
 ---
 
 <details>

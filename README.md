@@ -1,163 +1,204 @@
 <div align="center">
 
-# 🍳 AUV 您吃了么
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:ff4757,100:ffa751&height=170&section=header&text=AUV%20%E6%82%A8%E5%90%83%E4%BA%86%E4%B9%88&fontSize=46&fontColor=ffffff&fontAlignY=38&desc=HarmonyOS%20NEXT%20%E6%9C%AC%E5%9C%B0%E8%8F%9C%E8%B0%B1%E5%8A%A9%E6%89%8B&descAlignY=60&descSize=16&animation=fadeIn" />
 
-**HarmonyOS NEXT 本地菜谱助手** · 从冰箱已有食材出发，智能匹配可做菜谱，支持热量识别、营养评估、个性化推荐与专注烹饪模式。
-
-[![HarmonyOS NEXT](https://img.shields.io/badge/HarmonyOS%20NEXT-API%2022-007DFF?logo=harmonyos&logoColor=white)](https://developer.huawei.com/consumer/cn/harmonyos/)
-[![Language](https://img.shields.io/badge/Language-ArkTS-3178C6)](https://developer.huawei.com/consumer/cn/arkts/)
-[![License](https://img.shields.io/badge/License-MIT-2ea44f)](./LICENSE)
-[![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen)](./docs/CONTRIBUTING_IMAGES.md)
+[![HarmonyOS NEXT](https://img.shields.io/badge/platform-HarmonyOS%20NEXT-0a9cff?style=flat-square)](https://developer.huawei.com/consumer/cn/harmonyos/)
+[![ArkTS](https://img.shields.io/badge/language-ArkTS-3178C6?style=flat-square)](https://developer.huawei.com/consumer/cn/arkts/)
+[![License](https://img.shields.io/badge/license-MIT-2ea44f?style=flat-square)](./LICENSE)
 
 </div>
 
----
+> 打开冰箱，看看今天能做什么菜。
 
-## ✨ 简介
+AUV 您吃了么是一个跑在 HarmonyOS NEXT 上的本地菜谱应用。它的出发点是「冰箱里有什么」，而不是「想吃什么」——勾选现有食材，就能筛出今天做得成的菜；做完了，顺手记一笔热量，看一眼营养。
 
-「AUV 您吃了么」是一款面向日常下厨场景的鸿蒙原生应用。它把**冰箱里有什么**作为起点，反向匹配**能做什么菜**，并在识别、营养、推荐、采购与烹饪全程提供辅助：
-
-- 拍照或手动录入食材 → 识别菜品 → 自动计算热量与 Nutri-Score 营养评级
-- 从「今天吃什么」到「猜你喜欢」，基于内容的个性化推荐
-- 菜系经典、采购清单导出、专注烹饪模式等实用功能开箱即用
-
-全部数据本地处理，**无需联网即可使用**（云端识别为可选兜底）。
+数据全部存在本地，不联网也能正常用。云端识别只是可选兜底。
 
 ---
 
-## 🎯 功能
+## 目录
 
-| 模块 | 说明 |
-|---|---|
-| 🧊 **冰箱 Tab** | 37 种食材多选（肉蛋水产 / 蔬菜 / 碳水辅料三色）、厨具筛选、严格 / 模糊 / 生存三种搜索、24 组食材同义词、加权随机抽取 |
-| 📖 **菜谱 Tab** | 1008 道菜谱大图卡 / 列表双模式、菜名关键词 + 历史联想、标签筛选、8 类烹饪方式分组筛选 |
-| 🧭 **发现 Tab** | 菜系经典页（15 大菜系 · 经典菜排行）、猜你喜欢（Jaccard 相似度推荐）、随机推荐动画、饮食结构建议 |
-| 🍽️ **餐桌 Tab** | 今日饮食圆环 + 三大营养素进度条、收藏网格（最多 500）、浏览历史（最近 50）、12 周热力图、主题切换 |
-| 📋 **详情弹窗** | 食材用量 → 厨具 → 加入餐桌 → 步骤卡片 → 营养信息，人数调节（1–6 人）用量等比换算，Nutri-Score A–E 评级 |
-| 🛒 **采购清单** | 缺料对比 + 剪贴板导出 + Canvas 绘制 1080×1920 图片导出（三种风格） |
-| 🎬 **专注烹饪** | 全屏 Swiper 分步浏览、任意步骤跳入、屏幕常亮锁 |
-| 📷 **热量识别** | HiAI NPU（≥0.55）→ MindSpore Lite CPU（≥0.20）→ 百度云端三级降级，识别结果 Nutri-Score 即时评级，本地 RDB 持久化 |
-| 🔔 **每日推荐** | 系统级定时推送、四级优先级选菜、自动排除近 7 天、点击直达详情 |
+- [功能](#功能)
+- [技术栈](#技术栈)
+- [快速开始](#快速开始)
+- [项目结构](#项目结构)
+- [数据来源](#数据来源)
+- [已知问题与说明](#已知问题与说明)
+- [参与贡献](#参与贡献)
+- [许可证](#许可证)
 
 ---
 
-## 🛠️ 技术架构
+## 功能
+
+**冰箱**
+勾选食材（37 种，分肉蛋水产 / 蔬菜 / 碳水辅料三色），配合厨具筛选，用严格、模糊、生存三种模式找菜。支持 24 组食材同义词，番茄和西红柿都能搜到。
+
+**菜谱**
+收录 1008 道菜，大图卡和列表两种浏览方式。支持菜名搜索（带历史联想）、标签筛选和 8 类烹饪方式筛选。
+
+**发现**
+按菜系浏览经典菜：川、粤、湘、鲁、苏、浙、闽、东北、京、鄂、客家、西式、台式、东南亚、新疆共 15 个菜系，每个菜系精选经典菜排行，点开就能看做法。「猜你喜欢」基于标签、食材和烹饪方式做相似度推荐。
+
+**餐桌**
+今日饮食圆环（按热量完成度变色）、三大营养素进度、收藏与浏览历史、12 周饮食热力图，以及浅色 / 深色 / 跟随系统的主题切换。
+
+**详情与烹饪**
+食材用量按人数实时换算（1–6 人），Nutri-Score 给出 A–E 评级；缺料可以生成采购清单并导出为图片；专注烹饪模式按步骤全屏翻页，屏幕常亮。
+
+**拍照识别**
+HiAI NPU → MindSpore Lite → 百度云端三级降级。识别结果不可靠时不会硬算热量，而是提示「没认准」，可手动填写。
+
+**每日推荐**
+通过系统代理提醒在固定时间推送当天推荐菜谱，可在系统通知设置里随时关闭。
+
+---
+
+<details>
+<summary><strong>功能细节（点开查看）</strong></summary>
+
+<br />
+
+**营养计算**
+
+- 菜谱营养由食材营养库按单份经验份量聚合，`ingredient_nutrition.json` 覆盖全部食材名。
+- Nutri-Score 采用 Ofcom 简化模型：热量、饱和脂肪、糖、钠为负分项，蛋白质、膳食纤维、蔬菜占比为正分项。
+- 识别出的菜品同样会计算评级，在结果卡中以徽章展示。
+
+**识别降级**
+
+| 识别优先级&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | 引擎 | 触发条件 |
+| :--- | --- | --- |
+| 第一级&nbsp;&nbsp;&nbsp;&nbsp; | HiAI NPU | 初始化试运行通过，置信度 ≥ 0.55 |
+| 第二级&nbsp;&nbsp;&nbsp;&nbsp; | MindSpore Lite | 置信度 ≥ 0.20，纯 CPU 兜底 |
+| 第三级&nbsp;&nbsp;&nbsp;&nbsp; | 百度云端 | 前两级失败或置信度不足（可选） |
+
+模型文件缺失时自动跳过对应层级，识别来源会以不同颜色标注。
+
+**设计取舍**
+
+- 菜谱 ID 目前使用入库数组下标。调整 `recipe.json` 顺序前，需要迁移已存储的收藏与历史。
+- 页面间状态同步走 AppStorage + `@StorageProp` / `@Watch`，避免轮询。
+- 打开详情弹窗时延迟写入历史和推荐，优先保证弹窗渲染流畅。
+
+</details>
+
+---
+
+## 技术栈
+
+- **平台**：HarmonyOS NEXT，API 22（HarmonyOS 6.0.2）
+- **语言**：ArkTS，无 `any`
+- **构建**：Hvigor
+- **本地存储**：RDB（菜谱、饮食记录）+ Preferences（收藏、历史、设置）
+- **端侧推理**：HiAI Foundation、MindSpore Lite
+- **入口**：`StartupPage` → `IndexV2`
+
+应用结构大致是三层：
 
 ```
-Pages（13 页）
-        ↕
-Components（可复用组件）
-        ↕
-Service（业务模块）          Store（CookPreferences 单例）
-        ↕
-Data（数据层）               Model（类型定义）
+Pages ── Components ── Service ── Data / Model
+                                  └── Store（Preferences）
 ```
 
-**关键设计**
-
-- **跨页面状态同步**：AppStorage + `@StorageProp` / `@Watch`，零轮询
-- **营养评分**：Ofcom Nutri-Score 简化模型，负分（热量 / 饱和脂肪 / 糖 / 钠）− 正分（蛋白质 / 膳食纤维 / 蔬菜标签）
-- **混合识别**：`HybridRecognizer` 编排三级降级，模型缺失自动跳过，识别来源可视化
-- **食材营养聚合**：`IngredientNutritionService` 按食材经验份量聚合整份菜营养，389 条食材库（成分表精确值 + 类别估算）
-- **沉浸式适配**：`setWindowLayoutFullScreen(true)` + 状态栏安全区动态计算
-- **主题系统**：`@StorageProp` + `ThemeManager` 动态配色，浅色 / 深色 / 跟随系统
-
 ---
 
-## 📦 项目信息
+## 快速开始
 
-| 项 | 值 |
-|---|---|
-| 平台 | HarmonyOS NEXT API 22（HarmonyOS 6.0.2） |
-| 语言 | ArkTS（零 `any`，全类型推断） |
-| 包名 | `com.example.cook_njust_project` |
-| 版本 | 1.0.1 |
-| 构建工具 | Hvigor |
-| 入口 | `StartupPage` → `IndexV2` |
-| 菜谱规模 | 1008 道（去重后，覆盖 15 大菜系） |
+**环境**
 
----
-
-## 🚀 快速开始
-
-### 环境要求
-
-- DevEco Studio（支持项目模型版本 6.0.2 与目标 SDK）
+- DevEco Studio（支持项目模型版本 6.0.2）
 - HarmonyOS SDK API 22
+- 一台 HarmonyOS NEXT 设备或模拟器
 
-### 构建
+**运行**
 
-1. 用 DevEco Studio 打开仓库根目录，完成依赖同步
-2. 在项目设置中配置 SDK、`product` 与自己的签名
-3. 运行 `entry`
+1. 用 DevEco Studio 打开仓库根目录，等待依赖同步完成。
+2. 在项目设置里配置 SDK、product 和签名。
+3. 运行 `entry`。
 
-> 命令行构建需使用本地安装的 DevEco/Hvigor 工具链（仓库不含 `hvigor-wrapper.js`）。初始化与验证详见 [维护接手指南](docs/MAINTENANCE.md)。
+> 仓库不含 `hvigor-wrapper.js`，命令行构建请使用本机安装的 DevEco / Hvigor 工具链。
+> `build-profile.json5` 因包含签名配置未入库，新克隆需要自行配置。
 
-### 注意事项
+**云端识别（可选）**
 
-- 首次安装前请卸载旧版本，避免应用名称缓存
-- 名称显示异常时执行 `Run → Clean Project` 后重装
+复制 `entry/src/main/ets/config/CloudApiConfig.example.ets` 为 `CloudApiConfig.ets`，填入自己的百度 AI Key。不配置也能用，只是识别会走本地引擎。
+
+**安装注意**
+
+首次安装前建议卸载旧版本，避免应用名缓存；名称显示异常时执行 `Run → Clean Project` 后重装。
 
 ---
 
-## 📁 目录结构
+<details>
+<summary><strong>项目结构（点开查看）</strong></summary>
+
+<br />
 
 ```
 entry/src/main/
 ├── ets/
-│   ├── components/          # 可复用组件（卡片 / 详情弹窗 / 识别组件等）
-│   ├── constants/           # 品牌色 + 设计系统常量
-│   ├── config/              # 云端 API 配置（密钥用 .example 模板）
-│   ├── data/                # 数据层（菜谱仓库 / RDB / 食材同义词 / 目录）
-│   ├── model/               # 类型定义
-│   ├── pages/               # 13 个页面
-│   ├── service/             # 业务模块（识别 / 营养 / 推荐 / 采购 / 提醒等）
-│   ├── store/               # Preferences 持久化
-│   ├── util/                # 安全区 / 主题工具
-│   ├── utils/               # 热量计算 / 图片预处理等
-│   └── entryability/        # 入口 + 沉浸式 + 主题监听 + 通知跳转
+│   ├── components/      可复用组件（卡片、详情弹窗、识别预览等）
+│   ├── constants/       品牌色与设计系统
+│   ├── config/          云端 API 配置
+│   ├── data/            菜谱仓库、RDB、同义词、食材目录
+│   ├── model/           类型定义
+│   ├── pages/           页面
+│   ├── service/         识别、营养、推荐、采购、提醒等业务模块
+│   ├── store/           Preferences 持久化
+│   ├── util/            安全区、主题工具
+│   ├── utils/           热量计算、图片预处理
+│   └── entryability/    入口、沉浸式、主题监听、通知跳转
 └── resources/rawfile/
-    ├── recipe.json           # 1008 道菜谱
-    ├── cuisine_classics.json # 菜系经典页数据
-    ├── ingredient_nutrition.json # 食材营养库（389 条）
-    ├── recipe_images/        # 菜谱配图
-    └── ...                   # MindSpore 模型与标签
+    ├── recipe.json              菜谱数据
+    ├── cuisine_classics.json    菜系经典页数据
+    ├── ingredient_nutrition.json 食材营养库
+    ├── recipe_images/           菜谱配图
+    └── food_model.ms / food_labels.txt
 ```
 
----
-
-## 📊 数据与图片
-
-- **菜谱内容**整理自开源项目 [HowToCook](https://github.com/YunYouJun/cook)（MIT License）并补全扩展，版权归原作者所有。
-- **菜品配图**通过多渠道采集与用户贡献补充，详见 [菜品配图贡献说明](docs/CONTRIBUTING_IMAGES.md)。
+</details>
 
 ---
 
-## 🤝 贡献
+## 数据来源
 
-欢迎提交 Issue 与 PR。为菜谱补充配图请使用「菜品配图补充」Issue 模板，并确保图片为**本人拍摄**或**已获授权**。
+- **菜谱内容**整理自开源项目 [HowToCook](https://github.com/YunYouJun/cook)（MIT），并做了去重、补全和分类。
+- **菜谱配图**来自公开渠道采集与用户贡献。如果你发现自己的图片被使用且不希望这样，请提 Issue，我们会尽快移除。
+- **营养数据**参考《中国食物成分表（第 6 版）》整理，部分细分类食材为类别估算。
+
+---
+
+## 已知问题与说明
+
+- 营养数值为估算值，仅供日常参考，不构成膳食或医疗建议。
+- 识别准确率受拍摄光线、菜品摆盘影响，复杂菜品可能需要手动修正。
+- 部分菜谱暂无配图，会显示占位图。
+- 代理提醒属于应用市场审核受限能力，仅在审核通过的品类下可用。
+- 菜谱 ID 依赖数组顺序，后续如果重构需要做一次迁移。
 
 ---
 
-## ⚖️ 许可证
+## 参与贡献
 
-本项目代码以 [MIT License](./LICENSE) 开源。
-
-```
-MIT License
-Copyright (c) 2026 AUV您吃了么 项目组 · 南京理工大学
-```
-
-> 菜谱内容版权归属其原始作者，使用时请遵循 [HowToCook](https://github.com/YunYouJun/cook) 的开源协议。
+欢迎提 Issue 和 PR。补充菜品配图请使用「菜品配图补充」Issue 模板，并确保图片是本人拍摄或已获授权，配图要求见 [贡献说明](docs/CONTRIBUTING_IMAGES.md)。
 
 ---
+
+## 许可证
+
+代码以 [MIT License](./LICENSE) 发布，版权归 AUV 您吃了么项目组所有。
+
+菜谱内容版权归原作者，使用请遵循 [HowToCook](https://github.com/YunYouJun/cook) 的 MIT 协议。
 
 ---
 
 <div align="center">
 
-**AUV 您吃了么 · 南京理工大学**
+<a href="https://github.com/TEITAR-mxh/Cook-njust">
+  <img src="https://img.shields.io/badge/GitHub-TEITAR--mxh%2FCook--njust-181717?style=for-the-badge&logo=github" />
+</a>
 
-[https://github.com/TEITAR-mxh/Cook-njust.git](https://github.com/TEITAR-mxh/Cook-njust.git)
+<sub>AUV 您吃了么 · 南京理工大学</sub>
 
 </div>

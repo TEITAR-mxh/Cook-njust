@@ -163,7 +163,7 @@ entry/src/main/
 
 ## 数据来源
 
-- **菜谱内容**整理自开源项目 [HowToCook](https://github.com/YunYouJun/cook)（MIT），并做了去重、补全和分类。
+- **菜谱做法**来源于开源项目 [HowToCook](https://github.com/Anduin2017/HowToCook)（Unlicense，公有领域），并做了去重、补全和分类。
 - **菜谱配图**来自公开渠道采集与用户贡献。如果你发现自己的图片被使用且不希望这样，请提 Issue，我们会尽快移除。
 - **营养数据**参考《中国食物成分表（第 6 版）》整理，部分细分类食材为类别估算。
 
@@ -189,7 +189,7 @@ entry/src/main/
 
 代码以 [MIT License](./LICENSE) 发布，版权归 AUV 您吃了么项目组所有。
 
-菜谱内容版权归原作者，使用请遵循 [HowToCook](https://github.com/YunYouJun/cook) 的 MIT 协议。
+菜谱做法来源于 [HowToCook](https://github.com/Anduin2017/HowToCook)，该项目以 Unlicense（公有领域）发布。
 
 ---
 
